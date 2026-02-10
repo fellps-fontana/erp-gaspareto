@@ -1,1 +1,31 @@
-/* You can add global styles to this file, and also import other style files */
+/* src/styles.css */
+
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  /* MUDANÇA: min-height permite que a página cresça se o conteúdo for maior que a tela */
+  min-height: 100% !important; 
+  height: auto !important; 
+  background-color: #121212 !important;
+  
+  /* MUDANÇA: Permitir scroll vertical e esconder o horizontal que as vezes buga no mobile */
+  overflow-y: auto !important; 
+  overflow-x: hidden !important;
+  
+  /* Scroll suave para celulares (iOS/Android) */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Ajuste no app-root para não travar o conteúdo */
+app-root {
+  display: block;
+  width: 100%;
+  /* MUDANÇA: height auto permite que os produtos do PDV "empurrem" a altura */
+  height: auto !important;
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}

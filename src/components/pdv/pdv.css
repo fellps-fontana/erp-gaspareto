@@ -1,0 +1,258 @@
+/* ==========================================================
+   CONTAINER PRINCIPAL E SCROLL
+   ========================================================== */
+.pdv-container {
+  min-height: 100vh; 
+  width: 100%;
+  background-color: #121212; /* Ajustado para o tema dark real */
+  padding: 15px;
+  box-sizing: border-box;
+  display: block; 
+}
+
+.grid-section {
+  width: 100%;
+  overflow-y: visible; 
+  padding-bottom: 120px; 
+}
+
+/* ==========================================================
+   GRADE E CARDS DE PRODUTO
+   ========================================================== */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
+  gap: 12px;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+  }
+}
+
+.card-produto {
+  height: clamp(140px, 20vh, 180px);
+  border-radius: 20px; /* Bordas um pouco mais arredondadas para estilo moderno */
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  cursor: pointer;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.5);
+  transition: transform 0.1s, box-shadow 0.2s;
+  user-select: none;
+  touch-action: manipulation;
+  overflow: hidden;
+  
+  /* Configurações para Imagem de Fundo */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.card-produto:active { transform: scale(0.96); }
+
+/* Overlay escuro para garantir contraste do texto sobre a imagem */
+.card-overlay {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.8));
+  z-index: 1;
+}
+
+/* Conteúdo interno do card */
+.card-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 10px;
+  text-align: center;
+}
+
+.icon { 
+  font-size: clamp(1.5rem, 5vw, 2.5rem); 
+  margin-bottom: 5px; 
+  filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+}
+
+.card-produto h3 { 
+  margin: 0; 
+  font-size: 0.95rem; 
+  font-weight: 800; 
+  text-transform: uppercase; 
+  color: white;
+  text-shadow: 2px 2px 5px rgba(0,0,0,0.9);
+}
+
+.card-produto p { 
+  margin: 5px 0 0 0; 
+  font-size: 1.1rem; 
+  font-weight: 700; 
+  color: #f4c042; /* Preço sempre em destaque amarelado Vermeiolandia */
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+}
+
+/* Badge de Quantidade */
+.badge-qty {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #f4c042;
+  color: #000;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 900;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  z-index: 3;
+}
+
+/* ==========================================================
+   CARRINHO WIDGET
+   ========================================================== */
+.cart-widget {
+  position: fixed;
+  bottom: 25px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.cart-popup {
+  background: white;
+  color: #333 !important;
+  width: 92vw;
+  max-width: 400px;
+  max-height: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  margin-bottom: 15px;
+  box-shadow: 0 15px 50px rgba(0,0,0,0.6);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cart-popup.open {
+  max-height: 75vh;
+  opacity: 1;
+}
+
+.cart-header {
+  background: #f1f1f1;
+  padding: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 800;
+  border-bottom: 1px solid #ddd;
+}
+
+.cart-list { 
+  flex: 1; 
+  overflow-y: auto; 
+  padding: 5px 0; 
+  -webkit-overflow-scrolling: touch; 
+}
+
+.cart-item {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.item-info { flex: 1; margin-left: 12px; }
+.item-info strong { font-size: 0.95rem; color: #111; display: block; }
+.item-info small { color: #666; font-size: 0.85rem; }
+
+.item-total { font-weight: 800; color: #111; font-size: 0.95rem; }
+
+.btn-remove {
+  background: #ffeaeb;
+  color: #d32f2f;
+  border: none;
+  width: 36px; 
+  height: 36px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.cart-footer { padding: 20px; background: #fff; border-top: 2px solid #eee; }
+.total-row { display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: 900; margin-bottom: 15px; color: #000; }
+
+.btn-checkout {
+  width: 100%;
+  background: #27ae60;
+  color: white;
+  border: none;
+  padding: 16px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
+}
+
+.cart-fab {
+  background-color: #f4c042;
+  color: #000;
+  height: 65px;
+  padding: 0 25px;
+  border-radius: 35px;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.cart-fab:active { transform: scale(0.9); }
+
+.fab-price {
+  font-weight: 900;
+  border-left: 2px solid rgba(0,0,0,0.1);
+  padding-left: 12px;
+  font-size: 1.1rem;
+}
+
+/* ==========================================================
+   NOTIFICAÇÃO (TOAST)
+   ========================================================== */
+.toast-notification {
+  position: fixed;
+  top: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #27ae60;
+  color: white;
+  padding: 14px 28px;
+  border-radius: 40px;
+  z-index: 10001;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  font-weight: 800;
+  white-space: nowrap;
+  animation: slideDown 0.4s ease-out;
+}
+
+@keyframes slideDown {
+  from { transform: translate(-50%, -50px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}

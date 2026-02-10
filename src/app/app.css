@@ -1,0 +1,40 @@
+/* Zera margens e paddings padrão */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  /* MUDANÇA CHAVE: Permitir que a altura cresça e o scroll apareça */
+  min-height: 100vh; 
+  height: auto !important; 
+  background-color: #121212;
+  /* overflow: hidden;  <-- REMOVA OU COMENTE ESTA LINHA */
+  overflow-y: auto !important; 
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* Scroll suave para celular */
+}
+
+/* Ajuste no seletor :host do Angular */
+:host {
+  display: block;
+  width: 100%;
+  height: auto !important;
+  min-height: 100vh;
+}
+
+/* O estoque-layout continua ocupando a tela toda, mas sem travar o scroll do body */
+.estoque-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100vw;
+  background-color: #121212;
+  color: white;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.welcome-header {
+  display: none !important;
+}
+
+* {
+  box-sizing: border-box;
+}

@@ -1,0 +1,16 @@
+{
+  "hosting": {
+    "public": "C:\\Estudos\\erp-gaspareto\\dist\\erp-gaspareto\\browser",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

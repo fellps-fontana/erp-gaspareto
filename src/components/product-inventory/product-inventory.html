@@ -1,0 +1,183 @@
+<div class="estoque-layout">
+  
+  <aside class="sidebar">
+    <div class="logo-area">
+      <h2>VERMEIOLANDIA</h2>
+      <small>Gestão</small>
+    </div>
+
+    <nav class="menu-botoes">
+      <button [class.active]="activeTab === 'relatorio'" (click)="activeTab = 'relatorio'">
+        📊 Relatório
+      </button>
+      <button [class.active]="activeTab === 'estoque'" (click)="activeTab = 'estoque'">
+        📦 Gerenciar Estoque
+      </button>
+    </nav>
+
+    <button class="btn-voltar" [routerLink]="['/']">⬅ Voltar ao PDV</button>
+  </aside>
+
+  <main class="conteudo">
+
+    <section *ngIf="activeTab === 'relatorio'" class="painel-relatorio">
+      
+      <div class="header-section">
+        <h1>Dashboard Financeiro</h1>
+        <p>Acompanhe o desempenho do seu negócio.</p>
+      </div>
+      
+      <div class="cards-kpi">
+        <div class="card kpi-venda">
+          <span>Faturamento Total</span>
+          <strong>R$ {{ relatorio.faturamento | number:'1.2-2' }}</strong>
+          <small>{{ relatorio.qtdVendas }} vendas no período</small>
+        </div>
+
+        <div class="card kpi-custo">
+          <span>Custo das Vendas (CMV)</span>
+          <strong>R$ {{ relatorio.custoTotal | number:'1.2-2' }}</strong>
+        </div>
+
+        <div class="card kpi-lucro">
+          <span>Lucro Líquido</span>
+          <strong>R$ {{ relatorio.lucro | number:'1.2-2' }}</strong>
+          <small *ngIf="relatorio.faturamento > 0">
+            Margem Real: {{ relatorio.margem | number:'1.0-0' }}%
+          </small>
+        </div>
+      </div>
+
+      <div class="filtros-container">
+        <h3>🔍 Filtrar Resultados</h3>
+        
+        <div class="filtros-bar">
+          <div class="campo-filtro">
+            <label>De:</label>
+            <input type="date" [(ngModel)]="filtroDataInicio">
+          </div>
+
+          <div class="campo-filtro">
+            <label>Até:</label>
+            <input type="date" [(ngModel)]="filtroDataFim">
+          </div>
+
+          <div class="campo-filtro grow">
+            <label>Produto Específico:</label>
+            <select [(ngModel)]="filtroProdutoId">
+              <option value="">Todos os Produtos</option>
+              <option *ngFor="let p of products" [value]="p.id">
+                {{ p.title }}
+              </option>
+            </select>
+          </div>
+
+          <div class="acoes-filtro">
+            <button class="btn-filtrar" (click)="atualizarRelatorio()">FILTRAR</button>
+            <button class="btn-limpar" (click)="limparFiltros()">Limpar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section *ngIf="activeTab === 'estoque'" class="painel-estoque">
+      <div class="header-estoque">
+        <h1>Gestão de Produtos</h1>
+        <button class="btn-novo" (click)="abrirNovo()">+ Novo Produto</button>
+      </div>
+
+      <div class="form-box modal-inline" *ngIf="exibirFormularioNovo || produtoSelecionadoCompra">
+        <button class="btn-cancelar" (click)="fecharFormulario(); cancelarSelecaoCompra()">⬅ Voltar para a lista</button>
+        
+        <div *ngIf="exibirFormularioNovo">
+          <h2>{{ produtoEmEdicao ? 'Editar Produto' : 'Novo Produto' }}</h2>
+          
+          <div class="row">
+            <div class="form-group" style="flex: 2;">
+              <label>Nome do Produto</label>
+              <input type="text" [(ngModel)]="novoProduto.title" placeholder="Ex: Cerveja Lata">
+            </div>
+            <div class="form-group">
+              <label>Cor do Card</label>
+              <input type="color" [(ngModel)]="novoProduto.color" style="height: 46px; padding: 5px; cursor: pointer;">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Foto do Produto (Upload Direto)</label>
+            <div class="upload-container">
+              <input type="file" (change)="onFileSelected($event)" accept="image/*" id="fileInput" hidden>
+              <label for="fileInput" class="btn-upload">
+                {{ novoProduto.urlImage ? '📸 Imagem Selecionada' : '📁 Escolher Foto' }}
+              </label>
+              
+              <div class="preview-upload" *ngIf="novoProduto.urlImage">
+                <img [src]="novoProduto.urlImage" alt="Preview">
+                <button (click)="novoProduto.urlImage = ''">✕</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="form-group">
+              <label>Preço Venda (R$)</label>
+              <input type="number" [(ngModel)]="novoProduto.sellPrice">
+            </div>
+            <div class="form-group">
+              <label>Custo (R$)</label>
+              <input type="number" [(ngModel)]="novoProduto.buyPrice">
+            </div>
+            <div class="form-group">
+              <label>Estoque Atual</label>
+              <input type="number" [(ngModel)]="novoProduto.stock">
+            </div>
+          </div>
+          <button class="btn-salvar" (click)="salvarProduto()">✅ SALVAR</button>
+        </div>
+
+        <div *ngIf="produtoSelecionadoCompra">
+          <h2>Entrada: {{ produtoSelecionadoCompra.title }}</h2>
+          <div class="row">
+            <div class="form-group">
+              <label>Quantidade que Chegou</label>
+              <input type="number" [(ngModel)]="dadosCompra.quantidade">
+            </div>
+            <div class="form-group">
+              <label>Novo Custo Unitário (R$)</label>
+              <input type="number" [(ngModel)]="dadosCompra.novoPrecoCusto">
+            </div>
+          </div>
+          <button class="btn-confirmar-compra" (click)="confirmarCompra()">💰 REGISTRAR ENTRADA</button>
+        </div>
+      </div>
+
+      <div class="produtos-lista" *ngIf="!exibirFormularioNovo && !produtoSelecionadoCompra">
+        <div class="produto-card" *ngFor="let p of products" [style.border-left-color]="p.color">
+          
+          <div class="prod-thumb" *ngIf="p.urlImage">
+            <img [src]="p.urlImage" alt="foto">
+          </div>
+
+          <div class="prod-info">
+            <span class="prod-title">{{ p.title }}</span>
+            <span class="prod-details">
+              Estoque: <strong>{{ p.stock }}</strong> | 
+              Venda: R$ {{ p.sellPrice | number:'1.2-2' }}
+            </span>
+          </div>
+
+          <div class="prod-acoes">
+            <button class="btn-acao compra" (click)="selecionarParaCompra(p)" title="Entrada de Estoque">📦</button>
+            <button class="btn-acao edit" (click)="abrirEdicao(p)" title="Editar">✏️</button>
+            <button class="btn-acao delete" (click)="excluirProduto(p.id!)" title="Excluir">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="notification-toast" *ngIf="notification" [class.show]="notification">
+        {{ notification }}
+      </div>
+    </section>
+
+  </main>
+</div>

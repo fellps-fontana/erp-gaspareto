@@ -1,0 +1,180 @@
+.container-selecao {
+  height: 100vh;
+  background-color: #2c3136; /* Fundo cinza escuro da imagem */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.header-simples {
+  background-color: #1a1a1a;
+  color: white;
+  width: 100%;
+  max-width: 800px;
+  text-align: center;
+  padding: 10px 0;
+  font-family: sans-serif;
+  letter-spacing: 2px;
+  margin-bottom: 40px;
+  font-size: 1.2rem;
+}
+
+.grid-botoes {
+  display: flex;
+  gap: 30px;
+  width: 100%;
+  max-width: 900px;
+  justify-content: center;
+}
+
+.btn-card {
+  flex: 1;
+  height: 320px;
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+/* Efeito de clique para Tablet */
+.btn-card:active {
+  transform: scale(0.95);
+}
+
+.amarelo {
+  background-color: #f4c042; /* Amarelo da imagem */
+}
+
+.verde {
+  background-color: #58a399; /* Verde água da imagem */
+}
+
+.icone {
+  width: 100px;
+  color: white;
+  margin-bottom: 20px;
+}
+
+.label {
+  color: #2c3136; /* Texto escuro para contrastar */
+  font-family: 'Arial Black', sans-serif;
+  font-size: 1.5rem;
+  text-align: center;
+  padding: 0 10px;
+}
+.dashboard-container {
+  height: 100vh;
+  background-color: #2c3136; /* Mantendo o tom que você pediu */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  color: white;
+}
+
+.main-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.main-header .subtitle {
+  font-size: 0.8rem;
+  letter-spacing: 5px;
+  color: #888;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.main-header h1 {
+  font-size: 2.5rem;
+  font-weight: 200; /* Fonte bem fina para ser minimalista */
+  letter-spacing: 2px;
+  margin: 0;
+}
+
+.selection-grid {
+  display: flex;
+  gap: 20px;
+  width: 90%;
+  max-width: 800px;
+}
+
+.minimal-card {
+  flex: 1;
+  height: 200px;
+  background-color: rgba(255, 255, 255, 0.05); /* Fundo quase transparente */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px; /* Bordas menos arredondadas = mais sério/minimalista */
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.card-number {
+  font-size: 0.9rem;
+  font-weight: bold;
+  opacity: 0.5;
+}
+
+.card-content h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 400;
+}
+
+.card-content p {
+  margin: 5px 0 0 0;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+/* Cores sutis apenas no hover ou na borda lateral */
+.pdv:hover {
+  background-color: rgba(244, 192, 66, 0.1);
+  border-color: #f4c042;
+  transform: translateY(-5px);
+}
+
+.estoque:hover {
+  background-color: rgba(88, 163, 153, 0.1);
+  border-color: #58a399;
+  transform: translateY(-5px);
+}
+
+/* Feedback de clique para o tablet */
+.minimal-card:active {
+  transform: scale(0.98);
+}
+
+/* Responsividade */
+@media (max-width: 600px) {
+  .selection-grid {
+    flex-direction: column;
+  }
+  .minimal-card {
+    height: 150px;
+  }
+}
+/* Responsividade para Tablet em pé (Retrato) */
+@media (max-width: 768px) {
+  .grid-botoes {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .btn-card {
+    width: 100%;
+    max-width: 400px;
+    height: 250px;
+  }
+}

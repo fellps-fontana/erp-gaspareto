@@ -1,0 +1,80 @@
+<div *ngIf="notification" class="toast-notification">
+  {{ notification }}
+</div>
+
+<div class="pdv-container">
+  
+  <main class="grid-section">
+    <div class="product-grid">
+      <div *ngFor="let p of products$ | async; let i = index" 
+           class="card-produto"
+           [style.background-color]="p.color || '#37474F'"
+           [style.background-image]="p.urlImage ? 'url(' + p.urlImage + ')' : 'none'"
+           (click)="addToCart(p)">
+        
+        <div *ngIf="getQuantity(p) > 0" class="badge-qty">
+          {{ getQuantity(p) }}
+        </div>
+
+        <div class="card-overlay"></div>
+
+        <div class="card-content">
+          <div class="icon" *ngIf="!p.urlImage">
+            {{ getProductIcon(p.title) }}
+          </div>
+          
+          <h3>{{ p.title }}</h3>
+          <p>R$ {{ p.sellPrice | number:'1.2-2' }}</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="cart-widget">
+    
+    <div class="cart-popup" [class.open]="isCartOpen">
+      <div class="cart-header">
+        <span>Seu Pedido ({{ cart.length }})</span>
+        <button class="btn-close" (click)="toggleCart()">✕</button>
+      </div>
+
+      <div class="cart-list">
+        <div *ngIf="cart.length === 0" class="empty-msg">
+          Seu carrinho está vazio 🍕
+        </div>
+        
+        <div *ngFor="let item of cart; let i = index" class="cart-item">
+          <button class="btn-remove" (click)="decreaseItemById(item.idProduct, i)">-</button>
+          
+          <div class="item-info">
+            <strong>{{ item.name }}</strong>
+            <small>{{ item.quantity }} un. x R$ {{ item.priceAtSale | number:'1.2-2' }}</small>
+          </div>
+
+          <div class="item-total">
+            R$ {{ (item.priceAtSale * item.quantity) | number:'1.2-2' }}
+          </div>
+        </div>
+      </div>
+
+      <div class="cart-footer">
+        <div class="total-row">
+          <span>TOTAL</span>
+          <span>R$ {{ total | number:'1.2-2' }}</span>
+        </div>
+        <button class="btn-checkout" (click)="fecharVenda()" [disabled]="cart.length === 0">
+          CONFIRMAR PEDIDO
+        </button>
+      </div>
+    </div>
+
+    <button class="cart-fab" (click)="toggleCart()">
+      <span style="font-size: 1.5rem;">🛒</span>
+      
+      <span *ngIf="total > 0" class="fab-price">
+        R$ {{ total | number:'1.0-0' }}
+      </span>
+    </button>
+
+  </div>
+</div>

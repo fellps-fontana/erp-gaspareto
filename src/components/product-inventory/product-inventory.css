@@ -1,0 +1,336 @@
+/* ==========================================================
+   LAYOUT PRINCIPAL E SIDEBAR
+   ========================================================== */
+.estoque-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #121212;
+  color: white;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar {
+  width: 260px;
+  background-color: #0a0a0a;
+  display: flex;
+  flex-direction: column;
+  padding: 25px 20px;
+  border-right: 1px solid #222;
+  flex-shrink: 0;
+}
+
+.logo-area h2 { color: #f4c042; margin: 0; font-size: 1.4rem; letter-spacing: 1px; }
+.logo-area small { color: #666; text-transform: uppercase; font-size: 0.7rem; font-weight: bold; }
+
+.menu-botoes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 40px;
+  flex: 1;
+}
+
+.menu-botoes button {
+  background: transparent;
+  color: #888;
+  border: none;
+  padding: 15px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: 0.2s;
+  font-size: 1rem;
+}
+
+.menu-botoes button:hover { background: #1a1a1a; color: white; }
+.menu-botoes button.active {
+  background: #f4c042;
+  color: #000;
+  font-weight: bold;
+}
+
+.btn-voltar {
+  background: #222;
+  color: #ccc;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: auto;
+}
+
+/* ==========================================================
+   CONTEÚDO GERAL
+   ========================================================== */
+.conteudo {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+  background-color: #121212;
+}
+
+h1 { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 5px; }
+
+/* ==========================================================
+   ABA 1: RELATÓRIO FINANCEIRO (ESTILO ORIGINAL)
+   ========================================================== */
+.header-section p { color: #888; margin-top: 0; margin-bottom: 30px; }
+
+.cards-kpi { display: flex; gap: 20px; margin-bottom: 30px; }
+
+.card {
+  flex: 1;
+  padding: 25px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.kpi-venda { background: linear-gradient(135deg, #1b5e20, #2e7d32); }
+.kpi-custo { background: linear-gradient(135deg, #b71c1c, #c62828); }
+.kpi-lucro { background: linear-gradient(135deg, #0d47a1, #1565c0); }
+
+.card span { font-size: 0.9rem; opacity: 0.9; margin-bottom: 5px; }
+.card strong { font-size: 2.2rem; font-weight: 800; }
+.card small { 
+  font-size: 0.85rem; 
+  background: rgba(0,0,0,0.2); 
+  padding: 4px 8px; 
+  border-radius: 4px; 
+  align-self: flex-start; 
+  margin-top: 10px; 
+}
+
+.filtros-container {
+  background-color: #1a1a1a;
+  padding: 25px;
+  border-radius: 12px;
+  border: 1px solid #333;
+  margin-bottom: 30px;
+}
+
+.filtros-container h3 { margin: 0 0 15px 0; color: #f4c042; font-size: 1.1rem; }
+
+.filtros-bar {
+  display: flex;
+  gap: 15px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.campo-filtro { display: flex; flex-direction: column; }
+.campo-filtro label { font-size: 0.9rem; color: #888; margin-bottom: 5px; }
+.campo-filtro.grow { flex: 1; min-width: 250px; }
+
+.acoes-filtro { display: flex; gap: 10px; }
+
+.btn-filtrar {
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  height: 46px; 
+  transition: 0.2s;
+}
+
+.btn-limpar {
+  background: transparent;
+  border: 1px solid #444;
+  color: #888;
+  padding: 12px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  height: 46px;
+}
+
+/* ==========================================================
+   ABA 2: GESTÃO DE ESTOQUE (COM THUMB E COR DINÂMICA)
+   ========================================================== */
+.header-estoque {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.btn-novo {
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* Lista e Cards */
+.produtos-lista { display: flex; flex-direction: column; gap: 12px; }
+
+.produto-card {
+  background: #1a1a1a;
+  border: 1px solid #222;
+  /* A cor do border-left é definida pelo [style.border-left-color] no HTML */
+  border-left: 6px solid #f4c042; 
+  padding: 15px 25px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  transition: 0.2s;
+}
+
+.produto-card:hover { background: #222; }
+
+/* Miniatura da Imagem */
+.prod-thumb {
+  width: 55px;
+  height: 55px;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-right: 20px;
+  background: #252525;
+  border: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.prod-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.prod-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.prod-title { font-size: 1.1rem; font-weight: 600; color: #fff; }
+.prod-details { font-size: 0.9rem; color: #888; }
+.prod-details strong { color: #f4c042; }
+
+/* Ações */
+.prod-acoes { display: flex; gap: 10px; margin-left: 20px; }
+.btn-acao {
+  width: 40px; height: 40px; border-radius: 8px; border: 1px solid #333;
+  background: #252525; color: white; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: 0.2s;
+}
+.btn-acao.compra:hover { background: #27ae60; border-color: #2ecc71; }
+.btn-acao.edit:hover { background: #2980b9; border-color: #3498db; }
+.btn-acao.delete:hover { background: #c0392b; border-color: #e74c3c; }
+
+/* ==========================================================
+   FORMULÁRIOS E INPUTS
+   ========================================================== */
+.modal-inline {
+  background: #1a1a1a;
+  padding: 35px;
+  border-radius: 15px;
+  border: 1px solid #333;
+  max-width: 850px;
+  margin: 0 auto 30px auto;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.form-group { margin-bottom: 20px; display: flex; flex-direction: column; }
+.form-group label { color: #f4c042; margin-bottom: 8px; font-size: 0.9rem; font-weight: 500; }
+
+.row { display: flex; gap: 20px; width: 100%; }
+.row .form-group { flex: 1; }
+
+input, select {
+  padding: 12px;
+  background-color: #252525;
+  border: 1px solid #333;
+  color: white;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+}
+input:focus { border-color: #f4c042; }
+
+/* Estilo para o seletor de cor */
+input[type="color"] {
+  padding: 2px;
+  cursor: pointer;
+}
+
+.btn-salvar { background: #27ae60; color: white; width: 100%; padding: 16px; border-radius: 8px; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; font-size: 1.1rem; }
+.btn-confirmar-compra { background: #f4c042; color: #000; width: 100%; padding: 16px; border-radius: 8px; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; font-size: 1.1rem; }
+.btn-cancelar { background: none; border: none; color: #666; cursor: pointer; font-weight: 600; margin-bottom: 25px; }
+.btn-cancelar:hover { color: #fff; }
+
+/* ==========================================================
+   NOTIFICAÇÃO TOAST
+   ========================================================== */
+.notification-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #1e1e1e;
+  color: #f4c042;
+  padding: 15px 30px;
+  border-radius: 10px;
+  border: 1px solid #f4c042;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+  z-index: 10000;
+  font-weight: bold;
+  animation: fadeInDown 0.4s ease forwards;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translate(-50%, -20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.upload-container {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.btn-upload {
+  background: #333;
+  color: #f4c042;
+  border: 1px dashed #f4c042;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+.btn-upload:hover { background: #444; }
+
+.preview-upload {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #27ae60;
+}
+
+.preview-upload img { width: 100%; height: 100%; object-fit: cover; }
+
+.preview-upload button {
+  position: absolute;
+  top: 0; right: 0;
+  background: rgba(255,0,0,0.8);
+  color: white;
+  border: none;
+  font-size: 10px;
+  cursor: pointer;
+}
