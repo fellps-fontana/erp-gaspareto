@@ -90,7 +90,7 @@ export class PdvComponent implements OnInit {
     } else {
       this.cart.push({
         idProduct: p.id,
-        name: p.title || 'Produto',
+        productName: p.title || 'Produto',
         quantity: 1,
         priceAtSale: p.sellPrice || 0,
         priceAtCost: p.buyPrice || 0
@@ -116,36 +116,35 @@ export class PdvComponent implements OnInit {
     this.total = this.cart.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
   }
 
-  async fecharVenda() {
-    if (this.cart.length === 0) return;
+async fecharVenda() {
+  if (this.cart.length === 0) return;
+  
+  const itensLimpos = this.cart.map(i => ({
+      idProduct: i.idProduct,
+      productName: i.name, // Ajustei aqui pra 'productName' pra bater com o service que você mandou antes
+      quantity: Number(i.quantity),
+      priceAtSale: Number(i.priceAtSale),
+      priceAtCost: Number(i.priceAtCost || 0)
+  }));
+
+  try {
+    const sale = {
+      items: itensLimpos,
+      total: Number(this.total),
+      sale_type: 'pdv', 
+      date: new Date()
+    };
     
-    const itensLimpos = this.cart.map(i => ({
-        idProduct: i.idProduct,
-        name: i.name,
-        quantity: Number(i.quantity),
-        priceAtSale: Number(i.priceAtSale),
-        priceAtCost: Number(i.priceAtCost || 0)
-    }));
+    await this.saleService.processSale(sale);
+    
+    this.showNotification('Venda Confirmada! ✅'); 
 
-    try {
-      const sale = {
-        items: itensLimpos,
-        total: Number(this.total),
-        date: new Date()
-      };
-      
-      // Chama o serviço para salvar venda e dar baixa no estoque
-      await this.saleService.processSale(sale as any);
-      
-      this.showNotification('Venda Confirmada! ✅'); 
-
-      // Limpa o estado do PDV após sucesso
-      this.cart = [];
-      this.total = 0;
-      this.isCartOpen = false;
-    } catch(e: any) { 
-      this.showNotification('Erro ao processar venda ❌');
-      console.error(e);
-    }
+    this.cart = [];
+    this.total = 0;
+    this.isCartOpen = false;
+  } catch(e: any) { 
+    this.showNotification(e.message || 'Erro ao processar venda ❌'); // Usei e.message pra ver o erro real do estoque
+    console.error(e);
   }
+}
 }

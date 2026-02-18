@@ -1,0 +1,114 @@
+<div class="orders-dashboard">
+  
+  <header class="dashboard-header">
+    <div class="header-info">
+      <h1>Pedidos & Encomendas</h1>
+      <div class="filters">
+        <button [class.active]="filterStatus === 'all'" (click)="filterStatus = 'all'">Todos</button>
+        <button [class.active]="filterStatus === 'pending'" (click)="filterStatus = 'pending'">Pendentes</button>
+        <button [class.active]="filterStatus === 'delivery'" (click)="filterStatus = 'delivery'">Entrega</button>
+      </div>
+    </div>
+    
+    <button class="btn-new-order" (click)="openNewOrder()">
+      <span class="plus">+</span> NOVO PEDIDO
+    </button>
+  </header>
+
+  <div class="kanban-grid">
+    <div *ngFor="let order of filteredOrders$ | async" class="order-card" [ngClass]="order.status">
+      
+      <div class="card-top">
+        <span class="order-id">#{{ order.createdAt?.toMillis() | date:'mmss' }}</span> <span class="time-badge">🕒 {{ order.createdAt?.toDate() | date:'HH:mm' }}</span>
+      </div>
+
+      <div class="card-main">
+        <h3>{{ order.customerName }}</h3>
+        
+        <div class="delivery-info" *ngIf="order.deliveryType === 'delivery'">
+          🛵 <strong>Delivery</strong>
+          <span class="address">{{ order.address }}</span>
+        </div>
+        <div class="delivery-info pickup" *ngIf="order.deliveryType === 'pickup'">
+          🏢 <strong>Retirada</strong>
+        </div>
+
+        <ul class="items-preview">
+          <li *ngFor="let item of order.items.slice(0, 3)">
+            {{ item.quantity }}x {{ item.productName }}
+          </li>
+          <li *ngIf="order.items.length > 3" class="more-items">
+            + {{ order.items.length - 3 }} itens...
+          </li>
+        </ul>
+      </div>
+
+      <div class="card-actions">
+        <div class="status-indicator">{{ translateStatus(order.status) }}</div>
+        
+        <div class="btn-group">
+          <button *ngIf="order.status !== 'finished'" class="btn-action" (click)="advanceStatus(order)">
+            {{ getNextActionLabel(order.status) }}
+          </button>
+          
+          <button class="btn-details" (click)="viewDetails(order)">👁️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay-panel" *ngIf="isNewOrderOpen">
+    <div class="panel-content">
+      <div class="panel-header">
+        <h2>Nova Encomenda</h2>
+        <button class="btn-close" (click)="closeNewOrder()">✕</button>
+      </div>
+
+      <div class="panel-body">
+        <div class="form-section">
+          <div class="input-group">
+            <input type="text" [(ngModel)]="customerName" placeholder="Nome do Cliente" autofocus>
+            <input type="text" [(ngModel)]="customerPhone" placeholder="Telefone">
+          </div>
+          
+          <div class="toggle-delivery">
+            <button [class.active]="deliveryType === 'pickup'" (click)="deliveryType = 'pickup'">Retirada</button>
+            <button [class.active]="deliveryType === 'delivery'" (click)="deliveryType = 'delivery'">Entrega</button>
+          </div>
+
+          <input *ngIf="deliveryType === 'delivery'" type="text" [(ngModel)]="address" placeholder="Endereço de Entrega" class="full-width">
+          
+          <div class="freight-row">
+            <label>Frete R$:</label>
+            <input type="number" [(ngModel)]="shippingCost">
+          </div>
+        </div>
+
+        <div class="products-section">
+          <h3>Adicionar Produtos</h3>
+          <div class="mini-product-grid">
+            <div *ngFor="let p of products$ | async" class="mini-card" (click)="addToCart(p)">
+              <span>{{ p.title }}</span>
+              <small>R$ {{ p.sellPrice }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-footer">
+        <div class="cart-summary">
+          <span *ngFor="let item of cart">
+            {{ item.quantity }}x {{ item.productName }} <a (click)="removeFromCart(item)">x</a>
+          </span>
+          <span *ngIf="cart.length === 0" class="empty-msg">Nenhum item adicionado</span>
+        </div>
+        
+        <div class="footer-actions">
+          <div class="total-badge">Total: R$ {{ finalTotal | number:'1.2-2' }}</div>
+          <button class="btn-save-order" (click)="saveOrder()" [disabled]="cart.length === 0">CONFIRMAR PEDIDO</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

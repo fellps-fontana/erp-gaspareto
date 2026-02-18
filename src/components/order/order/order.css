@@ -1,0 +1,270 @@
+/* --- DASHBOARD LAYOUT --- */
+.orders-dashboard {
+  padding: 20px;
+  background-color: #f0f2f5; /* Cinza bem claro corporativo */
+  min-height: 100vh;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* HEADER */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.header-info h1 {
+  margin: 0 0 10px 0;
+  color: #2c3136;
+  font-size: 1.8rem;
+}
+
+.filters button {
+  background: transparent;
+  border: 1px solid #ccc;
+  padding: 8px 16px;
+  margin-right: 5px;
+  border-radius: 20px;
+  cursor: pointer;
+  color: #666;
+  font-weight: 500;
+}
+
+.filters button.active {
+  background: #2c3136;
+  color: white;
+  border-color: #2c3136;
+}
+
+/* BOTÃO NOVO PEDIDO (DESTAQUE) */
+.btn-new-order {
+  background-color: #28a745; /* Verde Sucesso */
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+  transition: transform 0.2s;
+}
+
+.btn-new-order:active { transform: scale(0.95); }
+.btn-new-order .plus { font-size: 1.5rem; line-height: 0; }
+
+/* --- GRID DE CARDS --- */
+.kanban-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.order-card {
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-left: 6px solid #ccc; /* Cor do status */
+  position: relative;
+}
+
+/* Cores de Status */
+.order-card.pending { border-left-color: #ffc107; } /* Pendente (Amarelo) */
+.order-card.preparing { border-left-color: #17a2b8; } /* Preparando (Azul) */
+.order-card.delivered { border-left-color: #6f42c1; } /* Entregue (Roxo) */
+.order-card.finished { border-left-color: #28a745; opacity: 0.6; } /* Finalizado (Verde) */
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  color: #888;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+.card-main h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+.delivery-info {
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  color: #555;
+}
+
+.delivery-info.pickup { background: #fff3cd; color: #856404; }
+
+.items-preview {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.95rem;
+  color: #444;
+}
+
+.more-items { color: #888; font-style: italic; font-size: 0.85rem; }
+
+/* Ações do Card */
+.card-actions {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-indicator {
+  font-weight: bold;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.btn-group { display: flex; gap: 5px; }
+
+.btn-action {
+  background: #2c3136;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-details {
+  background: #eee;
+  border: none;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+/* --- OVERLAY NOVO PEDIDO (ESTILO MODAL FULL) --- */
+.overlay-panel {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+}
+
+.panel-content {
+  background: white;
+  width: 90%;
+  height: 90%;
+  max-width: 1000px;
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+}
+
+.panel-header {
+  padding: 20px;
+  background: #2c3136;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.panel-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1.5fr; /* Esquerda menor, Direita maior */
+  gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+  background: #f9f9f9;
+}
+
+/* Formulário Esquerda */
+.form-section { display: flex; flex-direction: column; gap: 15px; }
+.input-group input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px; }
+.full-width { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; }
+
+.toggle-delivery { display: flex; gap: 10px; margin-bottom: 10px; }
+.toggle-delivery button {
+  flex: 1; padding: 10px; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 6px;
+}
+.toggle-delivery button.active { background: #007bff; color: white; border-color: #007bff; }
+
+/* Lista de Produtos Direita */
+.mini-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.mini-card {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  text-align: center;
+  cursor: pointer;
+}
+.mini-card:active { background: #e2e6ea; }
+
+/* Footer Fixo do Painel */
+.panel-footer {
+  padding: 15px 20px;
+  background: white;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cart-summary {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  max-width: 60%;
+}
+.cart-summary span {
+  background: #eee; padding: 5px 10px; border-radius: 15px; font-size: 0.9rem;
+}
+.cart-summary a { margin-left: 5px; color: red; cursor: pointer; font-weight: bold; }
+
+.footer-actions { display: flex; align-items: center; gap: 20px; }
+.total-badge { font-size: 1.2rem; font-weight: bold; color: #333; }
+
+.btn-save-order {
+  background: #28a745; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-weight: bold; cursor: pointer;
+}
+.btn-save-order:disabled { background: #ccc; cursor: not-allowed; }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .panel-body { grid-template-columns: 1fr; }
+  .panel-footer { flex-direction: column; gap: 15px; }
+  .cart-summary { max-width: 100%; flex-wrap: wrap; }
+}

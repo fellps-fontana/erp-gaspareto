@@ -63,14 +63,15 @@ export class SaleService {
       const saleData = {
         items: sale.items.map((i: any) => ({
           idProduct: i.idProduct,
-          productName: i.name || i.productName || 'Produto sem nome',
+          productName: i.productName|| 'Produto sem nome', // Garante que pegue o nome certo
           quantity: Number(i.quantity) || 1,
           priceAtSale: Number(i.priceAtSale) || 0,
           priceAtCost: Number(i.priceAtCost) || 0 
         })),
         total: Number(sale.total || sale.value) || 0,
         date: serverTimestamp(), 
-        status: 'completed' 
+        status: 'completed',
+        sale_type: sale.sale_type || 'pdv' 
       };
 
       transaction.set(newSaleRef, saleData);
