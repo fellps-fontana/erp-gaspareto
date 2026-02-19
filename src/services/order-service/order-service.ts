@@ -1,47 +1,95 @@
-import { Injectable } from '@angular/core';
-import { 
-  Firestore, collection, collectionData, doc, 
-  addDoc, updateDoc, serverTimestamp, query, orderBy, where 
-} from '@angular/fire/firestore';
-import { Observable } from 'rxjs';
+import { Injectable, inject, NgZone } from '@angular/core';
+import { Firestore } from '@angular/fire/firestore';
+import {
+  collection, doc, addDoc, updateDoc, serverTimestamp, query, orderBy,
+  CollectionReference, DocumentReference, onSnapshot
+} from 'firebase/firestore';
+import { Observable, from, throwError } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { Order } from '../../models/order-model';
 import { SaleService } from '../sale-service/sale-service';
-import { PaymentMethod } from '../../models/sell-model'; // Importe o Enum do seu modelo de venda
+import { PaymentMethod, Sale } from '../../models/sell-model';
 
 @Injectable({
   providedIn: 'root',
 })
 export class OrderService {
-  private ordersCollection;
+  private firestore = inject(Firestore);
+  private saleService = inject(SaleService);
+  private ngZone = inject(NgZone);
 
-  constructor(
-    private firestore: Firestore,
-    private saleService: SaleService // Injetamos o SaleService aqui
-  ) {
-    this.ordersCollection = collection(this.firestore, 'orders');
+  private readonly ORDERS_COLLECTION = 'orders';
+  private ordersCollection: CollectionReference;
+
+  constructor() {
+    this.ordersCollection = collection(this.firestore, this.ORDERS_COLLECTION);
   }
 
-  // --- LEITURA ---
+  // --- LEITURA (COM NATIVE SDK PARA EVITAR ERROS DE INJECTION CONTEXT) ---
+
+  /**
+   * Helper privado para criar Observable a partir de query do Firestore
+   * Garante execução no NgZone e evita erros de 'Injection Context' do angular/fire
+   */
+  private collectionDataObservable<T>(queryFn: any): Observable<T[]> {
+    return new Observable<T[]>((observer) => {
+      console.log('OrderService: Iniciando listener do Firestore...');
+      const unsubscribe = onSnapshot(queryFn,
+        (snapshot: any) => {
+          console.log(`OrderService: Snapshot recebido. Docs: ${snapshot.docs.length}`);
+          const data = snapshot.docs.map((doc: any) => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          console.log('OrderService: Dados processados:', data);
+          this.ngZone.run(() => observer.next(data));
+        },
+        (error: any) => {
+          console.error("OrderService: Erro no Firestore:", error);
+          this.ngZone.run(() => observer.error(error));
+        }
+      );
+      return () => {
+        console.log('OrderService: Unsubscribing...');
+        unsubscribe();
+      };
+    });
+  }
+
+  /**
+   * Retorna todos os pedidos ordenados por data de criação (decrescente).
+   */
   getOrders(): Observable<Order[]> {
-    // Ordena pelos mais recentes
     const q = query(this.ordersCollection, orderBy('createdAt', 'desc'));
-    return collectionData(q, { idField: 'id' }) as Observable<Order[]>;
+    return this.collectionDataObservable<Order>(q);
   }
-  
-  // Pega só os pendentes (útil pra tela de "Cozinha/Preparo")
+
+  /**
+   * Retorna apenas pedidos pendentes (não finalizados nem cancelados).
+   * Filtragem feita no CLIENTE para evitar necessidade de Index Composto.
+   */
   getPendingOrders(): Observable<Order[]> {
+    const activeStatuses = ['pending', 'preparing', 'ready', 'delivering'];
+
+    // 1. Busca tudo ordenado por data (Index padrão cobre isso)
     const q = query(
-      this.ordersCollection, 
-      where('status', '!=', 'finished'), // Traz tudo que não tá finalizado
-      orderBy('status', 'asc'),
+      this.ordersCollection,
       orderBy('createdAt', 'desc')
     );
-    return collectionData(q, { idField: 'id' }) as Observable<Order[]>;
+
+    // 2. Filtra no cliente
+    return this.collectionDataObservable<Order>(q).pipe(
+      map(orders => orders.filter(o => activeStatuses.includes(o.status)))
+    );
   }
 
   // --- CRIAÇÃO ---
-  addOrder(order: Order) {
-    // Garante que as datas e status iniciais estejam certos
+
+  /**
+   * Cria um novo pedido.
+   * @param order Dados do pedido sem ID.
+   */
+  addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<DocumentReference> {
     const newOrder = {
       ...order,
       status: 'pending',
@@ -50,51 +98,84 @@ export class OrderService {
       shippingCost: Number(order.shippingCost || 0),
       total: Number(order.itemsTotal) + Number(order.shippingCost || 0)
     };
+
     return addDoc(this.ordersCollection, newOrder);
   }
 
   // --- ATUALIZAÇÃO DE STATUS ---
 
-  // 1. Saiu para entrega ou Cliente retirou (Mas ainda não necessariamente pagou)
-  markAsDelivered(orderId: string) {
-    const orderRef = doc(this.firestore, `orders/${orderId}`);
+  /**
+   * Marca um pedido como entregue.
+   * @param orderId ID do pedido.
+   */
+  markAsDelivered(orderId: string): Promise<void> {
+    if (!orderId) return Promise.reject('Order ID is required');
+
+    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
     return updateDoc(orderRef, {
       status: 'delivered',
-      actualDeliveryDate: serverTimestamp() // Marca a hora da entrega real
+      actualDeliveryDate: serverTimestamp()
     });
   }
 
-  // 2. Finalizar: O cliente pagou e o pedido vira VENDA (Dinheiro no bolso)
-  async finalizeOrder(order: Order, paymentMethod: PaymentMethod) {
+  // --- FINALIZAR (PAGAMENTO) ---
+
+  /**
+   * Finaliza um pedido, gerando a venda correspondente e baixando estoque.
+   * @param order O pedido completo.
+   * @param paymentMethod Método de pagamento escolhido.
+   */
+  async finalizeOrder(order: Order, paymentMethod: PaymentMethod): Promise<boolean> {
+    if (!order.id) {
+      throw new Error('Pedido sem ID não pode ser finalizado.');
+    }
+
     try {
-      // Passo 1: Cria a Venda no SaleService (Abate estoque e entra no financeiro)
-      const saleData = {
-        items: order.items,
-        total: order.total, // Inclui o frete no valor final da venda
-        sale_type: 'order', // Identifica que veio de uma encomenda
-        paymentMethod: paymentMethod // PIX ou Dinheiro
+      // 1. Prepara dados da Venda com tipagem correta
+      const saleData: Sale = {
+        items: order.items.map(item => ({
+          idProduct: item.idProduct,
+          productName: item.productName,
+          // Garante que números sejam números
+          quantity: Number(item.quantity),
+          priceAtSale: Number(item.priceAtSale),
+          priceAtCost: Number(item.priceAtCost)
+        })),
+        total: Number(order.total),
+        sale_type: 'order', // Identifica que veio de um pedido
+        paymentMethod: paymentMethod,
+        date: serverTimestamp() // O SaleService pode sobrescrever, mas garantimos aqui
       };
 
-      await this.saleService.processSale(saleData as any);
+      // 2. Processa a Venda (Isso já baixa o estoque via SaleService)
+      await this.saleService.processSale(saleData);
 
-      // Passo 2: Atualiza o Pedido para Finalizado
-      const orderRef = doc(this.firestore, `orders/${order.id}`);
+      // 3. Atualiza o Pedido para 'finished'
+      const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${order.id}`);
       await updateDoc(orderRef, {
         status: 'finished',
         paymentDate: serverTimestamp(),
         closingDate: serverTimestamp()
       });
-      
+
       return true;
     } catch (error) {
-      console.error("Erro ao finalizar pedido:", error);
+      console.error("Erro ao finalizar pedido no OrderService:", error);
+      // Repassa o erro para ser tratado no componente (ex: mostrar toast)
       throw error;
     }
   }
 
-  // Cancelar (Se o cliente desistir)
-  cancelOrder(orderId: string) {
-    const orderRef = doc(this.firestore, `orders/${orderId}`);
+  // --- CANCELAMENTO ---
+
+  /**
+   * Cancela um pedido.
+   * @param orderId ID do pedido.
+   */
+  cancelOrder(orderId: string): Promise<void> {
+    if (!orderId) return Promise.reject('Order ID is required');
+
+    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
     return updateDoc(orderRef, {
       status: 'canceled'
     });

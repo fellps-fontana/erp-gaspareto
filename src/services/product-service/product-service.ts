@@ -1,13 +1,15 @@
-import { Injectable } from '@angular/core';
-import { 
-  Firestore, 
-  collection, 
-  collectionData, 
-  addDoc, 
-  doc, 
-  updateDoc, 
-  deleteDoc 
-} from '@angular/fire/firestore';
+import { Injectable, inject, NgZone } from '@angular/core';
+import { Firestore } from '@angular/fire/firestore';
+import {
+  collection,
+  addDoc,
+  doc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  orderBy
+} from 'firebase/firestore';
 import { Product } from '../../models/product-model';
 import { Observable } from 'rxjs';
 
@@ -15,14 +17,35 @@ import { Observable } from 'rxjs';
   providedIn: 'root',
 })
 export class ProductService {
+  private firestore = inject(Firestore);
+  private ngZone = inject(NgZone);
   private productsCollection;
 
-  constructor(private firestore: Firestore) {
+  constructor() {
     this.productsCollection = collection(this.firestore, 'products');
   }
 
   getProducts(): Observable<Product[]> {
-    return collectionData(this.productsCollection, { idField: 'id' }) as Observable<Product[]>;
+    return new Observable<Product[]>((observer) => {
+      // Ordenar por título se possível, ou padrão
+      const q = query(this.productsCollection); // Pode adicionar orderBy('title') se tiver index
+
+      const unsubscribe = onSnapshot(q,
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          } as Product));
+          this.ngZone.run(() => observer.next(data));
+        },
+        (error) => {
+          console.error("ProductService Error:", error);
+          this.ngZone.run(() => observer.error(error));
+        }
+      );
+
+      return () => unsubscribe();
+    });
   }
 
   addProduct(product: Product) {
@@ -42,10 +65,10 @@ export class ProductService {
    */
   updateProduct(id: string, product: Partial<Product>) {
     const productDocRef = doc(this.firestore, `products/${id}`);
-    
+
     // Cria uma cópia e remove o ID para não dar erro de escrita no Firestore
     const data = { ...product };
-    delete data.id; 
+    delete data.id;
 
     // O cast 'as any' ou 'UpdateData' resolve o erro de propriedades incompatíveis (ts 2559)
     return updateDoc(productDocRef, data as any);
