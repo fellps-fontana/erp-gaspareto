@@ -25,7 +25,7 @@ export interface Order {
   address?: string;        // Endereço (Só se for delivery)
   
   // --- STATUS & DATAS ---
-  status: 'pending' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'finished' | 'canceled';
+  status: 'pending' | 'delivered' | 'finished' | 'canceled';
   
   createdAt: Timestamp;          // Data do pedido
   scheduledDate: Timestamp;      // Data agendada (Previsão)

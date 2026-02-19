@@ -133,18 +133,7 @@
   background: #ffc107;
 }
 
-.order-card.preparing .status-badge {
-  background: #17a2b8;
-}
 
-.order-card.ready .status-badge {
-  background: #fd7e14;
-}
-
-.order-card.delivering .status-badge {
-  background: #6f42c1;
-  color: white;
-}
 
 .order-card.delivered .status-badge {
   background: #20c997;

@@ -1,0 +1,118 @@
+/* --- NOVO ESTILO PARA O BOTÃO VOLTAR --- */
+.btn-back {
+    background: transparent;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    /* Espaço para o título */
+}
+
+.btn-back:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    transform: translateX(-3px);
+}
+
+/* Ajuste no Header para acomodar o botão voltar */
+.header-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* --- ESTILOS DO MODAL DE DETALHES NOVO --- */
+.detail-header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 15px;
+}
+
+.customer-info h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: white;
+}
+
+.customer-info .phone {
+    display: block;
+    font-size: 0.9rem;
+    color: #888;
+    margin-top: 4px;
+}
+
+.status-tag {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #121212;
+    background: #ccc;
+}
+
+/* Cores do Status Tag no Modal */
+.status-tag.pending {
+    background: #ffc107;
+}
+
+.status-tag.delivered {
+    background: #20c997;
+}
+
+.status-tag.finished {
+    background: #28a745;
+    color: white;
+}
+
+.status-tag.canceled {
+    background: #dc3545;
+    color: white;
+}
+
+.detail-delivery-section {
+    background: #2a2a2a;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.delivery-badge {
+    display: inline-block;
+    font-weight: bold;
+    color: #42a5f5;
+    margin-bottom: 5px;
+}
+
+.delivery-badge.pickup {
+    color: #ffc107;
+}
+
+.address-text {
+    margin: 0;
+    font-size: 1rem;
+    color: #ddd;
+}
+
+.detail-items-section h4 {
+    margin: 0 0 10px 0;
+    color: #888;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+/* Ajuste da lista de itens para o modal */
+.detail-items-list {
+    background: #252525;
+    /* Um pouco mais claro que o fundo */
+}

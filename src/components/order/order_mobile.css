@@ -1,0 +1,163 @@
+/* --- TOAST NOTIFICATIONS --- */
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    border-radius: 50px;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    z-index: 3000;
+    animation: slideDown 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 300px;
+    justify-content: center;
+    text-align: center;
+}
+
+.toast.error {
+    background: #dc3545;
+}
+
+.toast.success {
+    background: #28a745;
+}
+
+@keyframes slideDown {
+    from {
+        top: -50px;
+        opacity: 0;
+    }
+
+    to {
+        top: 20px;
+        opacity: 1;
+    }
+}
+
+/* --- CONFIRM MODAL SPECIFIC --- */
+.confirm-modal {
+    max-width: 400px;
+    height: auto;
+    max-height: 90vh;
+    text-align: center;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.confirm-modal h3 {
+    color: #f4c042;
+    margin-bottom: 15px;
+}
+
+.confirm-modal p {
+    font-size: 1.1rem;
+    margin-bottom: 30px;
+    color: #ddd;
+}
+
+.confirm-modal .modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.btn-cancel {
+    background: #444;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.btn-confirm {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* --- MOBILE OPTIMIZATIONS --- */
+@media (max-width: 768px) {
+    .orders-dashboard {
+        padding: 10px;
+    }
+
+    .dashboard-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+
+    .header-info h1 {
+        font-size: 1.5rem;
+        text-align: center;
+    }
+
+    .filters {
+        display: flex;
+        overflow-x: auto;
+        padding-bottom: 5px;
+        justify-content: flex-start;
+        /* Permite scroll horizontal se preciso */
+    }
+
+    .filters button {
+        flex: 1;
+        /* Botões ocupam largura total disponível */
+        white-space: nowrap;
+        padding: 10px;
+    }
+
+    .btn-new-order {
+        width: 100%;
+        justify-content: center;
+        padding: 15px;
+    }
+
+    /* Cards em coluna única no mobile */
+    .kanban-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Modais Full Screen em Mobile */
+    .panel-content {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        border-radius: 0;
+    }
+
+    .panel-body {
+        grid-template-columns: 1fr;
+        /* Uma coluna só */
+        padding: 15px;
+    }
+
+    .modal-content {
+        width: 90%;
+        max-width: none;
+    }
+
+    /* Ajuste para botões de ação do card ficarem maiores (touch friendly) */
+    .btn-primary-action {
+        padding: 15px;
+        font-size: 1.1rem;
+    }
+
+    .btn-icon {
+        width: 48px;
+        height: 48px;
+    }
+}

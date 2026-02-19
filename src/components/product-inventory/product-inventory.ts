@@ -14,7 +14,7 @@ import { PurchaseService } from '../../services/purchase-service/purchase-servic
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './product-inventory.html',
-  styleUrls: ['./product-inventory.css']
+  styleUrls: ['./product-inventory.css', './product-inventory-mobile.css']
 })
 export class ProductInventoryComponent implements OnInit {
   // Controle das Abas
@@ -26,7 +26,7 @@ export class ProductInventoryComponent implements OnInit {
 
   // Lista de produtos
   products: Product[] = [];
-  
+
   // --- FILTROS ---
   filtroDataInicio: string = '';
   filtroDataFim: string = '';
@@ -66,14 +66,14 @@ export class ProductInventoryComponent implements OnInit {
     private productService: ProductService,
     private purchaseService: PurchaseService,
     private saleService: SaleService
-  ) {}
+  ) { }
 
   ngOnInit() {
     // 1. Carrega produtos em tempo real
     this.productService.getProducts().subscribe(data => {
       this.products = data;
     });
-    
+
     // 2. Define datas iniciais como HOJE
     const hoje = new Date();
     this.filtroDataInicio = this.formatDateToInput(hoje);
@@ -114,7 +114,7 @@ export class ProductInventoryComponent implements OnInit {
         let vendaEntrouNoFiltro = false;
         if (venda.items) {
           venda.items.forEach((item: any) => {
-            if (this.filtroProdutoId && item.idProduct !== this.filtroProdutoId) return; 
+            if (this.filtroProdutoId && item.idProduct !== this.filtroProdutoId) return;
 
             faturamento += (item.priceAtSale * item.quantity);
             custo += ((item.priceAtCost || 0) * item.quantity);
@@ -149,13 +149,13 @@ export class ProductInventoryComponent implements OnInit {
 
   abrirNovo() {
     this.produtoEmEdicao = null;
-    this.novoProduto = { 
-      title: '', 
-      sellPrice: 0, 
-      buyPrice: 0, 
+    this.novoProduto = {
+      title: '',
+      sellPrice: 0,
+      buyPrice: 0,
       stock: 0,
       urlImage: '',
-      color: '#FDD835' 
+      color: '#FDD835'
     };
     this.exibirFormularioNovo = true;
     this.produtoSelecionadoCompra = null;
@@ -164,7 +164,7 @@ export class ProductInventoryComponent implements OnInit {
   abrirEdicao(p: Product) {
     this.produtoEmEdicao = p;
     // Garante que campos opcionais tenham valor padrão ao editar
-    this.novoProduto = { 
+    this.novoProduto = {
       ...p,
       urlImage: p.urlImage || '',
       color: p.color || '#FDD835'
@@ -245,19 +245,19 @@ export class ProductInventoryComponent implements OnInit {
 
   // No seu ProductInventoryComponent
 
-onFileSelected(event: any) {
-  const file: File = event.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    
-    // Quando terminar de ler o arquivo
-    reader.onload = (e: any) => {
-      const base64String = e.target.result;
-      // Salvamos a imagem inteira como string no campo urlImage
-      this.novoProduto.urlImage = base64String;
-    };
+  onFileSelected(event: any) {
+    const file: File = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
 
-    reader.readAsDataURL(file); // Converte para Base64
+      // Quando terminar de ler o arquivo
+      reader.onload = (e: any) => {
+        const base64String = e.target.result;
+        // Salvamos a imagem inteira como string no campo urlImage
+        this.novoProduto.urlImage = base64String;
+      };
+
+      reader.readAsDataURL(file); // Converte para Base64
+    }
   }
-}
 }

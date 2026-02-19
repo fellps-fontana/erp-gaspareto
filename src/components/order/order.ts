@@ -1,4 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable, map, catchError, of } from 'rxjs';
@@ -16,11 +17,12 @@ import { Timestamp } from '@angular/fire/firestore';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './order.html',
-  styleUrls: ['./order.css']
+  styleUrls: ['./order.css', './order_mobile.css', './order_details.css']
 })
 export class OrdersComponent implements OnInit {
   private productService = inject(ProductService);
   private orderService = inject(OrderService);
+  private router = inject(Router);
 
   // --- DADOS DO BANCO ---
   products$!: Observable<Product[]>;
@@ -28,13 +30,13 @@ export class OrdersComponent implements OnInit {
   filteredOrders$!: Observable<Order[]>; // Alterado para property
 
   // --- CONTROLE DE FILTROS ---
-  private _filterStatus: 'all' | 'pending' | 'delivery' = 'all';
+  private _filterStatus: 'all' | 'pending' | 'delivered' = 'all';
 
   get filterStatus() {
     return this._filterStatus;
   }
 
-  set filterStatus(value: 'all' | 'pending' | 'delivery') {
+  set filterStatus(value: 'all' | 'pending' | 'delivered') {
     this._filterStatus = value;
     this.updateFilter(); // Atualiza o filtro quando muda
   }
@@ -62,6 +64,11 @@ export class OrdersComponent implements OnInit {
   selectedOrderToFinalize: Order | null = null;
   selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
 
+  // --- CONTROLE DE CONFIRMAÇÃO (GENERIC MODAL) ---
+  isConfirmModalOpen: boolean = false;
+  confirmMessage: string = '';
+  confirmAction: (() => void) | null = null;
+
   ngOnInit() {
     console.log('OrdersComponent: ngOnInit');
     this.loadData();
@@ -85,6 +92,10 @@ export class OrdersComponent implements OnInit {
     this.updateFilter();
   }
 
+  goBack() {
+    this.router.navigate(['/']);
+  }
+
   updateFilter() {
     if (!this.orders$) return;
 
@@ -97,11 +108,11 @@ export class OrdersComponent implements OnInit {
         if (this._filterStatus === 'all') return orders;
 
         if (this._filterStatus === 'pending') {
-          return orders.filter(o => o.status === 'pending' || o.status === 'preparing' || o.status === 'ready');
+          return orders.filter(o => o.status === 'pending');
         }
 
-        if (this._filterStatus === 'delivery') {
-          return orders.filter(o => o.status === 'delivered' || o.status === 'delivering');
+        if (this._filterStatus === 'delivered') {
+          return orders.filter(o => o.status === 'delivered');
         }
 
         return orders;
@@ -226,10 +237,7 @@ export class OrdersComponent implements OnInit {
   translateStatus(status: string): string {
     const map: Record<string, string> = {
       'pending': 'Pendente',
-      'preparing': 'Preparando',
-      'ready': 'Pronto',
-      'delivering': 'Saiu p/ Entrega',
-      'delivered': 'Entregue / Retirado',
+      'delivered': 'Entregue',
       'finished': 'Finalizado',
       'canceled': 'Cancelado'
     };
@@ -237,8 +245,8 @@ export class OrdersComponent implements OnInit {
   }
 
   getNextActionLabel(status: string): string {
-    if (status === 'pending' || status === 'preparing' || status === 'ready') return 'Saiu / Entregar';
-    if (status === 'delivering' || status === 'delivered') return 'Receber & Finalizar';
+    if (status === 'pending') return 'Entregar';
+    if (status === 'delivered') return 'Finalizar (Pagar)';
     return '';
   }
 
@@ -247,37 +255,46 @@ export class OrdersComponent implements OnInit {
     if (!order.id) return;
 
     // Confirmações
-    if (order.status === 'pending' || order.status === 'preparing' || order.status === 'ready') {
-      if (!confirm(`Confirmar saída/entrega do pedido de ${order.customerName}?`)) return;
-
-      this.isProcessingAction = true;
-      try {
-        await this.orderService.markAsDelivered(order.id);
-      } catch (err) {
-        this.showTemporaryError('Erro ao atualizar status.');
-      } finally {
-        this.isProcessingAction = false;
-      }
+    if (order.status === 'pending') {
+      this.openConfirmModal(
+        `Confirmar entrega do pedido de ${order.customerName}? (Isso baixará o estoque)`,
+        async () => {
+          this.isProcessingAction = true;
+          try {
+            await this.orderService.markAsDelivered(order.id!);
+          } catch (err) {
+            this.showTemporaryError('Erro ao atualizar status.');
+          } finally {
+            this.isProcessingAction = false;
+            this.closeConfirmModal();
+          }
+        }
+      );
     }
     // Entregue -> Finalizar (Pagamento)
-    else if (order.status === 'delivered' || order.status === 'delivering') {
+    else if (order.status === 'delivered') {
       this.openPaymentModal(order);
     }
   }
 
   async cancelAction(order: Order) {
     if (!order.id) return;
-    if (!confirm(`Tem certeza que deseja CANCELAR o pedido de ${order.customerName}?`)) return;
 
-    this.isProcessingAction = true;
-    try {
-      await this.orderService.cancelOrder(order.id);
-      this.showTemporarySuccess('Pedido cancelado.');
-    } catch (err) {
-      this.showTemporaryError('Erro ao cancelar pedido.');
-    } finally {
-      this.isProcessingAction = false;
-    }
+    this.openConfirmModal(
+      `Tem certeza que deseja CANCELAR o pedido de ${order.customerName}?`,
+      async () => {
+        this.isProcessingAction = true;
+        try {
+          await this.orderService.cancelOrder(order.id!);
+          this.showTemporarySuccess('Pedido cancelado.');
+        } catch (err) {
+          this.showTemporaryError('Erro ao cancelar pedido.');
+        } finally {
+          this.isProcessingAction = false;
+          this.closeConfirmModal();
+        }
+      }
+    );
   }
 
   // =============================================================
@@ -341,11 +358,30 @@ export class OrdersComponent implements OnInit {
   }
 
   private showTemporarySuccess(msg: string) {
-    // Pode usar um toast no futuro. Por enquanto, alert ou variavel de msg.
-    // Como não implementei toast no HTML, vou usar alert se for crítico sucesso, 
-    // ou apenas logar se for menor.
-    // Mas o ideal é ter feedback.
-    alert(msg); // Mantendo alert para sucesso crítico por enquanto para garantir visibilidade
+    this.successMessage = msg;
+    setTimeout(() => this.successMessage = null, 3000);
+  }
+
+  // --- CONFIRMATION MODAL HELPERS ---
+  openConfirmModal(message: string, action: () => void) {
+    this.confirmMessage = message;
+    this.confirmAction = action;
+    this.isConfirmModalOpen = true;
+  }
+
+  closeConfirmModal() {
+    this.isConfirmModalOpen = false;
+    this.confirmMessage = '';
+    this.confirmAction = null;
+  }
+
+  onConfirmYes() {
+    if (this.confirmAction) {
+      this.confirmAction();
+    }
+    // Não fecha aqui, a action fecha ou mantemos aberto se for async.
+    // Mas no meu implementacao acima, eu chamo closeConfirmModal() no finally da action.
+    // Então aqui só executamos.
   }
 
   // =============================================================

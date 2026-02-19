@@ -1,0 +1,173 @@
+/* --- MOBILE OPTIMIZATIONS FOR INVENTORY --- */
+@media (max-width: 900px) {
+
+    /* Layout vira coluna (Menu em cima, conteúdo embaixo) */
+    .estoque-layout {
+        flex-direction: column;
+        height: 100vh;
+        /* Mantém altura total */
+        overflow: hidden;
+        /* Evita scroll duplo no body */
+    }
+
+    /* Sidebar vira Header/Menu Topo */
+    .sidebar {
+        width: 100%;
+        height: auto;
+        flex-direction: column;
+        /* No mobile, ainda coluna mas compacta */
+        padding: 15px;
+        border-right: none;
+        border-bottom: 1px solid #333;
+        background: #0a0a0a;
+        z-index: 10;
+    }
+
+    .logo-area {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
+    /* Menu de botões em linha com scroll horizontal */
+    .menu-botoes {
+        flex-direction: row;
+        margin-top: 15px;
+        gap: 10px;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 5px;
+        /* Pra scrollbar não colar */
+    }
+
+    .menu-botoes button {
+        flex: 1;
+        min-width: 120px;
+        padding: 10px 15px;
+        text-align: center;
+        font-size: 0.9rem;
+        border: 1px solid #333;
+    }
+
+    .btn-voltar {
+        display: none;
+        /* Esconde voltar original pra economizar espaço, ou move pro topo */
+    }
+
+    /* Se quiser manter o voltar, pode ser um ícone no topo */
+    /* Se quiser manter o voltar, pode ser um ícone no topo */
+    /* .logo-area::after {
+        content: '🏠 Voltar'; 
+    } */
+
+    /* Conteúdo com menos padding */
+    .conteudo {
+        padding: 15px;
+        width: 100%;
+    }
+
+    /* --- ABA RELATÓRIO --- */
+    .cards-kpi {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .card {
+        padding: 20px;
+    }
+
+    .filtros-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .campo-filtro.grow {
+        min-width: auto;
+    }
+
+    .acoes-filtro {
+        flex-direction: row;
+        /* Botões lado a lado */
+    }
+
+    .acoes-filtro button {
+        flex: 1;
+    }
+
+    /* --- ABA ESTOQUE --- */
+    .produtos-lista {
+        padding-bottom: 60px;
+        /* Espaço pro final */
+    }
+
+    .header-estoque {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .header-estoque .btn-novo {
+        width: 100%;
+    }
+
+    .produto-card {
+        padding: 10px 15px;
+    }
+
+    .prod-thumb {
+        width: 45px;
+        height: 45px;
+        margin-right: 15px;
+    }
+
+    .prod-title {
+        font-size: 1rem;
+    }
+
+    .prod-details {
+        font-size: 0.8rem;
+    }
+
+    /* Ações do Card - Ícones maiores */
+    .btn-acao {
+        width: 44px;
+        height: 44px;
+        font-size: 1.2rem;
+    }
+
+    /* --- FORMULÁRIOS --- */
+    .modal-inline {
+        padding: 20px;
+        width: 100%;
+        border-radius: 0;
+        margin-bottom: 0px;
+        height: auto;
+        border: none;
+        background: #151515;
+    }
+
+    .row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .form-group {
+        width: 100%;
+        margin-bottom: 15px;
+    }
+
+    /* Inputs maiores para toque */
+    input,
+    select {
+        padding: 14px;
+        font-size: 16px;
+        /* Evita zoom no iPhone */
+    }
+
+    .btn-salvar,
+    .btn-confirmar-compra {
+        padding: 18px;
+        font-size: 1.1rem;
+    }
+}

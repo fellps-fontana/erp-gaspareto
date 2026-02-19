@@ -8,7 +8,8 @@ import {
   deleteDoc,
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  increment
 } from 'firebase/firestore';
 import { Product } from '../../models/product-model';
 import { Observable } from 'rxjs';
@@ -72,5 +73,25 @@ export class ProductService {
 
     // O cast 'as any' ou 'UpdateData' resolve o erro de propriedades incompatíveis (ts 2559)
     return updateDoc(productDocRef, data as any);
+  }
+
+  /**
+   * Diminui o estoque de um produto atomicamente.
+   */
+  decreaseStock(id: string, quantity: number) {
+    const productRef = doc(this.firestore, `products/${id}`);
+    return updateDoc(productRef, {
+      stock: increment(-quantity)
+    });
+  }
+
+  /**
+   * Aumenta o estoque de um produto atomicamente.
+   */
+  increaseStock(id: string, quantity: number) {
+    const productRef = doc(this.firestore, `products/${id}`);
+    return updateDoc(productRef, {
+      stock: increment(quantity)
+    });
   }
 }

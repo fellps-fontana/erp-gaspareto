@@ -2,11 +2,18 @@
 
   <header class="dashboard-header">
     <div class="header-info">
+      <button class="btn-back" (click)="goBack()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </button>
       <h1>Pedidos & Encomendas</h1>
       <div class="filters">
         <button [class.active]="filterStatus === 'all'" (click)="filterStatus = 'all'">Todos</button>
-        <button [class.active]="filterStatus === 'pending'" (click)="filterStatus = 'pending'">Ativos</button>
-        <button [class.active]="filterStatus === 'delivery'" (click)="filterStatus = 'delivery'">Entrega/Final</button>
+        <button [class.active]="filterStatus === 'pending'" (click)="filterStatus = 'pending'">Para Enviar</button>
+        <button [class.active]="filterStatus === 'delivered'"
+          (click)="filterStatus = 'delivered'">Enviados/Finalizados</button>
       </div>
     </div>
 
@@ -15,13 +22,13 @@
     </button>
   </header>
 
-  <!-- ERROR FEEDBACK -->
-  <div class="error-banner" *ngIf="errorMessage">
+  <!-- ERROR FEEDBACK (TOAST) -->
+  <div class="toast error" *ngIf="errorMessage">
     {{ errorMessage }}
   </div>
 
-  <!-- SUCCESS FEEDBACK (Se não usar alert) -->
-  <div class="success-banner" *ngIf="successMessage">
+  <!-- SUCCESS FEEDBACK (TOAST) -->
+  <div class="toast success" *ngIf="successMessage">
     {{ successMessage }}
   </div>
 
@@ -49,7 +56,7 @@
           {{ translateStatus(order.status) }}
         </div>
         <div class="meta-info">
-          <span class="order-id">#{{ order.createdAt?.toMillis() | date:'mmss' }}</span>
+          <span class="order-id">{{ getOrderDate(order.createdAt) | date:'dd/MM' }}</span>
           <span class="time-badge">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"></circle>
@@ -233,13 +240,28 @@
     </div>
   </div>
 
+  <!-- MODAL DE CONFIRMAÇÃO GENÉRICO -->
+  <div class="modal-backdrop" *ngIf="isConfirmModalOpen">
+    <div class="modal-content confirm-modal">
+      <h3>Confirmação</h3>
+      <p>{{ confirmMessage }}</p>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" (click)="closeConfirmModal()" [disabled]="isProcessingAction">Não</button>
+        <button class="btn-confirm" (click)="onConfirmYes()" [disabled]="isProcessingAction">
+          {{ isProcessingAction ? 'Processando...' : 'Sim, Confirmar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- MODAL DETALHES -->
 <div class="modal-backdrop" *ngIf="isDetailsModalOpen && selectedOrderDetails">
   <div class="modal-content details-modal">
     <div class="modal-header">
-      <h3>Detalhes do Pedido #{{ selectedOrderDetails.createdAt?.toMillis() | date:'mmss' }}</h3>
+      <h3>Detalhes do Pedido #{{ selectedOrderDetails.createdAt.toMillis() | date:'mmss' }}</h3>
       <button class="btn-close-modal" (click)="closeDetails()">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -250,30 +272,31 @@
 
     <div class="modal-body">
 
-      <div class="detail-group">
-        <label>Cliente</label>
-        <div class="detail-value big">{{ selectedOrderDetails.customerName }}</div>
-        <div class="detail-sub" *ngIf="selectedOrderDetails.customerPhone">📞 {{ selectedOrderDetails.customerPhone }}
+      <!-- HEADER DO DETALHE: NOME E STATUS -->
+      <div class="detail-header-section">
+        <div class="customer-info">
+          <h2>{{ selectedOrderDetails.customerName }}</h2>
+          <span class="phone" *ngIf="selectedOrderDetails.customerPhone">{{ selectedOrderDetails.customerPhone }}</span>
+        </div>
+        <div class="status-tag" [ngClass]="selectedOrderDetails.status">
+          {{ translateStatus(selectedOrderDetails.status) }}
         </div>
       </div>
 
-      <br>
-
-      <div class="detail-group">
-        <label>Tipo de Entrega</label>
-        <div class="detail-value">
+      <!-- TIPO DE ENTREGA -->
+      <div class="detail-delivery-section">
+        <div class="delivery-badge" [class.pickup]="selectedOrderDetails.deliveryType === 'pickup'">
           <span *ngIf="selectedOrderDetails.deliveryType === 'delivery'">🛵 Entrega</span>
           <span *ngIf="selectedOrderDetails.deliveryType === 'pickup'">🏢 Retirada</span>
         </div>
-        <div class="detail-address" *ngIf="selectedOrderDetails.address">
-          📍 {{ selectedOrderDetails.address }}
-        </div>
+        <p class="address-text" *ngIf="selectedOrderDetails.address">
+          {{ selectedOrderDetails.address }}
+        </p>
       </div>
 
-      <br>
-
-      <div class="detail-group">
-        <label>Itens do Pedido</label>
+      <!-- LISTA DE ITENS -->
+      <div class="detail-items-section">
+        <h4>Itens do Pedido</h4>
         <ul class="detail-items-list">
           <li *ngFor="let item of selectedOrderDetails.items">
             <div class="item-line">
@@ -285,6 +308,7 @@
         </ul>
       </div>
 
+      <!-- TOTAIS -->
       <div class="detail-totals">
         <div class="total-row" *ngIf="selectedOrderDetails.shippingCost > 0">
           <span>Taxa de Entrega:</span>
@@ -296,6 +320,7 @@
         </div>
       </div>
 
+      <!-- OBS -->
       <div class="detail-obs" *ngIf="selectedOrderDetails.observations">
         <label>Observações:</label>
         <p>{{ selectedOrderDetails.observations }}</p>
