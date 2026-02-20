@@ -14,8 +14,8 @@ export class ComandaService {
         const comandaCol = collection(this.firestore, this.COLLECTION_NAME);
         const q = query(
             comandaCol,
-            where('status', '==', 'open')
-            // orderBy('createdAt', 'desc') // Removendo orderBy temporariamente para evitar problemas de index
+            where('status', '==', 'open'),
+            orderBy('createdAt', 'desc')
         );
         return collectionData(q, { idField: 'id' }) as Observable<Comanda[]>;
     }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Product } from '../../models/product-model';
@@ -15,7 +15,8 @@ import { Subscription } from 'rxjs';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './pdv.html',
-  styleUrls: ['./pdv.css']
+  styleUrls: ['./pdv.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PdvComponent implements OnInit {
   products$!: Observable<Product[]>;
@@ -46,7 +47,8 @@ export class PdvComponent implements OnInit {
   constructor(
     private productService: ProductService,
     private saleService: SaleService,
-    private comandaService: ComandaService
+    private comandaService: ComandaService,
+    private cdr: ChangeDetectorRef
   ) { }
 
   ngOnInit() {
@@ -56,6 +58,7 @@ export class PdvComponent implements OnInit {
     // Carrega comandas abertas
     this.comandaSub = this.comandaService.getOpenComandas().subscribe(comandas => {
       this.openComandas = comandas;
+      this.cdr.markForCheck(); // Notifica o Angular que os dados mudaram
     });
   }
 
@@ -85,6 +88,7 @@ export class PdvComponent implements OnInit {
 
   setStep(step: any) {
     this.checkoutStep = step;
+    this.cdr.markForCheck();
   }
 
   closeCheckout() {
@@ -103,11 +107,13 @@ export class PdvComponent implements OnInit {
 
   toggleComandaItems(comandaId: string) {
     this.expandedComandaId = this.expandedComandaId === comandaId ? null : comandaId;
+    this.cdr.markForCheck();
   }
 
   // --- EXIBIR NOTIFICAÇÃO (Toast) ---
   showNotification(message: string) {
     this.notification = message;
+    this.cdr.markForCheck();
 
     if (this.notificationTimeout) {
       clearTimeout(this.notificationTimeout);
@@ -115,6 +121,7 @@ export class PdvComponent implements OnInit {
 
     this.notificationTimeout = setTimeout(() => {
       this.notification = null;
+      this.cdr.markForCheck();
     }, 3000);
   }
 
@@ -169,6 +176,7 @@ export class PdvComponent implements OnInit {
       this.isCartOpen = true;
     }
     this.atualizarTotal();
+    this.cdr.markForCheck();
   }
 
   decreaseItemById(idProduct: string, index: number) {
@@ -179,10 +187,12 @@ export class PdvComponent implements OnInit {
       if (this.cart.length === 0) this.isCartOpen = false;
     }
     this.atualizarTotal();
+    this.cdr.markForCheck();
   }
 
   atualizarTotal() {
     this.total = this.cart.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
+    this.cdr.markForCheck();
   }
 
   async finalizarCheckout() {
@@ -264,10 +274,12 @@ export class PdvComponent implements OnInit {
     this.isCheckoutModalOpen = false;
     this.comandaBeingPaid = null;
     this.selectedComanda = null;
+    this.cdr.markForCheck();
   }
 
   selectComanda(c: Comanda) {
     this.selectedComanda = c;
+    this.cdr.markForCheck();
   }
 
   // --- OTIMIZAÇÃO DE PERFORMANCE (trackBy) ---
