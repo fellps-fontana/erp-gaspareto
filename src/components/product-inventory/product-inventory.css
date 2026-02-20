@@ -4,7 +4,8 @@
 .estoque-layout {
   display: flex;
   height: 100vh;
-  width: 100vw;
+  width: 100%;
+  /* Mudado de 100vw para 100% para evitar scroll horizontal indesejado */
   background-color: var(--bg-app);
   color: var(--text-primary);
   font-family: 'Segoe UI', Roboto, sans-serif;
@@ -177,13 +178,14 @@ h1 {
   width: auto;
 }
 
-.product-selection select {
+.product-selection select,
+.source-selection select {
   background: #252525;
   border: 1px solid var(--border-color);
   color: white;
   padding: 8px 15px;
   border-radius: var(--radius-md);
-  min-width: 180px;
+  min-width: 150px;
 }
 
 /* --- BOTÕES PREMIUM DASHBOARD --- */

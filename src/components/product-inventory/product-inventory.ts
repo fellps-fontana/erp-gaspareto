@@ -34,6 +34,7 @@ export class ProductInventoryComponent implements OnInit {
   filtroDataInicio: string = '';
   filtroDataFim: string = '';
   filtroProdutoId: string = '';
+  filtroOrigem: string = 'todos'; // 'todos' | 'pdv' | 'order'
 
   // --- NOTIFICAÇÕES CUSTOMIZADAS ---
   notification: string | null = null;
@@ -118,6 +119,9 @@ export class ProductInventoryComponent implements OnInit {
       let contagemVendas = 0;
 
       vendas.forEach((venda: any) => {
+        // Filtro por Origem (PDV vs Pedidos/Massa)
+        if (this.filtroOrigem !== 'todos' && venda.sale_type !== this.filtroOrigem) return;
+
         let vendaEntrouNoFiltro = false;
         if (venda.items) {
           venda.items.forEach((item: any) => {
@@ -196,6 +200,9 @@ export class ProductInventoryComponent implements OnInit {
     }
 
     vendas.forEach(v => {
+      // Filtro por Origem
+      if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
+
       const vDate = (v.date?.toDate ? v.date.toDate() : new Date(v.date));
       const dayKey = vDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
@@ -259,6 +266,9 @@ export class ProductInventoryComponent implements OnInit {
     const productsMap: { [key: string]: { name: string, qty: number } } = {};
 
     vendas.forEach(v => {
+      // Filtro por Origem
+      if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
+
       v.items?.forEach((item: any) => {
         if (!productsMap[item.idProduct]) {
           // Tenta pegar o nome do produto da lista principal caso não esteja no item da venda
@@ -319,6 +329,7 @@ export class ProductInventoryComponent implements OnInit {
     this.filtroDataInicio = this.formatDateToInput(hoje);
     this.filtroDataFim = this.formatDateToInput(hoje);
     this.filtroProdutoId = '';
+    this.filtroOrigem = 'todos';
     this.atualizarRelatorio();
   }
 

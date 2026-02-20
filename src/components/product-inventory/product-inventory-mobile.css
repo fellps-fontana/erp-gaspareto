@@ -1,5 +1,5 @@
 /* --- MOBILE OPTIMIZATIONS FOR INVENTORY --- */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
 
     /* Layout vira coluna (Menu em cima, conteúdo embaixo) */
     .estoque-layout {
@@ -67,19 +67,112 @@
         width: 100%;
     }
 
-    /* --- ABA RELATÓRIO --- */
+    /* --- ABA RELATÓRIO / DASHBOARD FINANCEIRO --- */
+    .header-section h1 {
+        font-size: 1.4rem;
+        margin-bottom: 5px;
+    }
+
+    .header-section p {
+        font-size: 0.85rem;
+        margin-bottom: 15px;
+    }
+
+    /* Filtros Compactos */
+    .filtros-dashboard {
+        padding: 12px;
+        margin-bottom: 15px;
+    }
+
+    .date-presets {
+        width: 100%;
+        overflow-x: auto;
+        justify-content: flex-start;
+        padding: 2px;
+    }
+
+    .btn-preset {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+
+    .custom-dates {
+        width: 100%;
+        justify-content: space-between;
+        padding: 5px 10px;
+    }
+
+    .custom-dates input {
+        font-size: 0.85rem;
+    }
+
+    .product-selection,
+    .source-selection {
+        width: 100%;
+    }
+
+    .product-selection select,
+    .source-selection select {
+        width: 100%;
+        min-width: unset;
+    }
+
+    .filter-actions {
+        width: 100%;
+        margin-left: 0;
+        gap: 8px;
+    }
+
+    .btn-dashboard-action {
+        flex: 1;
+        justify-content: center;
+        padding: 10px;
+        font-size: 0.8rem;
+    }
+
+    /* KPIs Compactos */
     .cards-kpi {
-        flex-direction: column;
-        gap: 15px;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-bottom: 15px;
     }
 
     .card {
-        padding: 20px;
+        padding: 12px 15px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: auto;
+        /* Garante que não herde alturas fixas problemáticas */
     }
 
-    .filtros-bar {
-        flex-direction: column;
-        align-items: stretch;
+    .kpi-label {
+        font-size: 0.75rem;
+        margin-bottom: 2px;
+    }
+
+    .kpi-value {
+        font-size: 1.4rem;
+    }
+
+    .kpi-meta {
+        font-size: 0.75rem;
+    }
+
+    /* Gráficos em Coluna */
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .chart-container {
+        height: 300px;
+        padding: 15px;
+    }
+
+    .chart-container h3 {
+        font-size: 0.95rem;
+        margin-bottom: 10px;
     }
 
     .campo-filtro.grow {

@@ -18,16 +18,16 @@ export class PdvComponent implements OnInit {
   products$!: Observable<Product[]>;
   cart: any[] = [];
   total: number = 0;
-  isCartOpen: boolean = false; 
+  isCartOpen: boolean = false;
 
   // --- CONTROLE DE NOTIFICAÇÃO ---
   notification: string | null = null;
   notificationTimeout: any;
 
   constructor(
-    private productService: ProductService, 
+    private productService: ProductService,
     private saleService: SaleService
-  ) {}
+  ) { }
 
   ngOnInit() {
     // Carrega produtos em tempo real do Firestore
@@ -61,7 +61,7 @@ export class PdvComponent implements OnInit {
     if (t.includes('água')) return '💧';
     if (t.includes('pizza')) return '🍕';
     if (t.includes('massa') || t.includes('tortei')) return '🍝';
-    return '🥤'; 
+    return '🥤';
   }
 
   getQuantity(p: Product): number {
@@ -71,7 +71,7 @@ export class PdvComponent implements OnInit {
 
   addToCart(p: Product) {
     if (!p.id) return;
-    
+
     // Verificação de estoque antes de adicionar
     if (p.stock === undefined || p.stock <= 0) {
       this.showNotification('⚠️ Produto sem estoque disponível!');
@@ -96,9 +96,11 @@ export class PdvComponent implements OnInit {
         priceAtCost: p.buyPrice || 0
       });
     }
-    
-    // Abre o carrinho automaticamente ao adicionar o primeiro item ou incrementar
-    this.isCartOpen = true; 
+
+    // Abre o carrinho automaticamente apenas em telas maiores (Tablet/Desktop)
+    if (window.innerWidth >= 768) {
+      this.isCartOpen = true;
+    }
     this.atualizarTotal();
   }
 
@@ -116,35 +118,35 @@ export class PdvComponent implements OnInit {
     this.total = this.cart.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
   }
 
-async fecharVenda() {
-  if (this.cart.length === 0) return;
-  
-  const itensLimpos = this.cart.map(i => ({
+  async fecharVenda() {
+    if (this.cart.length === 0) return;
+
+    const itensLimpos = this.cart.map(i => ({
       idProduct: i.idProduct,
       productName: i.name, // Ajustei aqui pra 'productName' pra bater com o service que você mandou antes
       quantity: Number(i.quantity),
       priceAtSale: Number(i.priceAtSale),
       priceAtCost: Number(i.priceAtCost || 0)
-  }));
+    }));
 
-  try {
-    const sale = {
-      items: itensLimpos,
-      total: Number(this.total),
-      sale_type: 'pdv', 
-      date: new Date()
-    };
-    
-    await this.saleService.processSale(sale);
-    
-    this.showNotification('Venda Confirmada! ✅'); 
+    try {
+      const sale = {
+        items: itensLimpos,
+        total: Number(this.total),
+        sale_type: 'pdv',
+        date: new Date()
+      };
 
-    this.cart = [];
-    this.total = 0;
-    this.isCartOpen = false;
-  } catch(e: any) { 
-    this.showNotification(e.message || 'Erro ao processar venda ❌'); // Usei e.message pra ver o erro real do estoque
-    console.error(e);
+      await this.saleService.processSale(sale);
+
+      this.showNotification('Venda Confirmada! ✅');
+
+      this.cart = [];
+      this.total = 0;
+      this.isCartOpen = false;
+    } catch (e: any) {
+      this.showNotification(e.message || 'Erro ao processar venda ❌'); // Usei e.message pra ver o erro real do estoque
+      console.error(e);
+    }
   }
-}
 }

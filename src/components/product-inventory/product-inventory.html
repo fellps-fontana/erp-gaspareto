@@ -50,6 +50,14 @@
             </select>
           </div>
 
+          <div class="source-selection">
+            <select [(ngModel)]="filtroOrigem" (change)="atualizarRelatorio()">
+              <option value="todos">Todas as Origens</option>
+              <option value="pdv">Vendas PDV</option>
+              <option value="order">Massa (Pedidos)</option>
+            </select>
+          </div>
+
           <div class="filter-actions">
             <button class="btn-dashboard-action primary" (click)="atualizarRelatorio()">
               <span>🔍</span> FILTRAR
