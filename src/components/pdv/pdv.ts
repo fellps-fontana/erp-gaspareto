@@ -5,12 +5,15 @@ import { Product } from '../../models/product-model';
 import { Observable } from 'rxjs';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
-import { RouterLink } from '@angular/router';
+import { ComandaService } from '../../services/comanda-service/comanda-service';
+import { PaymentMethod } from '../../models/sell-model';
+import { Comanda } from '../../models/comanda-model';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-pdv',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule],
   templateUrl: './pdv.html',
   styleUrls: ['./pdv.css']
 })
@@ -20,18 +23,86 @@ export class PdvComponent implements OnInit {
   total: number = 0;
   isCartOpen: boolean = false;
 
+  // --- CONTROLE DE CHECKOUT/COMANDA ---
+  isCheckoutModalOpen: boolean = false;
+  checkoutStep: 'choice' | 'payment-method' | 'comanda-selection' | 'new-comanda' = 'choice';
+  PaymentMethod = PaymentMethod;
+  paymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
+  comandaName: string = '';
+  selectedComanda: Comanda | null = null;
+
+  openComandas: Comanda[] = [];
+  isComandaListOpen: boolean = false;
+  private comandaSub?: Subscription;
+
+  // Variável para quando estivermos pagando uma comanda pronta
+  comandaBeingPaid: Comanda | null = null;
+  expandedComandaId: string | null = null;
+
   // --- CONTROLE DE NOTIFICAÇÃO ---
   notification: string | null = null;
   notificationTimeout: any;
 
   constructor(
     private productService: ProductService,
-    private saleService: SaleService
+    private saleService: SaleService,
+    private comandaService: ComandaService
   ) { }
 
   ngOnInit() {
     // Carrega produtos em tempo real do Firestore
     this.products$ = this.productService.getProducts();
+
+    // Carrega comandas abertas
+    this.comandaSub = this.comandaService.getOpenComandas().subscribe(comandas => {
+      this.openComandas = comandas;
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.comandaSub) this.comandaSub.unsubscribe();
+  }
+
+  // --- MODAL DE CHECKOUT ---
+  openCheckout() {
+    if (this.cart.length === 0) return;
+    this.isCheckoutModalOpen = true;
+    this.checkoutStep = 'choice';
+    this.paymentMethod = PaymentMethod.DINHEIRO;
+    this.comandaName = '';
+    this.selectedComanda = null;
+    this.comandaBeingPaid = null;
+  }
+
+  // Novo: Pagar uma comanda que já está aberta
+  checkoutComanda(comanda: Comanda) {
+    this.comandaBeingPaid = comanda;
+    this.isCheckoutModalOpen = true;
+    this.checkoutStep = 'payment-method';
+    this.paymentMethod = PaymentMethod.DINHEIRO;
+    this.isComandaListOpen = false;
+  }
+
+  setStep(step: any) {
+    this.checkoutStep = step;
+  }
+
+  closeCheckout() {
+    this.isCheckoutModalOpen = false;
+  }
+
+  toggleComandaList() {
+    this.isComandaListOpen = !this.isComandaListOpen;
+    if (this.isComandaListOpen) this.isCartOpen = false;
+  }
+
+  toggleCart() {
+    this.isCartOpen = !this.isCartOpen;
+    if (this.isCartOpen) this.isComandaListOpen = false;
+  }
+
+  toggleComandaItems(comandaId: string) {
+    this.expandedComandaId = this.expandedComandaId === comandaId ? null : comandaId;
   }
 
   // --- EXIBIR NOTIFICAÇÃO (Toast) ---
@@ -45,10 +116,6 @@ export class PdvComponent implements OnInit {
     this.notificationTimeout = setTimeout(() => {
       this.notification = null;
     }, 3000);
-  }
-
-  toggleCart() {
-    this.isCartOpen = !this.isCartOpen;
   }
 
   // Fallback de ícone caso o produto não tenha imagem cadastrada
@@ -118,35 +185,101 @@ export class PdvComponent implements OnInit {
     this.total = this.cart.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
   }
 
-  async fecharVenda() {
-    if (this.cart.length === 0) return;
-
-    const itensLimpos = this.cart.map(i => ({
-      idProduct: i.idProduct,
-      productName: i.name, // Ajustei aqui pra 'productName' pra bater com o service que você mandou antes
-      quantity: Number(i.quantity),
-      priceAtSale: Number(i.priceAtSale),
-      priceAtCost: Number(i.priceAtCost || 0)
-    }));
-
+  async finalizarCheckout() {
     try {
-      const sale = {
-        items: itensLimpos,
-        total: Number(this.total),
-        sale_type: 'pdv',
-        date: new Date()
-      };
+      if (this.checkoutStep === 'payment-method') {
+        const itens = this.comandaBeingPaid ? this.comandaBeingPaid.items : this.cart.map(i => ({
+          idProduct: i.idProduct,
+          productName: i.productName,
+          quantity: Number(i.quantity),
+          priceAtSale: Number(i.priceAtSale),
+          priceAtCost: Number(i.priceAtCost || 0)
+        }));
 
-      await this.saleService.processSale(sale);
+        const totalValue = this.comandaBeingPaid ? this.comandaBeingPaid.total : this.total;
 
-      this.showNotification('Venda Confirmada! ✅');
+        const sale = {
+          items: itens,
+          total: Number(totalValue),
+          sale_type: 'pdv',
+          paymentMethod: this.paymentMethod,
+          date: new Date()
+        };
 
-      this.cart = [];
-      this.total = 0;
-      this.isCartOpen = false;
+        await this.saleService.processSale(sale as any);
+
+        if (this.comandaBeingPaid) {
+          await this.comandaService.closeComanda(this.comandaBeingPaid.id!);
+          this.showNotification('Comanda Paga e Fechada! ✅');
+        } else {
+          this.showNotification('Venda Confirmada! ✅');
+        }
+
+      } else if (this.checkoutStep === 'new-comanda') {
+        if (!this.comandaName.trim()) {
+          this.showNotification('⚠️ Digite o nome da comanda!');
+          return;
+        }
+        const newComanda = {
+          customerName: this.comandaName,
+          items: this.cart.map(i => ({
+            idProduct: i.idProduct,
+            productName: i.productName,
+            quantity: Number(i.quantity),
+            priceAtSale: Number(i.priceAtSale),
+            priceAtCost: Number(i.priceAtCost || 0)
+          })),
+          total: Number(this.total)
+        };
+        await this.comandaService.addComanda(newComanda);
+        this.showNotification('Nova Comanda Criada! 📋');
+
+      } else if (this.checkoutStep === 'comanda-selection') {
+        if (!this.selectedComanda) {
+          this.showNotification('⚠️ Selecione uma comanda!');
+          return;
+        }
+        const itemsToAdd = this.cart.map(i => ({
+          idProduct: i.idProduct,
+          productName: i.productName,
+          quantity: Number(i.quantity),
+          priceAtSale: Number(i.priceAtSale),
+          priceAtCost: Number(i.priceAtCost || 0)
+        }));
+        await this.comandaService.addToExistingComanda(this.selectedComanda.id!, itemsToAdd, this.total);
+        this.showNotification(`Adicionado à comanda de ${this.selectedComanda.customerName}! 📋`);
+      }
+
+      this.limparPdv();
     } catch (e: any) {
-      this.showNotification(e.message || 'Erro ao processar venda ❌'); // Usei e.message pra ver o erro real do estoque
+      this.showNotification(e.message || 'Erro ao processar ❌');
       console.error(e);
     }
+  }
+
+  limparPdv() {
+    this.cart = [];
+    this.total = 0;
+    this.isCartOpen = false;
+    this.isCheckoutModalOpen = false;
+    this.comandaBeingPaid = null;
+    this.selectedComanda = null;
+  }
+
+  selectComanda(c: Comanda) {
+    this.selectedComanda = c;
+  }
+
+  // --- OTIMIZAÇÃO DE PERFORMANCE (trackBy) ---
+  trackByProductId(index: number, product: Product): string {
+    return product.id || String(index);
+  }
+
+  trackByCartItem(index: number, item: any): string {
+    return item.idProduct || String(index);
+  }
+
+  trackByComandaId(index: number, comanda: Comanda): string {
+    return comanda.id || String(index);
   }
 }

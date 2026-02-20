@@ -3,15 +3,13 @@
 </div>
 
 <div class="pdv-container">
-  
+
   <main class="grid-section">
     <div class="product-grid">
-      <div *ngFor="let p of products$ | async; let i = index" 
-           class="card-produto"
-           [style.background-color]="p.color || '#37474F'"
-           [style.background-image]="p.urlImage ? 'url(' + p.urlImage + ')' : 'none'"
-           (click)="addToCart(p)">
-        
+      <div *ngFor="let p of products$ | async; trackBy: trackByProductId; let i = index" class="card-produto"
+        [style.background-color]="p.color || '#37474F'"
+        [style.background-image]="p.urlImage ? 'url(' + p.urlImage + ')' : 'none'" (click)="addToCart(p)">
+
         <div *ngIf="getQuantity(p) > 0" class="badge-qty">
           {{ getQuantity(p) }}
         </div>
@@ -22,7 +20,7 @@
           <div class="icon" *ngIf="!p.urlImage">
             {{ getProductIcon(p.title) }}
           </div>
-          
+
           <h3>{{ p.title }}</h3>
           <p>R$ {{ p.sellPrice | number:'1.2-2' }}</p>
         </div>
@@ -31,7 +29,7 @@
   </main>
 
   <div class="cart-widget">
-    
+
     <div class="cart-popup" [class.open]="isCartOpen">
       <div class="cart-header">
         <span>Seu Pedido ({{ cart.length }})</span>
@@ -42,12 +40,12 @@
         <div *ngIf="cart.length === 0" class="empty-msg">
           Seu carrinho está vazio 🍕
         </div>
-        
-        <div *ngFor="let item of cart; let i = index" class="cart-item">
+
+        <div *ngFor="let item of cart; trackBy: trackByCartItem; let i = index" class="cart-item">
           <button class="btn-remove" (click)="decreaseItemById(item.idProduct, i)">-</button>
-          
+
           <div class="item-info">
-            <strong>{{ item.name }}</strong>
+            <strong>{{ item.productName }}</strong>
             <small>{{ item.quantity }} un. x R$ {{ item.priceAtSale | number:'1.2-2' }}</small>
           </div>
 
@@ -62,19 +60,139 @@
           <span>TOTAL</span>
           <span>R$ {{ total | number:'1.2-2' }}</span>
         </div>
-        <button class="btn-checkout" (click)="fecharVenda()" [disabled]="cart.length === 0">
+        <button class="btn-checkout" (click)="openCheckout()" [disabled]="cart.length === 0">
           CONFIRMAR PEDIDO
         </button>
       </div>
     </div>
 
-    <button class="cart-fab" (click)="toggleCart()">
-      <span style="font-size: 1.5rem;">🛒</span>
-      
-      <span *ngIf="total > 0" class="fab-price">
-        R$ {{ total | number:'1.0-0' }}
-      </span>
-    </button>
+    <!-- Modal de Checkout / Comanda -->
+    <div class="checkout-overlay" *ngIf="isCheckoutModalOpen" (click)="closeCheckout()">
+      <div class="checkout-modal" (click)="$event.stopPropagation()">
+
+        <!-- Passo 1: Escolha Inicial -->
+        <ng-container *ngIf="checkoutStep === 'choice'">
+          <h2>O que deseja fazer?</h2>
+          <div class="checkout-choices">
+            <button class="choice-card" (click)="setStep('payment-method')">
+              <span class="icon">💰</span>
+              <strong>Pagar Agora</strong>
+              <small>Fechar a venda imediatamente</small>
+            </button>
+            <button class="choice-card" (click)="setStep('comanda-selection')">
+              <span class="icon">📋</span>
+              <strong>Adicionar à Comanda</strong>
+              <small>Colocar na conta de um cliente</small>
+            </button>
+          </div>
+        </ng-container>
+
+        <!-- Passo 2: Seleção de Pagamento -->
+        <ng-container *ngIf="checkoutStep === 'payment-method'">
+          <h2>Finalizar Pagamento</h2>
+          <p class="total-destaque">Total: R$ {{ (comandaBeingPaid ? comandaBeingPaid.total : total) | number:'1.2-2' }}
+          </p>
+
+          <div class="payment-options">
+            <button [class.active]="paymentMethod === PaymentMethod.PIX" (click)="paymentMethod = PaymentMethod.PIX">
+              <span>📱</span> PIX
+            </button>
+            <button [class.active]="paymentMethod === PaymentMethod.DINHEIRO"
+              (click)="paymentMethod = PaymentMethod.DINHEIRO">
+              <span>💵</span> Dinheiro
+            </button>
+          </div>
+        </ng-container>
+
+        <!-- Passo 2: Seleção de Comanda Existente -->
+        <ng-container *ngIf="checkoutStep === 'comanda-selection'">
+          <h2>Selecione a Comanda</h2>
+          <div class="comanda-selector-list">
+            <button *ngFor="let c of openComandas; trackBy: trackByComandaId" class="comanda-select-btn"
+              [class.selected]="selectedComanda?.id === c.id" (click)="selectComanda(c)">
+              <strong>{{ c.customerName }}</strong>
+              <span>R$ {{ c.total | number:'1.2-2' }}</span>
+            </button>
+
+            <button class="comanda-select-btn new" (click)="setStep('new-comanda')">
+              <strong>+ CRIAR NOVA COMANDA</strong>
+            </button>
+          </div>
+        </ng-container>
+
+        <!-- Passo 3: Nova Comanda -->
+        <ng-container *ngIf="checkoutStep === 'new-comanda'">
+          <h2>Nova Comanda</h2>
+          <div class="comanda-box">
+            <label>Nome do Cliente:</label>
+            <input type="text" [(ngModel)]="comandaName" placeholder="Ex: Mesa 05, João..." autofocus
+              (keyup.enter)="finalizarCheckout()">
+          </div>
+        </ng-container>
+
+        <!-- Ações do Modal -->
+        <div class="checkout-actions">
+          <button class="btn-cancel"
+            (click)="(checkoutStep === 'choice' || comandaBeingPaid) ? closeCheckout() : setStep('choice')">
+            {{ (checkoutStep === 'choice' || comandaBeingPaid) ? 'CANCELAR' : 'VOLTAR' }}
+          </button>
+
+          <button *ngIf="checkoutStep !== 'choice'" class="btn-confirm pay" (click)="finalizarCheckout()">
+            CONFIRMAR {{ checkoutStep === 'payment-method' ? 'PAGAMENTO' : 'ADICIONAR' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de Comandas Abertas -->
+    <div class="comandas-popup" [class.open]="isComandaListOpen">
+      <div class="cart-header">
+        <span>Contas Abertas ({{ openComandas.length }})</span>
+        <button class="btn-close" (click)="toggleComandaList()">✕</button>
+      </div>
+      <div class="comanda-list-content">
+        <div *ngIf="openComandas.length === 0" class="empty-msg">
+          Nenhuma conta aberta no momento 📋
+        </div>
+        <div *ngFor="let c of openComandas; trackBy: trackByComandaId" class="comanda-group">
+          <div class="comanda-item" (click)="toggleComandaItems(c.id!)">
+            <div class="c-info">
+              <strong>{{ c.customerName }}</strong>
+              <small>{{ c.items.length }} itens • R$ {{ c.total | number:'1.2-2' }}</small>
+            </div>
+            <div class="c-actions">
+              <span class="chevron" [class.up]="expandedComandaId === c.id">▼</span>
+              <button class="btn-settle" (click)="$event.stopPropagation(); checkoutComanda(c)">
+                RECEBER
+              </button>
+            </div>
+          </div>
+
+          <!-- Itens da Comanda (Accordion) -->
+          <div class="comanda-items-detail" *ngIf="expandedComandaId === c.id">
+            <div *ngFor="let item of c.items" class="c-detail-row">
+              <span>{{ item.quantity }}x {{ item.productName }}</span>
+              <span>R$ {{ item.priceAtSale | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pdv-actions-fabs">
+      <button class="comanda-fab" (click)="toggleComandaList()">
+        <span style="font-size: 1.5rem;">📋</span>
+        <span *ngIf="openComandas.length > 0" class="fab-badge">{{ openComandas.length }}</span>
+      </button>
+
+      <button class="cart-fab" (click)="toggleCart()">
+        <span style="font-size: 1.5rem;">🛒</span>
+
+        <span *ngIf="total > 0" class="fab-price">
+          R$ {{ total | number:'1.0-0' }}
+        </span>
+      </button>
+    </div>
 
   </div>
 </div>
