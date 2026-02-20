@@ -161,14 +161,14 @@
           </div>
 
           <div class="toggle-delivery">
-            <button [class.active]="deliveryType === 'pickup'" (click)="deliveryType = 'pickup'">Retirada</button>
-            <button [class.active]="deliveryType === 'delivery'" (click)="deliveryType = 'delivery'">Entrega</button>
+            <button [class.active]="deliveryType === 'pickup'" (click)="setDeliveryType('pickup')">Retirada</button>
+            <button [class.active]="deliveryType === 'delivery'" (click)="setDeliveryType('delivery')">Entrega</button>
           </div>
 
           <input *ngIf="deliveryType === 'delivery'" type="text" [(ngModel)]="address"
             placeholder="Endereço de Entrega *" class="full-width">
 
-          <div class="freight-row">
+          <div class="freight-row" *ngIf="deliveryType === 'delivery'">
             <label>Frete/Taxa R$:</label>
             <input type="number" [(ngModel)]="shippingCost" min="0">
           </div>

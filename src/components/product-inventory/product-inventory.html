@@ -1,5 +1,5 @@
 <div class="estoque-layout">
-  
+
   <aside class="sidebar">
     <div class="logo-area">
       <h2>VERMEIOLANDIA</h2>
@@ -21,63 +21,86 @@
   <main class="conteudo">
 
     <section *ngIf="activeTab === 'relatorio'" class="painel-relatorio">
-      
+
       <div class="header-section">
         <h1>Dashboard Financeiro</h1>
-        <p>Acompanhe o desempenho do seu negócio.</p>
+        <p>Visão geral de desempenho e tendências.</p>
       </div>
-      
+
+      <!-- FILTROS AVANÇADOS -->
+      <div class="filtros-dashboard card-base">
+        <div class="filter-row main-filters">
+          <div class="date-presets">
+            <button class="btn-preset" (click)="setPreset('hoje')">Hoje</button>
+            <button class="btn-preset" (click)="setPreset('7dias')">7 Dias</button>
+            <button class="btn-preset" (click)="setPreset('mes')">Este Mês</button>
+            <button class="btn-preset" (click)="setPreset('mesAnterior')">Mês Passado</button>
+          </div>
+
+          <div class="custom-dates">
+            <input type="date" [(ngModel)]="filtroDataInicio" (change)="atualizarRelatorio()">
+            <span>até</span>
+            <input type="date" [(ngModel)]="filtroDataFim" (change)="atualizarRelatorio()">
+          </div>
+
+          <div class="product-selection">
+            <select [(ngModel)]="filtroProdutoId" (change)="atualizarRelatorio()">
+              <option value="">Todos os Produtos</option>
+              <option *ngFor="let p of products" [value]="p.id">{{ p.title }}</option>
+            </select>
+          </div>
+
+          <div class="filter-actions">
+            <button class="btn-dashboard-action primary" (click)="atualizarRelatorio()">
+              <span>🔍</span> FILTRAR
+            </button>
+            <button class="btn-dashboard-action secondary" (click)="limparFiltros()">
+              LIMPAR
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
       <div class="cards-kpi">
         <div class="card kpi-venda">
-          <span>Faturamento Total</span>
-          <strong>R$ {{ relatorio.faturamento | number:'1.2-2' }}</strong>
-          <small>{{ relatorio.qtdVendas }} vendas no período</small>
+          <span class="kpi-label">Faturamento</span>
+          <strong class="kpi-value">R$ {{ relatorio.faturamento | number:'1.2-2' }}</strong>
+          <small class="kpi-meta">{{ relatorio.qtdVendas }} vendas</small>
         </div>
 
         <div class="card kpi-custo">
-          <span>Custo das Vendas (CMV)</span>
-          <strong>R$ {{ relatorio.custoTotal | number:'1.2-2' }}</strong>
+          <span class="kpi-label">Custo (CMV)</span>
+          <strong class="kpi-value">R$ {{ relatorio.custoTotal | number:'1.2-2' }}</strong>
         </div>
 
         <div class="card kpi-lucro">
-          <span>Lucro Líquido</span>
-          <strong>R$ {{ relatorio.lucro | number:'1.2-2' }}</strong>
-          <small *ngIf="relatorio.faturamento > 0">
-            Margem Real: {{ relatorio.margem | number:'1.0-0' }}%
+          <span class="kpi-label">Lucro Líquido</span>
+          <strong class="kpi-value">R$ {{ relatorio.lucro | number:'1.2-2' }}</strong>
+          <small class="kpi-meta" *ngIf="relatorio.faturamento > 0">
+            Margem: {{ relatorio.margem | number:'1.0-0' }}%
           </small>
         </div>
       </div>
 
-      <div class="filtros-container">
-        <h3>🔍 Filtrar Resultados</h3>
-        
-        <div class="filtros-bar">
-          <div class="campo-filtro">
-            <label>De:</label>
-            <input type="date" [(ngModel)]="filtroDataInicio">
+      <!-- GRÁFICOS -->
+      <div class="dashboard-grid">
+        <div class="chart-container main-chart card-base">
+          <h3>Evolução de Vendas</h3>
+          <div class="canvas-wrapper">
+            <canvas id="salesChart"></canvas>
           </div>
+        </div>
 
-          <div class="campo-filtro">
-            <label>Até:</label>
-            <input type="date" [(ngModel)]="filtroDataFim">
-          </div>
-
-          <div class="campo-filtro grow">
-            <label>Produto Específico:</label>
-            <select [(ngModel)]="filtroProdutoId">
-              <option value="">Todos os Produtos</option>
-              <option *ngFor="let p of products" [value]="p.id">
-                {{ p.title }}
-              </option>
-            </select>
-          </div>
-
-          <div class="acoes-filtro">
-            <button class="btn-filtrar" (click)="atualizarRelatorio()">FILTRAR</button>
-            <button class="btn-limpar" (click)="limparFiltros()">Limpar</button>
+        <div class="chart-container secondary-chart card-base">
+          <h3>Top 5 Produtos (Qtd)</h3>
+          <div class="canvas-wrapper">
+            <canvas id="topProductsChart"></canvas>
           </div>
         </div>
       </div>
+
+
     </section>
 
     <section *ngIf="activeTab === 'estoque'" class="painel-estoque">
@@ -87,19 +110,16 @@
       </div>
 
       <div class="form-box modal-inline" *ngIf="exibirFormularioNovo || produtoSelecionadoCompra">
-        <button class="btn-cancelar" (click)="fecharFormulario(); cancelarSelecaoCompra()">⬅ Voltar para a lista</button>
-        
+        <button class="btn-cancelar" (click)="fecharFormulario(); cancelarSelecaoCompra()">⬅ Voltar para a
+          lista</button>
+
         <div *ngIf="exibirFormularioNovo">
           <h2>{{ produtoEmEdicao ? 'Editar Produto' : 'Novo Produto' }}</h2>
-          
+
           <div class="row">
             <div class="form-group" style="flex: 2;">
               <label>Nome do Produto</label>
               <input type="text" [(ngModel)]="novoProduto.title" placeholder="Ex: Cerveja Lata">
-            </div>
-            <div class="form-group">
-              <label>Cor do Card</label>
-              <input type="color" [(ngModel)]="novoProduto.color" style="height: 46px; padding: 5px; cursor: pointer;">
             </div>
           </div>
 
@@ -110,7 +130,7 @@
               <label for="fileInput" class="btn-upload">
                 {{ novoProduto.urlImage ? '📸 Imagem Selecionada' : '📁 Escolher Foto' }}
               </label>
-              
+
               <div class="preview-upload" *ngIf="novoProduto.urlImage">
                 <img [src]="novoProduto.urlImage" alt="Preview">
                 <button (click)="novoProduto.urlImage = ''">✕</button>
@@ -153,7 +173,7 @@
 
       <div class="produtos-lista" *ngIf="!exibirFormularioNovo && !produtoSelecionadoCompra">
         <div class="produto-card" *ngFor="let p of products" [style.border-left-color]="p.color">
-          
+
           <div class="prod-thumb" *ngIf="p.urlImage">
             <img [src]="p.urlImage" alt="foto">
           </div>
@@ -161,7 +181,7 @@
           <div class="prod-info">
             <span class="prod-title">{{ p.title }}</span>
             <span class="prod-details">
-              Estoque: <strong>{{ p.stock }}</strong> | 
+              Estoque: <strong>{{ p.stock }}</strong> |
               Venda: R$ {{ p.sellPrice | number:'1.2-2' }}
             </span>
           </div>

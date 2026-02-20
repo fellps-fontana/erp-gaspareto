@@ -3,7 +3,7 @@
   min-height: 100vh;
   height: auto;
   /* Permite crescer se precisar */
-  background-color: #2c3136;
+  background-color: var(--bg-app);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -66,7 +66,9 @@
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-  color: #333;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
   /* Texto escuro pra contrastar com fundo claro */
   text-decoration: none;
   /* Tira o sublinhado do link */
@@ -76,30 +78,40 @@
 .menu-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+  background-color: #252525;
 }
 
 .menu-card:active {
   transform: scale(0.96);
 }
 
-/* --- CORES DOS CARTÕES --- */
+/* --- CORES DOS CARTÕES (Detalhes) --- */
 
 /* PDV: Amarelo (Atenção/Venda) */
-.card-pdv {
-  background: linear-gradient(135deg, #f4c042 0%, #d4a022 100%);
+.card-pdv .icon {
+  color: var(--color-primary);
+}
+
+.card-pdv:hover {
+  border-color: var(--color-primary);
 }
 
 /* Pedidos: Azul (Organização/Fluxo) */
-.card-orders {
-  background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
-  color: white;
-  /* Texto branco fica melhor no azul */
+.card-orders .icon {
+  color: var(--color-info);
+}
+
+.card-orders:hover {
+  border-color: var(--color-info);
 }
 
 /* Gestão: Verde (Estabilidade/Admin) */
-.card-admin {
-  background: linear-gradient(135deg, #58a399 0%, #3a7a72 100%);
-  color: white;
+.card-admin .icon {
+  color: var(--color-secondary);
+}
+
+.card-admin:hover {
+  border-color: var(--color-secondary);
 }
 
 /* Ícones */
@@ -107,7 +119,12 @@
   width: 80px;
   height: 80px;
   margin-bottom: 20px;
-  opacity: 0.9;
+  opacity: 1;
+  transition: transform 0.2s;
+}
+
+.menu-card:hover .icon {
+  transform: scale(1.1);
 }
 
 /* Texto */
@@ -122,7 +139,7 @@
   display: block;
   font-size: 0.9rem;
   font-weight: 400;
-  opacity: 0.8;
+  color: var(--text-secondary);
   margin-top: 5px;
   text-transform: uppercase;
 }

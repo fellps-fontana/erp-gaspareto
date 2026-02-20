@@ -2,6 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Chart, registerables } from 'chart.js';
+
+Chart.register(...registerables);
 
 // Models e Services
 import { Product } from '../../models/product-model';
@@ -45,6 +48,10 @@ export class ProductInventoryComponent implements OnInit {
     margem: 0
   };
 
+  // --- CHART INSTANCES ---
+  salesChart: any;
+  topProductsChart: any;
+
   // --- DADOS PARA CADASTRO / EDIÇÃO (CAMPOS NOVOS ADICIONADOS) ---
   novoProduto: Product = {
     title: '',
@@ -52,7 +59,7 @@ export class ProductInventoryComponent implements OnInit {
     buyPrice: 0,
     stock: 0,
     urlImage: '',
-    color: '#FDD835' // Cor amarela padrão da Vermeiolandia
+    color: '#f4c042' // Cor amarela padrão do Sistema
   };
 
   // --- DADOS PARA COMPRA (ENTRADA) ---
@@ -132,6 +139,178 @@ export class ProductInventoryComponent implements OnInit {
         qtdVendas: contagemVendas,
         margem: faturamento > 0 ? (lucro / faturamento * 100) : 0
       };
+
+      // Atualiza os gráficos com os dados filtrados
+      this.renderCharts(vendas);
+    });
+  }
+
+  // --- PRESETS DE DATA ---
+  setPreset(preset: 'hoje' | '7dias' | 'mes' | 'mesAnterior') {
+    const hoje = new Date();
+    let inicio = new Date();
+    let fim = new Date();
+
+    switch (preset) {
+      case 'hoje':
+        // Já está setado como hoje
+        break;
+      case '7dias':
+        inicio.setDate(hoje.getDate() - 7);
+        break;
+      case 'mes':
+        inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        break;
+      case 'mesAnterior':
+        inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+        fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+        break;
+    }
+
+    this.filtroDataInicio = this.formatDateToInput(inicio);
+    this.filtroDataFim = this.formatDateToInput(fim);
+    this.atualizarRelatorio();
+  }
+
+  // --- LÓGICA DE GRÁFICOS ---
+  renderCharts(vendas: any[]) {
+    this.renderSalesHistoryChart(vendas);
+    this.renderTopProductsChart(vendas);
+  }
+
+  renderSalesHistoryChart(vendas: any[]) {
+    const ctx = document.getElementById('salesChart') as HTMLCanvasElement;
+    if (!ctx) return;
+
+    // Agrupa vendas por dia
+    const salesByDay: { [key: string]: number } = {};
+
+    // Preenche os dias entre inicio e fim para não ficar buraco no gráfico
+    let current = new Date(this.filtroDataInicio + 'T00:00:00');
+    const end = new Date(this.filtroDataFim + 'T23:59:59');
+
+    while (current <= end) {
+      const dayKey = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      salesByDay[dayKey] = 0;
+      current.setDate(current.getDate() + 1);
+    }
+
+    vendas.forEach(v => {
+      const vDate = (v.date?.toDate ? v.date.toDate() : new Date(v.date));
+      const dayKey = vDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+      let totalVenda = 0;
+      v.items?.forEach((item: any) => {
+        if (!this.filtroProdutoId || item.idProduct === this.filtroProdutoId) {
+          totalVenda += (item.priceAtSale * item.quantity);
+        }
+      });
+
+      if (salesByDay[dayKey] !== undefined) {
+        salesByDay[dayKey] += totalVenda;
+      }
+    });
+
+    const labels = Object.keys(salesByDay);
+    const data = Object.values(salesByDay);
+
+    if (this.salesChart) this.salesChart.destroy();
+
+    this.salesChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Vendas (R$)',
+          data,
+          borderColor: '#f4c042',
+          backgroundColor: 'rgba(244, 192, 66, 0.1)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 3,
+          pointBackgroundColor: '#f4c042'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#888' }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#888' }
+          }
+        }
+      }
+    });
+  }
+
+  renderTopProductsChart(vendas: any[]) {
+    const ctx = document.getElementById('topProductsChart') as HTMLCanvasElement;
+    if (!ctx) return;
+
+    const productsMap: { [key: string]: { name: string, qty: number } } = {};
+
+    vendas.forEach(v => {
+      v.items?.forEach((item: any) => {
+        if (!productsMap[item.idProduct]) {
+          // Tenta pegar o nome do produto da lista principal caso não esteja no item da venda
+          const prodInfo = this.products.find(p => p.id === item.idProduct);
+          productsMap[item.idProduct] = { name: item.title || prodInfo?.title || 'Produto S/N', qty: 0 };
+        }
+        productsMap[item.idProduct].qty += item.quantity;
+      });
+    });
+
+    // Ordena e pega os top 5
+    const sorted = Object.values(productsMap)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+
+    const labels = sorted.map(s => s.name);
+    const data = sorted.map(s => s.qty);
+
+    if (this.topProductsChart) this.topProductsChart.destroy();
+
+    this.topProductsChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Qtd Vendida',
+          data,
+          backgroundColor: [
+            '#f4c042', '#3498db', '#2ecc71', '#e74c3c', '#9b59b6'
+          ],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#888' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: '#fff' }
+          }
+        }
+      }
     });
   }
 
@@ -155,7 +334,7 @@ export class ProductInventoryComponent implements OnInit {
       buyPrice: 0,
       stock: 0,
       urlImage: '',
-      color: '#FDD835'
+      color: '#f4c042'
     };
     this.exibirFormularioNovo = true;
     this.produtoSelecionadoCompra = null;
@@ -167,7 +346,7 @@ export class ProductInventoryComponent implements OnInit {
     this.novoProduto = {
       ...p,
       urlImage: p.urlImage || '',
-      color: p.color || '#FDD835'
+      color: p.color || '#f4c042'
     };
     this.exibirFormularioNovo = true;
     this.produtoSelecionadoCompra = null;

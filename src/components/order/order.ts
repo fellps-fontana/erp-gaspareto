@@ -230,6 +230,14 @@ export class OrdersComponent implements OnInit {
     this.observations = '';
   }
 
+  setDeliveryType(type: 'pickup' | 'delivery') {
+    this.deliveryType = type;
+    if (type === 'pickup') {
+      this.shippingCost = 0;
+      this.address = '';
+    }
+  }
+
   // =============================================================
   // 🚀 LÓGICA DE STATUS (KANBAN / FLUXO)
   // =============================================================

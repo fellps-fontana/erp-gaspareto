@@ -1,19 +1,66 @@
 /* src/styles.css */
 
-html, body {
+/* --- DESIGN SYSTEM TOKENS --- */
+:root {
+  /* COLORS */
+  --color-primary: #f4c042;
+  /* Amarelo Ouro (Ação/Destaque) */
+  --color-primary-dark: #d4a022;
+  /* Amarelo Escuro (Hover) */
+  --color-secondary: #00FF7F;
+  /* Verde Neon (Sucesso/Confirmação) */
+  --color-secondary-dark: #2ecc71;
+  --color-danger: #e74c3c;
+  /* Vermelho (Erro/Cancelar) */
+  --color-danger-dark: #c0392b;
+  --color-info: #3498db;
+  /* Azul (Informação) */
+
+  --bg-app: #121212;
+  /* Fundo Geral */
+  --bg-card: #1e1e1e;
+  /* Fundo de Cards/Modais */
+  --bg-input: #252525;
+  /* Fundo de Inputs */
+
+  --text-primary: #ffffff;
+  /* Texto Principal */
+  --text-secondary: #aaaaaa;
+  /* Texto Secundário (Labels) */
+  --text-on-primary: #121212;
+  /* Texto sobre Amarelo */
+
+  --border-color: #333333;
+  /* Bordas Sutis */
+
+  /* SPACING */
+  --sp-xs: 4px;
+  --sp-sm: 8px;
+  --sp-md: 16px;
+  --sp-lg: 24px;
+  --sp-xl: 32px;
+
+  /* BORDER RADIUS */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 50px;
+}
+
+html,
+body {
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
-  /* MUDANÇA: min-height permite que a página cresça se o conteúdo for maior que a tela */
-  min-height: 100% !important; 
-  height: auto !important; 
-  background-color: #121212 !important;
-  
-  /* MUDANÇA: Permitir scroll vertical e esconder o horizontal que as vezes buga no mobile */
-  overflow-y: auto !important; 
+  min-height: 100% !important;
+  height: auto !important;
+  background-color: var(--bg-app) !important;
+  color: var(--text-primary);
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  overflow-y: auto !important;
   overflow-x: hidden !important;
-  
-  /* Scroll suave para celulares (iOS/Android) */
   -webkit-overflow-scrolling: touch;
 }
 
@@ -21,11 +68,85 @@ html, body {
 app-root {
   display: block;
   width: 100%;
-  /* MUDANÇA: height auto permite que os produtos do PDV "empurrem" a altura */
   height: auto !important;
   min-height: 100vh;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* --- GLOBAL COMPONENT STYLES --- */
+
+/* Buttons */
+.btn {
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--text-on-primary);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-dark);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: #121212;
+}
+
+.btn-danger {
+  background-color: var(--color-danger);
+  color: white;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.btn-outline:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  width: 100%;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-primary);
+}
+
+/* Cards */
+.card-base {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
