@@ -255,81 +255,82 @@
     </div>
   </div>
 
-</div>
-
-<!-- MODAL DETALHES -->
-<div class="modal-backdrop" *ngIf="isDetailsModalOpen && selectedOrderDetails">
-  <div class="modal-content details-modal">
-    <div class="modal-header">
-      <h3>Detalhes do Pedido #{{ selectedOrderDetails.createdAt.toMillis() | date:'mmss' }}</h3>
-      <button class="btn-close-modal" (click)="closeDetails()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-    </div>
-
-    <div class="modal-body">
-
-      <!-- HEADER DO DETALHE: NOME E STATUS -->
-      <div class="detail-header-section">
-        <div class="customer-info">
-          <h2>{{ selectedOrderDetails.customerName }}</h2>
-          <span class="phone" *ngIf="selectedOrderDetails.customerPhone">{{ selectedOrderDetails.customerPhone }}</span>
-        </div>
-        <div class="status-tag" [ngClass]="selectedOrderDetails.status">
-          {{ translateStatus(selectedOrderDetails.status) }}
-        </div>
+  <!-- MODAL DETALHES -->
+  <div class="modal-backdrop" *ngIf="isDetailsModalOpen && selectedOrderDetails">
+    <div class="modal-content details-modal">
+      <div class="modal-header">
+        <h3>Detalhes do Pedido #{{ selectedOrderDetails.createdAt?.toMillis() | date:'mmss' }}</h3>
+        <button class="btn-close-modal" (click)="closeDetails()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
 
-      <!-- TIPO DE ENTREGA -->
-      <div class="detail-delivery-section">
-        <div class="delivery-badge" [class.pickup]="selectedOrderDetails.deliveryType === 'pickup'">
-          <span *ngIf="selectedOrderDetails.deliveryType === 'delivery'">🛵 Entrega</span>
-          <span *ngIf="selectedOrderDetails.deliveryType === 'pickup'">🏢 Retirada</span>
+      <div class="modal-body">
+
+        <!-- HEADER DO DETALHE: NOME E STATUS -->
+        <div class="detail-header-section">
+          <div class="customer-info">
+            <h2>{{ selectedOrderDetails.customerName }}</h2>
+            <span class="phone" *ngIf="selectedOrderDetails.customerPhone">{{ selectedOrderDetails.customerPhone
+              }}</span>
+          </div>
+          <div class="status-tag" [ngClass]="selectedOrderDetails.status">
+            {{ translateStatus(selectedOrderDetails.status) }}
+          </div>
         </div>
-        <p class="address-text" *ngIf="selectedOrderDetails.address">
-          {{ selectedOrderDetails.address }}
-        </p>
-      </div>
 
-      <!-- LISTA DE ITENS -->
-      <div class="detail-items-section">
-        <h4>Itens do Pedido</h4>
-        <ul class="detail-items-list">
-          <li *ngFor="let item of selectedOrderDetails.items">
-            <div class="item-line">
-              <span class="item-qty">{{ item.quantity }}x</span>
-              <span class="item-name">{{ item.productName }}</span>
-              <span class="item-price">R$ {{ item.priceAtSale * item.quantity | number:'1.2-2' }}</span>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <!-- TOTAIS -->
-      <div class="detail-totals">
-        <div class="total-row" *ngIf="selectedOrderDetails.shippingCost > 0">
-          <span>Taxa de Entrega:</span>
-          <span>R$ {{ selectedOrderDetails.shippingCost | number:'1.2-2' }}</span>
+        <!-- TIPO DE ENTREGA -->
+        <div class="detail-delivery-section">
+          <div class="delivery-badge" [class.pickup]="selectedOrderDetails.deliveryType === 'pickup'">
+            <span *ngIf="selectedOrderDetails.deliveryType === 'delivery'">Entrega</span>
+            <span *ngIf="selectedOrderDetails.deliveryType === 'pickup'">Retirada</span>
+          </div>
+          <p class="address-text" *ngIf="selectedOrderDetails.address">
+            {{ selectedOrderDetails.address }}
+          </p>
         </div>
-        <div class="total-row final">
-          <span>Total:</span>
-          <span>R$ {{ selectedOrderDetails.total | number:'1.2-2' }}</span>
+
+        <!-- LISTA DE ITENS -->
+        <div class="detail-items-section">
+          <h4>Itens do Pedido</h4>
+          <ul class="detail-items-list">
+            <li *ngFor="let item of selectedOrderDetails.items">
+              <div class="item-line">
+                <span class="item-qty">{{ item.quantity }}x</span>
+                <span class="item-name">{{ item.productName }}</span>
+                <span class="item-price">R$ {{ (item.priceAtSale * item.quantity) | number:'1.2-2' }}</span>
+              </div>
+            </li>
+          </ul>
         </div>
+
+        <!-- TOTAIS -->
+        <div class="detail-totals">
+          <div class="total-row" *ngIf="selectedOrderDetails.shippingCost > 0">
+            <span>Taxa de Entrega:</span>
+            <span>R$ {{ selectedOrderDetails.shippingCost | number:'1.2-2' }}</span>
+          </div>
+          <div class="total-row final">
+            <span>Total:</span>
+            <span>R$ {{ selectedOrderDetails.total | number:'1.2-2' }}</span>
+          </div>
+        </div>
+
+        <!-- OBS -->
+        <div class="detail-obs" *ngIf="selectedOrderDetails.observations">
+          <label>Observações:</label>
+          <p>{{ selectedOrderDetails.observations }}</p>
+        </div>
+
       </div>
 
-      <!-- OBS -->
-      <div class="detail-obs" *ngIf="selectedOrderDetails.observations">
-        <label>Observações:</label>
-        <p>{{ selectedOrderDetails.observations }}</p>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeDetails()">Fechar</button>
       </div>
-
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn-secondary" (click)="closeDetails()">Fechar</button>
     </div>
   </div>
+
 </div>

@@ -1,6 +1,11 @@
-import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, collectionData, doc, updateDoc, query, where, orderBy, serverTimestamp, runTransaction, increment, Transaction } from '@angular/fire/firestore';
-import { Observable } from 'rxjs';
+import { Injectable, inject, NgZone } from '@angular/core';
+import { Firestore } from '@angular/fire/firestore';
+import {
+    collection, doc, updateDoc, query, where, orderBy,
+    serverTimestamp, runTransaction, increment, Transaction, onSnapshot
+} from 'firebase/firestore';
+import { Observable, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { Comanda } from '../../models/comanda-model';
 
 @Injectable({
@@ -8,16 +13,56 @@ import { Comanda } from '../../models/comanda-model';
 })
 export class ComandaService {
     private firestore = inject(Firestore);
+    private ngZone = inject(NgZone);
     private readonly COLLECTION_NAME = 'comandas';
+
+    /**
+     * Helper para transformar onSnapshot em Observable estável (Native SDK)
+     */
+    private collectionDataObservable<T>(queryFn: any): Observable<T[]> {
+        return new Observable<T[]>((observer) => {
+            console.log(`ComandaService: [onSnapshot] Iniciando listener para ${this.COLLECTION_NAME}...`);
+            const unsubscribe = onSnapshot(queryFn,
+                (snapshot: any) => {
+                    console.log(`ComandaService: [onSnapshot] Snapshot recebido! Docs: ${snapshot.docs.length}`);
+                    const data = snapshot.docs.map((doc: any) => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    this.ngZone.run(() => observer.next(data));
+                },
+                (error: any) => {
+                    console.error("ComandaService: [onSnapshot] ERRO:", error);
+                    this.ngZone.run(() => observer.error(error));
+                }
+            );
+            return () => {
+                console.log(`ComandaService: [onSnapshot] Encerrando listener.`);
+                unsubscribe();
+            };
+        });
+    }
 
     getOpenComandas(): Observable<Comanda[]> {
         const comandaCol = collection(this.firestore, this.COLLECTION_NAME);
-        const q = query(
-            comandaCol,
-            where('status', '==', 'open'),
-            orderBy('createdAt', 'desc')
+
+        // Query simplificada: Apenas filtro por status. 
+        // SEM orderBy no banco para evitar erro de Index.
+        const q = query(comandaCol, where('status', '==', 'open'));
+
+        console.log("ComandaService: Solicitando comandas 'open' (sem orderBy no Firebase)");
+
+        return this.collectionDataObservable<Comanda>(q).pipe(
+            map(comandas => {
+                // Ordenação feita aqui no Cliente
+                return comandas
+                    .sort((a, b) => {
+                        const dateA = (a.createdAt as any)?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
+                        const dateB = (b.createdAt as any)?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+                        return dateB - dateA;
+                    });
+            })
         );
-        return collectionData(q, { idField: 'id' }) as Observable<Comanda[]>;
     }
 
     async addComanda(comanda: Omit<Comanda, 'id' | 'createdAt' | 'status'>): Promise<void> {

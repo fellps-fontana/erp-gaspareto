@@ -1,8 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject, NgZone } from '@angular/core';
+import { Firestore } from '@angular/fire/firestore';
 import {
-  Firestore, collection, collectionData, doc,
-  runTransaction, query, where, orderBy, serverTimestamp, increment
-} from '@angular/fire/firestore';
+  collection, doc, runTransaction, query, where, orderBy, serverTimestamp, increment, onSnapshot
+} from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { Sale } from '../../models/sell-model';
 
@@ -10,28 +10,49 @@ import { Sale } from '../../models/sell-model';
   providedIn: 'root',
 })
 export class SaleService {
-  private salesCollection;
+  private firestore = inject(Firestore);
+  private ngZone = inject(NgZone);
+  private readonly COLLECTION_NAME = 'sales';
 
-  constructor(private firestore: Firestore) {
-    this.salesCollection = collection(this.firestore, 'sales');
+  constructor() { }
+
+  /**
+   * Helper para Observable em tempo real usando Native SDK e NgZone
+   */
+  private collectionDataObservable<T>(queryFn: any): Observable<T[]> {
+    return new Observable<T[]>((observer) => {
+      const unsubscribe = onSnapshot(queryFn,
+        (snapshot: any) => {
+          const data = snapshot.docs.map((doc: any) => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          this.ngZone.run(() => observer.next(data));
+        },
+        (error: any) => {
+          console.error("SaleService [onSnapshot] ERRO:", error);
+          this.ngZone.run(() => observer.error(error));
+        }
+      );
+      return () => unsubscribe();
+    });
   }
 
   getSales(): Observable<Sale[]> {
-    return collectionData(this.salesCollection, { idField: 'id' }) as Observable<Sale[]>;
+    const q = query(collection(this.firestore, this.COLLECTION_NAME));
+    return this.collectionDataObservable<Sale>(q);
   }
 
   async processSale(sale: any, updateStock: boolean = true) {
     try {
       await runTransaction(this.firestore, async (transaction) => {
 
-        // --- PASSO 1: TODAS AS LEITURAS (READS) ---
-        // Primeiro, buscamos as referências e os dados de todos os produtos do carrinho
         const productSnapshots = [];
 
         if (updateStock) {
           for (const item of sale.items) {
             const productDocRef = doc(this.firestore, `products/${item.idProduct}`);
-            const productDoc = await transaction.get(productDocRef); // Leitura
+            const productDoc = await transaction.get(productDocRef);
 
             if (!productDoc.exists()) {
               throw new Error(`Produto ID: ${item.idProduct} não encontrado!`);
@@ -42,7 +63,6 @@ export class SaleService {
               throw new Error(`Estoque insuficiente para: ${item.name || 'Produto'}`);
             }
 
-            // Guardamos o snapshot e a referência para usar no passo de escrita
             productSnapshots.push({
               ref: productDocRef,
               quantity: item.quantity
@@ -50,10 +70,6 @@ export class SaleService {
           }
         }
 
-        // --- PASSO 2: TODAS AS ESCRITAS (WRITES) ---
-        // Agora que terminamos todos os 'await transaction.get', podemos fazer os updates
-
-        // 2.1 Atualizar estoques
         if (updateStock) {
           for (const p of productSnapshots) {
             transaction.update(p.ref, {
@@ -62,12 +78,11 @@ export class SaleService {
           }
         }
 
-        // 2.2 Registrar a Venda
-        const newSaleRef = doc(collection(this.firestore, 'sales'));
+        const newSaleRef = doc(collection(this.firestore, this.COLLECTION_NAME));
         const saleData = {
           items: sale.items.map((i: any) => ({
             idProduct: i.idProduct,
-            productName: i.productName || 'Produto sem nome', // Garante que pegue o nome certo
+            productName: i.productName || 'Produto sem nome',
             quantity: Number(i.quantity) || 1,
             priceAtSale: Number(i.priceAtSale) || 0,
             priceAtCost: Number(i.priceAtCost) || 0
@@ -89,20 +104,21 @@ export class SaleService {
   }
 
   getSalesByDate(startDate: Date, endDate: Date): Observable<Sale[]> {
+    const salesCollection = collection(this.firestore, this.COLLECTION_NAME);
     const salesQuery = query(
-      this.salesCollection,
+      salesCollection,
       where('date', '>=', startDate),
       where('date', '<=', endDate),
       orderBy('date', 'desc')
     );
 
-    return collectionData(salesQuery, { idField: 'id' }) as Observable<Sale[]>;
+    return this.collectionDataObservable<Sale>(salesQuery);
   }
 
   async cancelSale(saleId: string) {
     try {
       await runTransaction(this.firestore, async (transaction) => {
-        const saleDocRef = doc(this.firestore, `sales/${saleId}`);
+        const saleDocRef = doc(this.firestore, `${this.COLLECTION_NAME}/${saleId}`);
         const saleDoc = await transaction.get(saleDocRef);
 
         if (!saleDoc.exists()) throw new Error('Venda não encontrada');
@@ -111,7 +127,6 @@ export class SaleService {
 
         for (const item of saleData.items) {
           const productRef = doc(this.firestore, `products/${item.idProduct}`);
-          // Devolve o estoque usando increment positivo
           transaction.update(productRef, {
             stock: increment(item.quantity)
           });

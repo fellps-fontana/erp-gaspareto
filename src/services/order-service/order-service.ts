@@ -4,7 +4,7 @@ import {
   collection, doc, addDoc, updateDoc, serverTimestamp, query, orderBy,
   CollectionReference, DocumentReference, onSnapshot, getDoc
 } from 'firebase/firestore';
-import { Observable, from, throwError } from 'rxjs';
+import { Observable, from, throwError, combineLatest, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { Order } from '../../models/order-model';
 import { SaleService } from '../sale-service/sale-service';
@@ -35,35 +35,57 @@ export class OrderService {
    */
   private collectionDataObservable<T>(queryFn: any): Observable<T[]> {
     return new Observable<T[]>((observer) => {
-      console.log('OrderService: Iniciando listener do Firestore...');
+      console.log('OrderService: [onSnapshot] Iniciando listener...');
       const unsubscribe = onSnapshot(queryFn,
         (snapshot: any) => {
-          console.log(`OrderService: Snapshot recebido. Docs: ${snapshot.docs.length}`);
-          const data = snapshot.docs.map((doc: any) => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          console.log('OrderService: Dados processados:', data);
+          console.log(`OrderService: [onSnapshot] Snapshot recebido! Total docs: ${snapshot.docs.length}`);
+          const data = snapshot.docs.map((doc: any) => {
+            const rawData = doc.data();
+            return {
+              id: doc.id,
+              ...rawData
+            };
+          });
+
+          if (data.length > 0) {
+            console.log('OrderService: [onSnapshot] Primeiro item (debug):', {
+              id: data[0].id,
+              status: data[0].status,
+              hasCreatedAt: !!data[0].createdAt
+            });
+          } else {
+            console.warn('OrderService: [onSnapshot] Snapshot vazio! Documentos podem estar faltando ou filtros muito restritos.');
+          }
+
           this.ngZone.run(() => observer.next(data));
         },
         (error: any) => {
-          console.error("OrderService: Erro no Firestore:", error);
+          console.error("OrderService: [onSnapshot] ERRO CRÍTICO:", error);
           this.ngZone.run(() => observer.error(error));
         }
       );
       return () => {
-        console.log('OrderService: Unsubscribing...');
+        console.log('OrderService: [onSnapshot] Fechando listener.');
         unsubscribe();
       };
     });
   }
 
   /**
-   * Retorna todos os pedidos ordenados por data de criação (decrescente).
+   * Retorna todos os pedidos.
+   * Ordenação no cliente para evitar problemas de Index.
    */
   getOrders(): Observable<Order[]> {
-    const q = query(this.ordersCollection, orderBy('createdAt', 'desc'));
-    return this.collectionDataObservable<Order>(q);
+    const q = query(this.ordersCollection);
+    return this.collectionDataObservable<Order>(q).pipe(
+      map(orders => {
+        return [...orders].sort((a, b) => {
+          const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
+          const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+          return dateB - dateA;
+        });
+      })
+    );
   }
 
   /**
@@ -71,17 +93,33 @@ export class OrderService {
    * Filtragem feita no CLIENTE para evitar necessidade de Index Composto.
    */
   getPendingOrders(): Observable<Order[]> {
-    const activeStatuses = ['pending', 'delivered'];
+    const activeStatuses = ['open', 'pending', 'preparing', 'ready', 'delivering', 'delivered'];
 
-    // 1. Busca tudo ordenado por data (Index padrão cobre isso)
-    const q = query(
-      this.ordersCollection,
-      orderBy('createdAt', 'desc')
-    );
+    // 1. Busca exclusivamente na coleção 'orders'
+    const q = query(this.ordersCollection);
 
-    // 2. Filtra no cliente
+    console.log('OrderService: MONITORANDO COLEÇÃO "orders"...');
+
     return this.collectionDataObservable<Order>(q).pipe(
-      map(orders => orders.filter(o => activeStatuses.includes(o.status)))
+      map(orders => {
+        console.log(`OrderService: [DATA] Recebidos ${orders.length} documentos da coleção "orders"`);
+
+        if (orders.length > 0) {
+          console.log('OrderService: [SAMPLE] Primeiro doc:', orders[0]);
+        }
+
+        return orders
+          .filter(o => activeStatuses.includes(o.status))
+          .sort((a, b) => {
+            const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
+            const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+            return dateB - dateA; // Decrescente
+          });
+      }),
+      catchError(err => {
+        console.error('OrderService: Erro ao ler coleção "orders":', err);
+        return of([]);
+      })
     );
   }
 
@@ -136,6 +174,17 @@ export class OrderService {
       status: 'delivered',
       actualDeliveryDate: serverTimestamp()
     });
+  }
+
+  /**
+   * Atualiza o status de um pedido.
+   * @param orderId ID do pedido.
+   * @param status Novo status.
+   */
+  async updateStatus(orderId: string, status: string): Promise<void> {
+    if (!orderId) return Promise.reject('Order ID is required');
+    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
+    return updateDoc(orderRef, { status });
   }
 
   // --- FINALIZAR (PAGAMENTO) ---

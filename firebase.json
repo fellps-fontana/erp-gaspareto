@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "C:\\Estudos\\erp-gaspareto\\dist\\erp-gaspareto\\browser",
+    "public": "C:\\Projetos\\erp-gaspareto\\erp-gaspareto\\dist\\erp-gaspareto\\browser",
     "ignore": [
       "firebase.json",
       "**/.*",

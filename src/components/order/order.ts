@@ -10,7 +10,7 @@ import { Order, OrderItem } from '../../models/order-model';
 import { PaymentMethod } from '../../models/sell-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { OrderService } from '../../services/order-service/order-service';
-import { Timestamp } from '@angular/fire/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 @Component({
   selector: 'app-orders',
@@ -97,10 +97,14 @@ export class OrdersComponent implements OnInit {
   }
 
   updateFilter() {
-    if (!this.orders$) return;
+    if (!this.orders$) {
+      console.warn('OrdersComponent: updateFilter chamado mas orders$ está nulo');
+      return;
+    }
 
     this.filteredOrders$ = this.orders$.pipe(
       map(orders => {
+        console.log(`OrdersComponent: Processando ${orders?.length || 0} pedidos para filtro ${this._filterStatus}`);
         this.isLoadingOrders = false; // Dados chegaram
 
         if (!orders) return [];
@@ -108,11 +112,19 @@ export class OrdersComponent implements OnInit {
         if (this._filterStatus === 'all') return orders;
 
         if (this._filterStatus === 'pending') {
-          return orders.filter(o => o.status === 'pending');
+          // Ativos: Tudo que não foi finalizado ou cancelado
+          const activeStatuses = ['open', 'pending', 'preparing', 'ready', 'delivering'];
+          const filtered = orders.filter(o => activeStatuses.includes(o.status));
+          console.log(`OrdersComponent: Filtro 'pending' retornou ${filtered.length} pedidos`);
+          return filtered;
         }
 
         if (this._filterStatus === 'delivered') {
-          return orders.filter(o => o.status === 'delivered');
+          // Histórico: Entregues e Finalizados
+          const finishedStatuses = ['delivered', 'finished'];
+          const filtered = orders.filter(o => finishedStatuses.includes(o.status));
+          console.log(`OrdersComponent: Filtro 'delivered' retornou ${filtered.length} pedidos`);
+          return filtered;
         }
 
         return orders;
@@ -244,7 +256,11 @@ export class OrdersComponent implements OnInit {
 
   translateStatus(status: string): string {
     const map: Record<string, string> = {
+      'open': 'Aberto',
       'pending': 'Pendente',
+      'preparing': 'Preparando',
+      'ready': 'Pronto',
+      'delivering': 'Em Entrega',
       'delivered': 'Entregue',
       'finished': 'Finalizado',
       'canceled': 'Cancelado'
@@ -253,8 +269,11 @@ export class OrdersComponent implements OnInit {
   }
 
   getNextActionLabel(status: string): string {
-    if (status === 'pending') return 'Entregar';
-    if (status === 'delivered') return 'Finalizar (Pagar)';
+    if (status === 'open' || status === 'pending') return 'Preparar';
+    if (status === 'preparing') return 'Pronto';
+    if (status === 'ready') return 'Entregar';
+    if (status === 'delivering') return 'Entregue';
+    if (status === 'delivered') return 'Pagar';
     return '';
   }
 
@@ -262,26 +281,47 @@ export class OrdersComponent implements OnInit {
   async advanceStatus(order: Order) {
     if (!order.id) return;
 
-    // Confirmações
-    if (order.status === 'pending') {
-      this.openConfirmModal(
-        `Confirmar entrega do pedido de ${order.customerName}? (Isso baixará o estoque)`,
-        async () => {
-          this.isProcessingAction = true;
-          try {
-            await this.orderService.markAsDelivered(order.id!);
-          } catch (err) {
-            this.showTemporaryError('Erro ao atualizar status.');
-          } finally {
-            this.isProcessingAction = false;
-            this.closeConfirmModal();
+    this.isProcessingAction = true;
+    try {
+      // Pedido Aberto ou Pendente -> Preparar
+      if (order.status === 'open' || order.status === 'pending') {
+        await this.orderService.updateStatus(order.id, 'preparing');
+      }
+      // Preparando -> Pronto
+      else if (order.status === 'preparing') {
+        await this.orderService.updateStatus(order.id, 'ready');
+      }
+      // Pronto -> Entregar (Inicia o trajeto)
+      else if (order.status === 'ready') {
+        await this.orderService.updateStatus(order.id, 'delivering');
+      }
+      // Em Entrega -> Entregue (Confirma entrega e baixa estoque)
+      else if (order.status === 'delivering') {
+        this.openConfirmModal(
+          `Confirmar entrega do pedido de ${order.customerName}? (O estoque será baixado)`,
+          async () => {
+            this.isProcessingAction = true;
+            try {
+              await this.orderService.markAsDelivered(order.id!);
+              this.showTemporarySuccess('Pedido marcado como Entregue! ✅');
+            } catch (err) {
+              this.showTemporaryError('Erro ao registrar entrega.');
+            } finally {
+              this.isProcessingAction = false;
+              this.closeConfirmModal();
+            }
           }
-        }
-      );
-    }
-    // Entregue -> Finalizar (Pagamento)
-    else if (order.status === 'delivered') {
-      this.openPaymentModal(order);
+        );
+      }
+      // Entregue -> Finalizar (Abre modal de pagamento)
+      else if (order.status === 'delivered') {
+        this.openPaymentModal(order);
+      }
+    } catch (err) {
+      console.error(err);
+      this.showTemporaryError('Erro ao atualizar status do pedido.');
+    } finally {
+      this.isProcessingAction = false;
     }
   }
 

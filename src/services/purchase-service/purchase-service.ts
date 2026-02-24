@@ -1,8 +1,8 @@
-import { Injectable } from '@angular/core';
-import { 
-  Firestore, collection, doc, runTransaction, 
-  serverTimestamp, increment, collectionData 
-} from '@angular/fire/firestore';
+import { Injectable, inject, NgZone } from '@angular/core';
+import { Firestore } from '@angular/fire/firestore';
+import {
+  collection, doc, runTransaction, serverTimestamp, increment, onSnapshot, query
+} from 'firebase/firestore';
 import { Purchase } from '../../models/buy-model';
 import { Observable } from 'rxjs';
 
@@ -10,12 +10,37 @@ import { Observable } from 'rxjs';
   providedIn: 'root',
 })
 export class PurchaseService {
-  constructor(private firestore: Firestore) {}
+  private firestore = inject(Firestore);
+  private ngZone = inject(NgZone);
 
-  // Adicionei o GET para você listar suas compras
+  constructor() { }
+
+  /**
+   * Helper para Observable em tempo real usando Native SDK e NgZone
+   */
+  private collectionDataObservable<T>(queryFn: any): Observable<T[]> {
+    return new Observable<T[]>((observer) => {
+      const unsubscribe = onSnapshot(queryFn,
+        (snapshot: any) => {
+          const data = snapshot.docs.map((doc: any) => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          this.ngZone.run(() => observer.next(data));
+        },
+        (error: any) => {
+          console.error("PurchaseService [onSnapshot] ERRO:", error);
+          this.ngZone.run(() => observer.error(error));
+        }
+      );
+      return () => unsubscribe();
+    });
+  }
+
   getPurchases(): Observable<Purchase[]> {
     const purchaseCol = collection(this.firestore, 'purchases');
-    return collectionData(purchaseCol, { idField: 'id' }) as Observable<Purchase[]>;
+    const q = query(purchaseCol);
+    return this.collectionDataObservable<Purchase>(q);
   }
 
   async addPurchase(purchase: Purchase) {
@@ -30,20 +55,19 @@ export class PurchaseService {
 
         // 1. Atualiza o estoque e o preço de custo no cadastro do produto
         transaction.update(productDocRef, {
-          stock: increment(purchase.amount), // Mais seguro que fazer a soma manualmente
-          buyPrice: purchase.unityValue     // Atualiza o preço de compra para o último pago
+          stock: increment(purchase.amount),
+          buyPrice: purchase.unityValue
         });
 
         // 2. Registra o histórico da compra
         const purchaseCol = collection(this.firestore, 'purchases');
         const newPurchaseRef = doc(purchaseCol);
-        
-        // Removemos o ID do objeto para o Firebase não salvar um campo 'id' duplicado
+
         const { id, ...dataToSave } = purchase;
 
         transaction.set(newPurchaseRef, {
           ...dataToSave,
-          date: serverTimestamp() // Usa a hora oficial do Firebase
+          date: serverTimestamp()
         });
       });
       return true;
@@ -58,11 +82,11 @@ export class PurchaseService {
       await runTransaction(this.firestore, async (transaction) => {
         const purchaseDocRef = doc(this.firestore, `purchases/${purchaseId}`);
         const purchaseDoc = await transaction.get(purchaseDocRef);
-        
+
         if (!purchaseDoc.exists()) {
           throw new Error(`Compra com o ID ${purchaseId} não encontrada`);
         }
-        
+
         const purchaseData = purchaseDoc.data() as Purchase;
         const productDocRef = doc(this.firestore, `products/${purchaseData.idProduct}`);
         const productDoc = await transaction.get(productDocRef);
@@ -73,17 +97,14 @@ export class PurchaseService {
 
         const currentStock = productDoc.data()['stock'] || 0;
 
-        // Validação crucial: não deixa o estoque ficar negativo se deletar a compra
         if (currentStock < purchaseData.amount) {
           throw new Error('Estorno negado: O estoque atual é menor que a quantidade desta compra.');
         }
 
-        // Estorna o estoque
         transaction.update(productDocRef, {
           stock: increment(-purchaseData.amount)
         });
 
-        // Deleta o registro da compra
         transaction.delete(purchaseDocRef);
       });
       return true;

@@ -56,9 +56,17 @@ export class PdvComponent implements OnInit {
     this.products$ = this.productService.getProducts();
 
     // Carrega comandas abertas
-    this.comandaSub = this.comandaService.getOpenComandas().subscribe(comandas => {
-      this.openComandas = comandas;
-      this.cdr.markForCheck(); // Notifica o Angular que os dados mudaram
+    console.log('PdvComponent: Subscrita inicial em getOpenComandas()');
+    this.comandaSub = this.comandaService.getOpenComandas().subscribe({
+      next: (comandas) => {
+        console.log(`PdvComponent: [RECEBIDO] ${comandas.length} comandas do serviço.`);
+        if (comandas.length > 0) {
+          console.log('PdvComponent: [DADOS] Exemplo:', comandas[0]);
+        }
+        this.openComandas = comandas;
+        this.cdr.markForCheck(); // Notifica o Angular que os dados mudaram
+      },
+      error: (err) => console.error('PdvComponent: [ERRO] Falha ao carregar comandas:', err)
     });
   }
 
@@ -261,8 +269,10 @@ export class PdvComponent implements OnInit {
       }
 
       this.limparPdv();
+      this.cdr.markForCheck();
     } catch (e: any) {
       this.showNotification(e.message || 'Erro ao processar ❌');
+      this.cdr.markForCheck();
       console.error(e);
     }
   }
@@ -274,6 +284,7 @@ export class PdvComponent implements OnInit {
     this.isCheckoutModalOpen = false;
     this.comandaBeingPaid = null;
     this.selectedComanda = null;
+    this.comandaName = '';
     this.cdr.markForCheck();
   }
 

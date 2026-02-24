@@ -108,6 +108,10 @@
         <ng-container *ngIf="checkoutStep === 'comanda-selection'">
           <h2>Selecione a Comanda</h2>
           <div class="comanda-selector-list">
+            <div *ngIf="openComandas.length === 0" class="empty-mini-msg">
+              Nenhuma comanda aberta para adicionar.
+            </div>
+
             <button *ngFor="let c of openComandas; trackBy: trackByComandaId" class="comanda-select-btn"
               [class.selected]="selectedComanda?.id === c.id" (click)="selectComanda(c)">
               <strong>{{ c.customerName }}</strong>
@@ -151,6 +155,11 @@
         <button class="btn-close" (click)="toggleComandaList()">✕</button>
       </div>
       <div class="comanda-list-content">
+        <!-- DEBUG: Aparece se houver erro ou vazio no array -->
+        <div *ngIf="false" style="padding: 10px; font-size: 10px; color: gray;">
+          D: {{ openComandas.length }} | {{ isComandaListOpen }}
+        </div>
+
         <div *ngIf="openComandas.length === 0" class="empty-msg">
           Nenhuma conta aberta no momento 📋
         </div>
@@ -158,7 +167,7 @@
           <div class="comanda-item" (click)="toggleComandaItems(c.id!)">
             <div class="c-info">
               <strong>{{ c.customerName }}</strong>
-              <small>{{ c.items.length }} itens • R$ {{ c.total | number:'1.2-2' }}</small>
+              <small>{{ c.items?.length || 0 }} itens • R$ {{ (c.total || 0) | number:'1.2-2' }}</small>
             </div>
             <div class="c-actions">
               <span class="chevron" [class.up]="expandedComandaId === c.id">▼</span>
