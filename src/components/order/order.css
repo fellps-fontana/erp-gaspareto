@@ -81,6 +81,64 @@
   line-height: 0;
 }
 
+/* --- RESUMO DE PREPARAÇÃO --- */
+.order-summary-header {
+  margin-bottom: 25px;
+}
+
+.summary-container {
+  background: rgba(45, 45, 45, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 15px 20px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.summary-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary-tag {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.summary-tag:hover {
+  border-color: var(--color-primary);
+  background: #252525;
+}
+
+.summary-tag .tag-qty {
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+.summary-tag .tag-name {
+  color: #ddd;
+  font-weight: 500;
+}
+
 /* --- GRID DE CARDS --- */
 .kanban-grid {
   display: grid;

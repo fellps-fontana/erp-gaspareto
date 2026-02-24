@@ -22,6 +22,19 @@
     </button>
   </header>
 
+  <!-- RESUMO DE PREPARAÇÃO (AGGREGATED) -->
+  <section class="order-summary-header" *ngIf="orderSummary$ | async as summary">
+    <div class="summary-container" *ngIf="summary.length > 0">
+      <span class="summary-title">Resumo de Produção:</span>
+      <div class="summary-tags">
+        <div *ngFor="let item of summary" class="summary-tag">
+          <span class="tag-qty">{{ item.totalQuantity }}x</span>
+          <span class="tag-name">{{ item.productName }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ERROR FEEDBACK (TOAST) -->
   <div class="toast error" *ngIf="errorMessage">
     {{ errorMessage }}

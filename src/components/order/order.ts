@@ -27,7 +27,8 @@ export class OrdersComponent implements OnInit {
   // --- DADOS DO BANCO ---
   products$!: Observable<Product[]>;
   orders$!: Observable<Order[]>;
-  filteredOrders$!: Observable<Order[]>; // Alterado para property
+  filteredOrders$!: Observable<Order[]>;
+  orderSummary$!: Observable<{ productName: string, totalQuantity: number }[]>;
 
   // --- CONTROLE DE FILTROS ---
   private _filterStatus: 'all' | 'pending' | 'delivered' = 'all';
@@ -128,6 +129,27 @@ export class OrdersComponent implements OnInit {
         }
 
         return orders;
+      })
+    );
+
+    // Soma total de cada item para o resumo (preparação)
+    this.orderSummary$ = this.filteredOrders$.pipe(
+      map(orders => {
+        const summaryMap: Record<string, number> = {};
+
+        orders.forEach(order => {
+          order.items.forEach(item => {
+            const name = item.productName;
+            summaryMap[name] = (summaryMap[name] || 0) + item.quantity;
+          });
+        });
+
+        return Object.keys(summaryMap)
+          .map(name => ({
+            productName: name,
+            totalQuantity: summaryMap[name]
+          }))
+          .sort((a, b) => b.totalQuantity - a.totalQuantity);
       })
     );
   }
