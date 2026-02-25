@@ -142,6 +142,23 @@ export class OrderService {
     return addDoc(this.ordersCollection, newOrder);
   }
 
+  /**
+   * Atualiza um pedido existente.
+   */
+  async updateOrder(orderId: string, orderData: Partial<Order>): Promise<void> {
+    if (!orderId) return Promise.reject('Order ID is required');
+    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
+
+    // Recalcula totais se os itens mudarem
+    const data = { ...orderData };
+    if (data.items) {
+      data.itemsTotal = data.items.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
+      data.total = Number(data.itemsTotal) + Number(data.shippingCost || 0);
+    }
+
+    return updateDoc(orderRef, data);
+  }
+
   // --- ATUALIZAÇÃO DE STATUS ---
 
   /**

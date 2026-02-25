@@ -392,6 +392,17 @@
   background: #555;
 }
 
+.btn-icon.edit {
+  background: rgba(0, 123, 255, 0.1);
+  color: #007bff;
+  border: 1px solid rgba(0, 123, 255, 0.3);
+}
+
+.btn-icon.edit:hover {
+  background: #007bff;
+  color: white;
+}
+
 .btn-icon.cancel {
   background: rgba(220, 53, 69, 0.1);
   color: #dc3545;

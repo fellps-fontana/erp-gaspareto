@@ -65,6 +65,9 @@ export class OrdersComponent implements OnInit {
   selectedOrderToFinalize: Order | null = null;
   selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
 
+  // --- CONTROLE DE EDIÇÃO ---
+  editingOrderId: string | null = null;
+
   // --- CONTROLE DE CONFIRMAÇÃO (GENERIC MODAL) ---
   isConfirmModalOpen: boolean = false;
   confirmMessage: string = '';
@@ -164,8 +167,26 @@ export class OrdersComponent implements OnInit {
     this.errorMessage = null;
   }
 
+  editOrder(order: Order) {
+    if (order.status !== 'pending' && order.status !== 'open') {
+      this.showTemporaryError('Apenas pedidos pendentes podem ser editados.');
+      return;
+    }
+    this.clearForm();
+    this.editingOrderId = order.id || null;
+    this.customerName = order.customerName;
+    this.customerPhone = order.customerPhone || '';
+    this.deliveryType = order.deliveryType;
+    this.address = order.address || '';
+    this.shippingCost = order.shippingCost || 0;
+    this.observations = order.observations || '';
+    this.cart = [...order.items];
+    this.isNewOrderOpen = true;
+  }
+
   closeNewOrder() {
     this.isNewOrderOpen = false;
+    this.clearForm();
   }
 
   addToCart(p: Product) {
@@ -224,31 +245,35 @@ export class OrdersComponent implements OnInit {
     this.isProcessingAction = true;
 
     try {
-      // Monta o objeto Order (Tipagem parcial pois ID e Datas o Service/Firebase geram)
-      const newOrder: Omit<Order, 'id' | 'createdAt'> = {
+      // Monta o objeto dos dados (sem ID no caso de novo)
+      const orderData: any = {
         customerName: this.customerName,
         customerPhone: this.customerPhone,
-        items: this.cart, // Já está tipado como OrderItem[]
-
+        items: this.cart,
         itemsTotal: this.itemsTotal,
         shippingCost: Number(this.shippingCost),
         total: this.finalTotal,
-
         deliveryType: this.deliveryType,
         address: this.address,
         observations: this.observations,
-
-        status: 'pending', // Service garante, mas ok explicitar
-        scheduledDate: Timestamp.now() as any // placeholder se necessário pelo modelo, ou ajuste o modelo para opcional
+        scheduledDate: Timestamp.now()
       };
 
-      await this.orderService.addOrder(newOrder);
+      if (this.editingOrderId) {
+        // ATUALIZAÇÃO
+        await this.orderService.updateOrder(this.editingOrderId, orderData);
+        this.showTemporarySuccess('✅ Pedido Atualizado com Sucesso!');
+      } else {
+        // CRIAÇÃO
+        orderData.status = 'pending';
+        await this.orderService.addOrder(orderData);
+        this.showTemporarySuccess('✅ Pedido Criado com Sucesso!');
+      }
 
-      this.showTemporarySuccess('✅ Pedido Criado com Sucesso!');
       this.closeNewOrder();
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      this.showTemporaryError('Erro ao criar pedido. Verifique o console.');
+      this.showTemporaryError('Erro ao salvar pedido. Verifique o console.');
     } finally {
       this.isProcessingAction = false;
     }
@@ -262,6 +287,8 @@ export class OrdersComponent implements OnInit {
     this.shippingCost = 0;
     this.deliveryType = 'pickup';
     this.observations = '';
+    this.editingOrderId = null;
+    this.errorMessage = null;
   }
 
   setDeliveryType(type: 'pickup' | 'delivery') {
@@ -291,9 +318,7 @@ export class OrdersComponent implements OnInit {
   }
 
   getNextActionLabel(status: string): string {
-    if (status === 'open' || status === 'pending') return 'Preparar';
-    if (status === 'preparing') return 'Pronto';
-    if (status === 'ready') return 'Entregar';
+    if (status === 'open' || status === 'pending') return 'Entregar';
     if (status === 'delivering') return 'Entregue';
     if (status === 'delivered') return 'Pagar';
     return '';
@@ -305,20 +330,8 @@ export class OrdersComponent implements OnInit {
 
     this.isProcessingAction = true;
     try {
-      // Pedido Aberto ou Pendente -> Preparar
-      if (order.status === 'open' || order.status === 'pending') {
-        await this.orderService.updateStatus(order.id, 'preparing');
-      }
-      // Preparando -> Pronto
-      else if (order.status === 'preparing') {
-        await this.orderService.updateStatus(order.id, 'ready');
-      }
-      // Pronto -> Entregar (Inicia o trajeto)
-      else if (order.status === 'ready') {
-        await this.orderService.updateStatus(order.id, 'delivering');
-      }
-      // Em Entrega -> Entregue (Confirma entrega e baixa estoque)
-      else if (order.status === 'delivering') {
+      // Pendente -> Entregar -> Entregue (Confirma entrega e baixa estoque)
+      if (order.status === 'open' || order.status === 'pending' || order.status === 'delivering') {
         this.openConfirmModal(
           `Confirmar entrega do pedido de ${order.customerName}? (O estoque será baixado)`,
           async () => {
@@ -335,7 +348,7 @@ export class OrdersComponent implements OnInit {
           }
         );
       }
-      // Entregue -> Finalizar (Abre modal de pagamento)
+      // Entregue -> Pagar (Abre modal de pagamento)
       else if (order.status === 'delivered') {
         this.openPaymentModal(order);
       }
