@@ -40,6 +40,18 @@ export class PdvComponent implements OnInit {
   comandaBeingPaid: Comanda | null = null;
   expandedComandaId: string | null = null;
 
+  // --- CONTROLE DE EXCLUSÃO (MODAL ESTILIZADO) ---
+  isDeleteModalOpen: boolean = false;
+  comandaToDelete: Comanda | null = null;
+
+  // --- CÁLCULO DE TROCO ---
+  amountReceived: number = 0;
+  get change(): number {
+    const totalToPay = this.comandaBeingPaid ? this.comandaBeingPaid.total : this.total;
+    const diff = (this.amountReceived || 0) - totalToPay;
+    return diff > 0 ? diff : 0;
+  }
+
   // --- CONTROLE DE NOTIFICAÇÃO ---
   notification: string | null = null;
   notificationTimeout: any;
@@ -80,6 +92,7 @@ export class PdvComponent implements OnInit {
     this.isCheckoutModalOpen = true;
     this.checkoutStep = 'choice';
     this.paymentMethod = PaymentMethod.DINHEIRO;
+    this.amountReceived = 0;
     this.comandaName = '';
     this.selectedComanda = null;
     this.comandaBeingPaid = null;
@@ -91,6 +104,7 @@ export class PdvComponent implements OnInit {
     this.isCheckoutModalOpen = true;
     this.checkoutStep = 'payment-method';
     this.paymentMethod = PaymentMethod.DINHEIRO;
+    this.amountReceived = 0;
     this.isComandaListOpen = false;
   }
 
@@ -304,5 +318,29 @@ export class PdvComponent implements OnInit {
 
   trackByComandaId(index: number, comanda: Comanda): string {
     return comanda.id || String(index);
+  }
+
+  deleteComanda(c: Comanda) {
+    if (!c.id) return;
+    this.comandaToDelete = c;
+    this.isDeleteModalOpen = true;
+  }
+
+  closeDeleteModal() {
+    this.isDeleteModalOpen = false;
+    this.comandaToDelete = null;
+  }
+
+  async confirmDelete() {
+    if (!this.comandaToDelete || !this.comandaToDelete.id) return;
+
+    try {
+      await this.comandaService.deleteComanda(this.comandaToDelete.id);
+      this.showNotification('Comanda excluída com sucesso! ✅');
+      this.closeDeleteModal();
+    } catch (err) {
+      console.error(err);
+      this.showNotification('Erro ao excluir comanda. ❌');
+    }
   }
 }

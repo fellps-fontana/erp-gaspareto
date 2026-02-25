@@ -435,6 +435,122 @@
   cursor: pointer;
 }
 
+.btn-delete-comanda {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.btn-delete-comanda:hover {
+  background: #dc3545;
+  color: white;
+}
+
+/* --- CALCULADORA DE TROCO --- */
+.change-calculator {
+  margin-top: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #eee;
+}
+
+.change-calculator .input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.change-calculator label {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: 600;
+}
+
+.change-calculator input {
+  background: #fff;
+  border: 2px solid #ddd;
+  padding: 10px;
+  font-size: 1.1rem;
+  border-radius: 10px;
+  font-weight: 800;
+  color: #111;
+  outline: none;
+}
+
+.change-calculator input:focus {
+  border-color: #27ae60;
+}
+
+.change-calculator .change-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.change-calculator .change-row strong {
+  color: #27ae60;
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+/* --- ESTILOS PARA O MODAL DE EXCLUSÃO --- */
+.delete-modal {
+  text-align: center;
+}
+
+.modal-icon-header {
+  font-size: 3rem;
+  margin-bottom: 10px;
+}
+
+.modal-icon-header.warning {
+  color: #f39c12;
+}
+
+.delete-info {
+  margin-bottom: 25px;
+}
+
+.delete-info p {
+  color: #666;
+  margin: 5px 0;
+}
+
+.delete-info strong {
+  font-size: 1.2rem;
+  color: #111;
+  display: block;
+  margin: 10px 0;
+}
+
+.warning-text {
+  font-size: 0.85rem;
+  color: #dc3545 !important;
+  font-weight: 600;
+  margin-top: 15px !important;
+}
+
+.btn-confirm.danger {
+  background: #dc3545;
+}
+
+.btn-confirm.danger:hover {
+  background: #c82333;
+}
+
 /* ==========================================================
    MODAL DE CHECKOUT
    ========================================================== */

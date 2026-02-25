@@ -152,6 +152,33 @@ export class ComandaService {
         }
     }
 
+    async deleteComanda(comandaId: string): Promise<void> {
+        try {
+            await runTransaction(this.firestore, async (transaction: Transaction) => {
+                const comandaRef = doc(this.firestore, `${this.COLLECTION_NAME}/${comandaId}`);
+                const comandaSnap = await transaction.get(comandaRef);
+
+                if (!comandaSnap.exists()) throw new Error('Comanda não encontrada');
+
+                const comanda = comandaSnap.data() as Comanda;
+
+                // Devolver itens ao estoque
+                if (comanda.items && comanda.items.length > 0) {
+                    for (const item of comanda.items) {
+                        const productRef = doc(this.firestore, `products/${item.idProduct}`);
+                        transaction.update(productRef, { stock: increment(item.quantity) });
+                    }
+                }
+
+                // Excluir a comanda
+                transaction.delete(comandaRef);
+            });
+        } catch (error) {
+            console.error("Erro ao excluir comanda:", error);
+            throw error;
+        }
+    }
+
     updateComanda(id: string, data: Partial<Comanda>): Promise<void> {
         const comandaDoc = doc(this.firestore, `${this.COLLECTION_NAME}/${id}`);
         return updateDoc(comandaDoc, data);

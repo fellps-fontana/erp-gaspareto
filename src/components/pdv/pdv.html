@@ -102,6 +102,19 @@
               <span>💵</span> Dinheiro
             </button>
           </div>
+
+          <!-- Cálculo de Troco -->
+          <div class="change-calculator" *ngIf="paymentMethod === PaymentMethod.DINHEIRO">
+            <div class="input-row">
+              <label>Valor Recebido:</label>
+              <input type="number" [(ngModel)]="amountReceived" placeholder="0,00" autofocus
+                (keyup.enter)="finalizarCheckout()">
+            </div>
+            <div class="change-row" *ngIf="change > 0">
+              <span>Troco:</span>
+              <strong>R$ {{ change | number:'1.2-2' }}</strong>
+            </div>
+          </div>
         </ng-container>
 
         <!-- Passo 2: Seleção de Comanda Existente -->
@@ -174,6 +187,13 @@
               <button class="btn-settle" (click)="$event.stopPropagation(); checkoutComanda(c)">
                 RECEBER
               </button>
+              <button class="btn-delete-comanda" (click)="$event.stopPropagation(); deleteComanda(c)"
+                title="Excluir Comanda">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -204,4 +224,26 @@
     </div>
 
   </div>
+
+  <!-- MODAL DE EXCLUSÃO ESTILIZADO -->
+  <div class="checkout-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
+    <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <div class="modal-icon-header warning">⚠️</div>
+      <h2>Excluir Comanda?</h2>
+
+      <div class="delete-info" *ngIf="comandaToDelete">
+        <p>Você está prestes a excluir a conta de:</p>
+        <strong>{{ comandaToDelete.customerName }}</strong>
+        <p class="warning-text">Os itens desta comanda voltarão automaticamente para o estoque.</p>
+      </div>
+
+      <div class="checkout-actions">
+        <button class="btn-cancel" (click)="closeDeleteModal()">CANCELAR</button>
+        <button class="btn-confirm danger" (click)="confirmDelete()">
+          SIM, EXCLUIR
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>
