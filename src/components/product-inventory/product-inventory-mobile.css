@@ -1,266 +1,469 @@
-/* --- MOBILE OPTIMIZATIONS FOR INVENTORY --- */
+/* ============================================================
+   Tablet: até 1024px (desktop largo permanece intocado acima de 1024px)
+   ============================================================ */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .estoque-layout {
+    max-width: 100%;
+  }
+
+  .sidebar {
+    width: min(16.25rem, 28vw);
+    padding: 1.25rem 1rem;
+  }
+
+  .menu-botoes {
+    margin-top: 1.75rem;
+  }
+
+  .conteudo {
+    padding: 1.5rem;
+    min-width: 0;
+  }
+
+  .filtros-dashboard {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .filter-row.main-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .btn-dashboard-action {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 2.75rem;
+  }
+
+  .date-presets {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .custom-dates {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .product-selection select,
+  .source-selection select {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .cards-kpi {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr));
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-container {
+    height: clamp(17.5rem, 42vw, 25rem);
+  }
+
+  .header-estoque {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .produto-card {
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ============================================================
+   Mobile: até 768px
+   ============================================================ */
 @media (max-width: 768px) {
+  .estoque-layout {
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 100%;
+    overflow: hidden;
+  }
 
-    /* Layout vira coluna (Menu em cima, conteúdo embaixo) */
-    .estoque-layout {
-        flex-direction: column;
-        height: 100vh;
-        /* Mantém altura total */
-        overflow: hidden;
-        /* Evita scroll duplo no body */
-    }
+  .sidebar {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    flex-direction: column;
+    padding: 0.9375rem;
+    border-right: none;
+    border-bottom: 1px solid #333;
+    background: #0a0a0a;
+    z-index: 10;
+    box-sizing: border-box;
+  }
 
-    /* Sidebar vira Header/Menu Topo */
-    .sidebar {
-        width: 100%;
-        height: auto;
-        flex-direction: column;
-        /* No mobile, ainda coluna mas compacta */
-        padding: 15px;
-        border-right: none;
-        border-bottom: 1px solid #333;
-        background: #0a0a0a;
-        z-index: 10;
-    }
+  .logo-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
 
-    .logo-area {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-    }
+  /* Scroll só na faixa do menu — não empurra a página inteira */
+  .menu-botoes {
+    flex-direction: row;
+    margin-top: 0.9375rem;
+    gap: 0.625rem;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 0.3125rem;
+    white-space: nowrap;
+  }
 
-    /* Menu de botões em linha com scroll horizontal */
-    .menu-botoes {
-        flex-direction: row;
-        margin-top: 15px;
-        gap: 10px;
-        overflow-x: auto;
-        white-space: nowrap;
-        padding-bottom: 5px;
-        /* Pra scrollbar não colar */
-    }
+  .menu-botoes button {
+    flex: 0 0 auto;
+    min-width: min(44vw, 10rem);
+    min-height: 2.75rem;
+    padding: 0.625rem 0.9375rem;
+    text-align: center;
+    font-size: 0.9rem;
+    border: 1px solid #333;
+    box-sizing: border-box;
+  }
 
-    .menu-botoes button {
-        flex: 1;
-        min-width: 120px;
-        padding: 10px 15px;
-        text-align: center;
-        font-size: 0.9rem;
-        border: 1px solid #333;
-    }
+  .btn-voltar {
+    display: none;
+  }
 
-    .btn-voltar {
-        display: none;
-        /* Esconde voltar original pra economizar espaço, ou move pro topo */
-    }
+  .conteudo {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: 0.9375rem;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+  }
 
-    /* Se quiser manter o voltar, pode ser um ícone no topo */
-    /* Se quiser manter o voltar, pode ser um ícone no topo */
-    /* .logo-area::after {
-        content: '🏠 Voltar'; 
-    } */
+  .painel-relatorio,
+  .painel-estoque {
+    max-width: 100%;
+    min-width: 0;
+  }
 
-    /* Conteúdo com menos padding */
-    .conteudo {
-        padding: 15px;
-        width: 100%;
-    }
+  .header-section h1 {
+    font-size: 1.4rem;
+    margin-bottom: 0.3125rem;
+    word-wrap: break-word;
+  }
 
-    /* --- ABA RELATÓRIO / DASHBOARD FINANCEIRO --- */
-    .header-section h1 {
-        font-size: 1.4rem;
-        margin-bottom: 5px;
-    }
+  .header-section p {
+    font-size: 0.85rem;
+    margin-bottom: 0.9375rem;
+  }
 
-    .header-section p {
-        font-size: 0.85rem;
-        margin-bottom: 15px;
-    }
+  .filtros-dashboard {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.75rem;
+    margin-bottom: 0.9375rem;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
 
-    /* Filtros Compactos */
-    .filtros-dashboard {
-        padding: 12px;
-        margin-bottom: 15px;
-    }
+  .filter-row.main-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+  }
 
-    .date-presets {
-        width: 100%;
-        overflow-x: auto;
-        justify-content: flex-start;
-        padding: 2px;
-    }
+  .date-presets {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    padding: 0.125rem;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+  }
 
-    .btn-preset {
-        padding: 6px 10px;
-        font-size: 0.8rem;
-    }
+  .btn-preset {
+    flex: 0 0 auto;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
 
-    .custom-dates {
-        width: 100%;
-        justify-content: space-between;
-        padding: 5px 10px;
-    }
+  .custom-dates {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    box-sizing: border-box;
+  }
 
-    .custom-dates input {
-        font-size: 0.85rem;
-    }
+  .custom-dates input[type='date'] {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
 
-    .product-selection,
-    .source-selection {
-        width: 100%;
-    }
+  .product-selection,
+  .source-selection {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
 
-    .product-selection select,
-    .source-selection select {
-        width: 100%;
-        min-width: unset;
-    }
+  .product-selection select,
+  .source-selection select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 2.75rem;
+  }
 
-    .filter-actions {
-        width: 100%;
-        margin-left: 0;
-        gap: 8px;
-    }
+  .filter-actions {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
 
-    .btn-dashboard-action {
-        flex: 1;
-        justify-content: center;
-        padding: 10px;
-        font-size: 0.8rem;
-    }
+  .btn-dashboard-action {
+    flex: 1 1 calc(50% - 0.25rem);
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.8rem;
+  }
 
-    /* KPIs Compactos */
-    .cards-kpi {
-        grid-template-columns: 1fr;
-        gap: 10px;
-        margin-bottom: 15px;
-    }
+  .cards-kpi {
+    grid-template-columns: 1fr;
+    gap: 0.625rem;
+    margin-bottom: 0.9375rem;
+  }
 
-    .card {
-        padding: 12px 15px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        min-height: auto;
-        /* Garante que não herde alturas fixas problemáticas */
-    }
+  .card {
+    padding: 0.75rem 0.9375rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
 
-    .kpi-label {
-        font-size: 0.75rem;
-        margin-bottom: 2px;
-    }
+  .kpi-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.125rem;
+  }
 
-    .kpi-value {
-        font-size: 1.4rem;
-    }
+  .kpi-value {
+    font-size: 1.4rem;
+    word-break: break-word;
+  }
 
-    .kpi-meta {
-        font-size: 0.75rem;
-    }
+  .kpi-meta {
+    font-size: 0.75rem;
+  }
 
-    /* Gráficos em Coluna */
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 0.9375rem;
+    max-width: 100%;
+  }
 
-    .chart-container {
-        height: 300px;
-        padding: 15px;
-    }
+  .chart-container {
+    height: clamp(16rem, 55vw, 18.75rem);
+    padding: 0.9375rem;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
 
-    .chart-container h3 {
-        font-size: 0.95rem;
-        margin-bottom: 10px;
-    }
+  .chart-container h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.625rem;
+  }
 
-    .campo-filtro.grow {
-        min-width: auto;
-    }
+  .canvas-wrapper {
+    min-width: 0;
+  }
 
-    .acoes-filtro {
-        flex-direction: row;
-        /* Botões lado a lado */
-    }
+  .campo-filtro.grow {
+    min-width: 0;
+  }
 
-    .acoes-filtro button {
-        flex: 1;
-    }
+  .acoes-filtro {
+    flex-direction: row;
+  }
 
-    /* --- ABA ESTOQUE --- */
-    .produtos-lista {
-        padding-bottom: 60px;
-        /* Espaço pro final */
-    }
+  .acoes-filtro button {
+    flex: 1;
+    min-height: 2.75rem;
+  }
 
-    .header-estoque {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 15px;
-    }
+  .produtos-lista {
+    padding-bottom: 3.75rem;
+    max-width: 100%;
+  }
 
-    .header-estoque .btn-novo {
-        width: 100%;
-    }
+  .header-estoque {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.9375rem;
+    max-width: 100%;
+  }
 
-    .produto-card {
-        padding: 10px 15px;
-    }
+  .header-estoque h1 {
+    word-wrap: break-word;
+  }
 
-    .prod-thumb {
-        width: 45px;
-        height: 45px;
-        margin-right: 15px;
-    }
+  .btn-novo {
+    width: 100%;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+  }
 
-    .prod-title {
-        font-size: 1rem;
-    }
+  /* Card de produto: empilha ações (estilo “card” completo no mobile) */
+  .produto-card {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 0.75rem 0.9375rem;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
 
-    .prod-details {
-        font-size: 0.8rem;
-    }
+  .prod-thumb {
+    width: 2.8125rem;
+    height: 2.8125rem;
+    margin-right: 0.9375rem;
+  }
 
-    /* Ações do Card - Ícones maiores */
-    .btn-acao {
-        width: 44px;
-        height: 44px;
-        font-size: 1.2rem;
-    }
+  .prod-info {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 
-    /* --- FORMULÁRIOS --- */
-    .modal-inline {
-        padding: 20px;
-        width: 100%;
-        border-radius: 0;
-        margin-bottom: 0px;
-        height: auto;
-        border: none;
-        background: #151515;
-    }
+  .prod-title {
+    font-size: 1rem;
+    word-break: break-word;
+  }
 
-    .row {
-        flex-direction: column;
-        gap: 0;
-    }
+  .prod-details {
+    font-size: 0.8rem;
+    word-break: break-word;
+  }
 
-    .form-group {
-        width: 100%;
-        margin-bottom: 15px;
-    }
+  .prod-acoes {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+  }
 
-    /* Inputs maiores para toque */
-    input,
-    select {
-        padding: 14px;
-        font-size: 16px;
-        /* Evita zoom no iPhone */
-    }
+  .btn-acao {
+    width: 2.75rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    font-size: 1.2rem;
+  }
 
-    .btn-salvar,
-    .btn-confirmar-compra {
-        padding: 18px;
-        font-size: 1.1rem;
-    }
+  .modal-inline {
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+    margin-bottom: 0;
+    height: auto;
+    border: none;
+    background: #151515;
+    box-sizing: border-box;
+  }
+
+  .row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .form-group {
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 0.9375rem;
+    min-width: 0;
+  }
+
+  input,
+  select {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 0.875rem;
+    font-size: 16px;
+    min-height: 2.75rem;
+  }
+
+  .upload-container {
+    flex-wrap: wrap;
+    max-width: 100%;
+    gap: 0.75rem;
+  }
+
+  .btn-upload {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    max-width: 100%;
+  }
+
+  .btn-salvar,
+  .btn-confirmar-compra {
+    min-height: 2.75rem;
+    padding: 1.125rem;
+    font-size: 1.1rem;
+  }
+
+  .btn-cancelar {
+    min-height: 2.75rem;
+    padding: 0.5rem 0;
+  }
+
+  .notification-toast {
+    left: 50%;
+    right: auto;
+    width: calc(100% - 2rem);
+    max-width: 24rem;
+    padding: 0.875rem 1rem;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+    word-break: break-word;
+  }
 }
