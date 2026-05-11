@@ -90,6 +90,23 @@
 
 /* --- MOBILE OPTIMIZATIONS --- */
 @media (max-width: 768px) {
+
+    /* Resumo de Produção — empilha verticalmente */
+    .summary-container {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 15px;
+    }
+
+    .summary-tags {
+        width: 100%;
+    }
+
+    .summary-tag {
+        font-size: 0.85rem;
+        padding: 5px 10px;
+    }
     .orders-dashboard {
         padding: 10px;
     }

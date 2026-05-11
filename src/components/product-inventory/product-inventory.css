@@ -751,3 +751,193 @@ input[type="color"] {
   font-size: 10px;
   cursor: pointer;
 }
+
+/* ==========================================================
+   RESPONSIVIDADE — TABLET E MOBILE
+   ========================================================== */
+@media (max-width: 768px) {
+
+  /* Sidebar vira barra de navegação horizontal no topo */
+  .estoque-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 10px 15px;
+    gap: 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .logo-area {
+    margin-right: auto;
+  }
+
+  .logo-area h2 {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  .logo-area small {
+    display: none;
+  }
+
+  .menu-botoes {
+    flex-direction: row;
+    margin-top: 0;
+    flex: unset;
+    gap: 6px;
+  }
+
+  .menu-botoes button {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .btn-voltar {
+    margin-top: 0;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* Conteúdo principal sem overflow oculto */
+  .conteudo {
+    padding: 15px;
+    overflow-y: visible;
+    overflow-x: hidden;
+  }
+
+  /* Filtros empilhados */
+  .filtros-dashboard {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .filter-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .date-presets {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .custom-dates {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .product-selection select,
+  .source-selection select {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .filter-actions {
+    flex-direction: row;
+    margin-left: 0;
+  }
+
+  .btn-dashboard-action {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* KPIs — 1 coluna */
+  .cards-kpi {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Gráficos — 1 coluna */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .chart-container {
+    height: 18rem;
+  }
+
+  /* Formulário de produto — campos empilham */
+  .row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .modal-inline {
+    padding: 15px;
+    border-radius: var(--radius-lg);
+  }
+
+  /* Card de produto — compacto */
+  .produto-card {
+    padding: 12px 15px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .prod-thumb {
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-right: 10px;
+  }
+
+  .prod-title {
+    font-size: 1rem;
+  }
+
+  .prod-details {
+    font-size: 0.8rem;
+  }
+
+  .prod-acoes {
+    margin-left: auto;
+  }
+
+  .btn-acao {
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+}
+
+/* Telas muito pequenas (< 480px) */
+@media (max-width: 480px) {
+  .menu-botoes button {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+  }
+
+  .btn-voltar {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+  }
+
+  .header-estoque {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .btn-novo {
+    width: 100%;
+    text-align: center;
+  }
+
+  .prod-acoes {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
