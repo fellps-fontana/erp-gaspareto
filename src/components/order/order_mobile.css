@@ -6,7 +6,7 @@
     transform: translateX(-50%);
     padding: 12px 24px;
     border-radius: 50px;
-    color: white;
+    color: var(--text-inverse);
     font-weight: 600;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     z-index: 3000;
@@ -20,11 +20,11 @@
 }
 
 .toast.error {
-    background: #dc3545;
+    background: var(--color-danger);
 }
 
 .toast.success {
-    background: #28a745;
+    background: var(--color-success);
 }
 
 @keyframes slideDown {
@@ -52,14 +52,14 @@
 }
 
 .confirm-modal h3 {
-    color: #f4c042;
+    color: var(--color-primary);
     margin-bottom: 15px;
 }
 
 .confirm-modal p {
     font-size: 1.1rem;
     margin-bottom: 30px;
-    color: #ddd;
+    color: var(--text-secondary);
 }
 
 .confirm-modal .modal-actions {
@@ -69,8 +69,8 @@
 }
 
 .btn-cancel {
-    background: #444;
-    color: white;
+    background: var(--bg-muted);
+    color: var(--text-inverse);
     border: none;
     padding: 12px 24px;
     border-radius: 8px;
@@ -79,8 +79,8 @@
 }
 
 .btn-confirm {
-    background: #28a745;
-    color: white;
+    background: var(--color-success);
+    color: var(--text-inverse);
     border: none;
     padding: 12px 24px;
     border-radius: 8px;
@@ -179,7 +179,7 @@
     .cart-summary h4 {
         margin: 0;
         font-size: 0.8rem;
-        color: #888;
+        color: var(--text-muted);
         text-transform: uppercase;
     }
 
@@ -195,7 +195,7 @@
         justify-content: space-between;
         align-items: center;
         gap: 10px;
-        border-top: 1px solid #333;
+        border-top: 1px solid var(--border-color);
         padding-top: 10px;
     }
 

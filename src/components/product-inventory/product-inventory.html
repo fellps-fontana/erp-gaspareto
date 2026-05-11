@@ -197,15 +197,34 @@
           <div class="prod-acoes">
             <button class="btn-acao compra" (click)="selecionarParaCompra(p)" title="Entrada de Estoque">📦</button>
             <button class="btn-acao edit" (click)="abrirEdicao(p)" title="Editar">✏️</button>
-            <button class="btn-acao delete" (click)="excluirProduto(p.id!)" title="Excluir">🗑️</button>
+            <button class="btn-acao delete" (click)="excluirProduto(p)" title="Excluir">🗑️</button>
           </div>
         </div>
       </div>
 
-      <div class="notification-toast" *ngIf="notification" [class.show]="notification">
-        {{ notification }}
-      </div>
     </section>
 
   </main>
+
+  <!-- MODAL DE EXCLUSÃO DE PRODUTO -->
+  <div class="checkout-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
+    <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <div class="modal-icon-header warning">⚠️</div>
+      <h2>Excluir Produto?</h2>
+
+      <div class="delete-info" *ngIf="productToDelete">
+        <p>Você está prestes a excluir:</p>
+        <strong>{{ productToDelete.title }}</strong>
+        <p class="warning-text">Esta ação não pode ser desfeita.</p>
+      </div>
+
+      <div class="checkout-actions">
+        <button class="btn-cancel" (click)="closeDeleteModal()">CANCELAR</button>
+        <button class="btn-confirm danger" (click)="confirmDeleteProduct()">
+          SIM, EXCLUIR
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>

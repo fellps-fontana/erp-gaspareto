@@ -2,38 +2,19 @@
 
 /* --- DESIGN SYSTEM TOKENS --- */
 :root {
-  /* COLORS */
+  /* CORES FIXAS (não mudam com o tema) */
   --color-primary: #f4c042;
-  /* Amarelo Ouro (Ação/Destaque) */
   --color-primary-dark: #d4a022;
-  /* Amarelo Escuro (Hover) */
   --color-secondary: #00FF7F;
-  /* Verde Neon (Sucesso/Confirmação) */
   --color-secondary-dark: #2ecc71;
   --color-danger: #e74c3c;
-  /* Vermelho (Erro/Cancelar) */
   --color-danger-dark: #c0392b;
   --color-info: #3498db;
-  /* Azul (Informação) */
-
-  --bg-app: #121212;
-  /* Fundo Geral */
-  --bg-card: #1e1e1e;
-  /* Fundo de Cards/Modais */
-  --bg-input: #252525;
-  /* Fundo de Inputs */
-
-  --text-primary: #ffffff;
-  /* Texto Principal */
-  --text-secondary: #aaaaaa;
-  /* Texto Secundário (Labels) */
+  --color-success: #27ae60;
+  --color-warning: #f39c12;
   --text-on-primary: #121212;
-  /* Texto sobre Amarelo */
 
-  --border-color: #333333;
-  /* Bordas Sutis */
-
-  /* SPACING */
+  /* ESPAÇAMENTO */
   --sp-xs: 4px;
   --sp-sm: 8px;
   --sp-md: 16px;
@@ -46,6 +27,66 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-pill: 50px;
+
+  /* TEMA ESCURO (padrão — aplicado quando body.dark-theme) */
+  --bg-app:   #121212;
+  --bg-card:  #1e1e1e;
+  --bg-input: #252525;
+  --bg-muted: #2a2a2a;
+  --text-primary:   #ffffff;
+  --text-secondary: #aaaaaa;
+  --border-color:   #333333;
+  --shadow-card:      0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-home-card: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* TRANSIÇÃO DE TEMA */
+  --theme-transition-duration: 0.3s;
+  --theme-transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* VARIÁVEIS SEMÂNTICAS (escuro) */
+  --border-strong:  #555555;
+  --text-muted:     #888888;
+  --text-inverse:   #ffffff;
+  --bg-soft:        #2e2e2e;
+  --header-bg:      #1a1a1a;
+
+  /* RESUMO DE PEDIDOS */
+  --orders-summary-strip-bg:       rgba(255, 255, 255, 0.03);
+  --orders-summary-strip-border:   rgba(255, 255, 255, 0.08);
+  --orders-summary-label:          #888888;
+  --orders-summary-badge-bg:       rgba(255, 255, 255, 0.05);
+  --orders-summary-badge-border:   rgba(255, 255, 255, 0.10);
+  --orders-summary-badge-hover-bg: rgba(244, 192, 66, 0.10);
+  --orders-summary-tag-qty:        #f4c042;
+}
+
+/* TEMA CLARO — ativo quando body NÃO tem a classe .dark-theme */
+body:not(.dark-theme) {
+  --bg-app:   #f0f2f5;
+  --bg-card:  #ffffff;
+  --bg-input: #f5f5f5;
+  --bg-muted: #e8eaed;
+  --text-primary:   #1a1a1a;
+  --text-secondary: #5f6368;
+  --border-color:   #dadce0;
+  --shadow-card:      0 1px 4px rgba(0, 0, 0, 0.10), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-home-card: 0 4px 16px rgba(0, 0, 0, 0.10);
+
+  /* VARIÁVEIS SEMÂNTICAS (claro) */
+  --border-strong:  #9e9e9e;
+  --text-muted:     #9e9e9e;
+  --text-inverse:   #1a1a1a;
+  --bg-soft:        #eeeeee;
+  --header-bg:      #e8eaed;
+
+  /* RESUMO DE PEDIDOS */
+  --orders-summary-strip-bg:       rgba(0, 0, 0, 0.03);
+  --orders-summary-strip-border:   rgba(0, 0, 0, 0.08);
+  --orders-summary-label:          #5f6368;
+  --orders-summary-badge-bg:       rgba(0, 0, 0, 0.04);
+  --orders-summary-badge-border:   rgba(0, 0, 0, 0.08);
+  --orders-summary-badge-hover-bg: rgba(244, 192, 66, 0.15);
+  --orders-summary-tag-qty:        #d4a022;
 }
 
 html,
@@ -58,10 +99,12 @@ body {
   background-color: var(--bg-app) !important;
   color: var(--text-primary);
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-
   overflow-y: auto !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch;
+  transition:
+    background-color var(--theme-transition-duration) var(--theme-transition-ease),
+    color           var(--theme-transition-duration) var(--theme-transition-ease);
 }
 
 /* Ajuste no app-root para não travar o conteúdo */
@@ -150,3 +193,33 @@ textarea:focus {
   padding: var(--sp-md);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
+
+/* ==========================================================
+   TOAST NOTIFICATION GLOBAL (NotificationService)
+   ========================================================== */
+.erp-toast {
+  position: fixed;
+  top: 25px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  padding: 14px 28px;
+  border-radius: 40px;
+  z-index: 99999;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-weight: 800;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  color: white;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.35s ease;
+}
+
+.erp-toast--visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.erp-toast--success { background-color: #27ae60; }
+.erp-toast--error   { background-color: #e74c3c; }
+.erp-toast--warning { background-color: #f39c12; }

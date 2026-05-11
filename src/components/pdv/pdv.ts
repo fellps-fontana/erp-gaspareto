@@ -6,6 +6,7 @@ import { Observable } from 'rxjs';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { ComandaService } from '../../services/comanda-service/comanda-service';
+import { NotificationService } from '../../services/notification-service/notification.service';
 import { PaymentMethod } from '../../models/sell-model';
 import { Comanda } from '../../models/comanda-model';
 import { Subscription } from 'rxjs';
@@ -52,15 +53,12 @@ export class PdvComponent implements OnInit {
     return diff > 0 ? diff : 0;
   }
 
-  // --- CONTROLE DE NOTIFICAÇÃO ---
-  notification: string | null = null;
-  notificationTimeout: any;
-
   constructor(
     private productService: ProductService,
     private saleService: SaleService,
     private comandaService: ComandaService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private notif: NotificationService
   ) { }
 
   ngOnInit() {
@@ -132,21 +130,6 @@ export class PdvComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
-  // --- EXIBIR NOTIFICAÇÃO (Toast) ---
-  showNotification(message: string) {
-    this.notification = message;
-    this.cdr.markForCheck();
-
-    if (this.notificationTimeout) {
-      clearTimeout(this.notificationTimeout);
-    }
-
-    this.notificationTimeout = setTimeout(() => {
-      this.notification = null;
-      this.cdr.markForCheck();
-    }, 3000);
-  }
-
   // Fallback de ícone caso o produto não tenha imagem cadastrada
   getProductIcon(title: string): string {
     const t = title.toLowerCase();
@@ -170,7 +153,7 @@ export class PdvComponent implements OnInit {
 
     // Verificação de estoque antes de adicionar
     if (p.stock === undefined || p.stock <= 0) {
-      this.showNotification('⚠️ Produto sem estoque disponível!');
+      this.notif.warning('⚠️ Estoque insuficiente! Não é possível vender este item.');
       return;
     }
 
@@ -179,7 +162,7 @@ export class PdvComponent implements OnInit {
     if (existingItem) {
       // Verifica se a quantidade no carrinho não excede o estoque real
       if (existingItem.quantity >= p.stock) {
-        this.showNotification('⚠️ Limite de estoque atingido!');
+        this.notif.warning('⚠️ Estoque insuficiente! Não é possível vender este item.');
         return;
       }
       existingItem.quantity += 1;
@@ -242,14 +225,14 @@ export class PdvComponent implements OnInit {
 
         if (this.comandaBeingPaid) {
           await this.comandaService.closeComanda(this.comandaBeingPaid.id!);
-          this.showNotification('Comanda Paga e Fechada! ✅');
+          this.notif.success('Comanda Paga e Fechada! ✅');
         } else {
-          this.showNotification('Venda Confirmada! ✅');
+          this.notif.success('Venda Confirmada! ✅');
         }
 
       } else if (this.checkoutStep === 'new-comanda') {
         if (!this.comandaName.trim()) {
-          this.showNotification('⚠️ Digite o nome da comanda!');
+          this.notif.warning('⚠️ Digite o nome da comanda!');
           return;
         }
         const newComanda = {
@@ -264,11 +247,11 @@ export class PdvComponent implements OnInit {
           total: Number(this.total)
         };
         await this.comandaService.addComanda(newComanda);
-        this.showNotification('Nova Comanda Criada! 📋');
+        this.notif.success('Nova Comanda Criada! 📋');
 
       } else if (this.checkoutStep === 'comanda-selection') {
         if (!this.selectedComanda) {
-          this.showNotification('⚠️ Selecione uma comanda!');
+          this.notif.warning('⚠️ Selecione uma comanda!');
           return;
         }
         const itemsToAdd = this.cart.map(i => ({
@@ -279,13 +262,13 @@ export class PdvComponent implements OnInit {
           priceAtCost: Number(i.priceAtCost || 0)
         }));
         await this.comandaService.addToExistingComanda(this.selectedComanda.id!, itemsToAdd, this.total);
-        this.showNotification(`Adicionado à comanda de ${this.selectedComanda.customerName}! 📋`);
+        this.notif.success(`Adicionado à comanda de ${this.selectedComanda.customerName}! 📋`);
       }
 
       this.limparPdv();
       this.cdr.markForCheck();
     } catch (e: any) {
-      this.showNotification(e.message || 'Erro ao processar ❌');
+      this.notif.error(e.message || 'Erro ao processar. ❌');
       this.cdr.markForCheck();
       console.error(e);
     }
@@ -336,11 +319,11 @@ export class PdvComponent implements OnInit {
 
     try {
       await this.comandaService.deleteComanda(this.comandaToDelete.id);
-      this.showNotification('Comanda excluída com sucesso! ✅');
+      this.notif.success('Comanda excluída com sucesso! ✅');
       this.closeDeleteModal();
     } catch (err) {
       console.error(err);
-      this.showNotification('Erro ao excluir comanda. ❌');
+      this.notif.error('Erro ao excluir comanda. ❌');
     }
   }
 }

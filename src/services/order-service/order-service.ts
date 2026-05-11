@@ -2,7 +2,7 @@ import { Injectable, inject, NgZone } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection, doc, addDoc, updateDoc, serverTimestamp, query, orderBy,
-  CollectionReference, DocumentReference, onSnapshot, getDoc
+  CollectionReference, DocumentReference, onSnapshot, getDoc, runTransaction, increment
 } from 'firebase/firestore';
 import { Observable, from, throwError, combineLatest, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
@@ -162,34 +162,62 @@ export class OrderService {
   // --- ATUALIZAÇÃO DE STATUS ---
 
   /**
-   * Marca um pedido como entregue.
-   * @param orderId ID do pedido.
+   * Marca um pedido como entregue dentro de uma transação atômica.
+   * Valida estoque de cada item antes de qualquer escrita.
    */
   async markAsDelivered(orderId: string): Promise<void> {
     if (!orderId) return Promise.reject('Order ID is required');
 
-    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
-    const orderSnap = await getDoc(orderRef);
+    console.log('[markAsDelivered] iniciando para orderId:', orderId);
 
-    if (!orderSnap.exists()) {
-      throw new Error('Order not found');
-    }
+    await runTransaction(this.firestore, async (transaction) => {
+      const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
+      const orderSnap = await transaction.get(orderRef);
 
-    const order = orderSnap.data() as Order;
+      if (!orderSnap.exists()) throw new Error('Pedido não encontrado.');
 
-    // Baixa do estoque
-    if (order.items && order.items.length > 0) {
-      for (const item of order.items) {
-        // Não esperamos o await dentro do loop para ser mais rápido, 
-        // mas idealmente deveria ser transactional. 
-        // Como o Firestore não suporta transaction facilmente aqui sem mudar tudo, vamos de await sequencial ou Promise.all
-        this.productService.decreaseStock(item.idProduct, item.quantity);
+      const order = orderSnap.data() as Order;
+      console.log('[markAsDelivered] order.items:', JSON.stringify(order.items));
+
+      if (!order.items || order.items.length === 0) {
+        throw new Error('Pedido sem itens — não é possível entregar.');
       }
-    }
 
-    return updateDoc(orderRef, {
-      status: 'delivered',
-      actualDeliveryDate: serverTimestamp()
+      const stockUpdates: { ref: any; quantity: number }[] = [];
+
+      for (const item of order.items) {
+        console.log(`[markAsDelivered] verificando produto ${item.idProduct} qty=${item.quantity}`);
+        const productRef = doc(this.firestore, `products/${item.idProduct}`);
+        const productSnap = await transaction.get(productRef);
+
+        if (!productSnap.exists()) {
+          throw new Error(`Produto "${item.productName}" não encontrado no banco.`);
+        }
+
+        const data = productSnap.data();
+        const currentStock: number = (data['stock'] as number) ?? 0;
+        console.log(`[markAsDelivered] estoque atual de "${item.productName}": ${currentStock}, solicitado: ${item.quantity}`);
+
+        if (currentStock < item.quantity) {
+          throw new Error(
+            `⚠️ Estoque insuficiente para "${item.productName}": ` +
+            `disponível ${currentStock}, solicitado ${item.quantity}.`
+          );
+        }
+
+        stockUpdates.push({ ref: productRef, quantity: item.quantity });
+      }
+
+      for (const p of stockUpdates) {
+        transaction.update(p.ref, { stock: increment(-p.quantity) });
+      }
+
+      transaction.update(orderRef, {
+        status: 'delivered',
+        actualDeliveryDate: serverTimestamp()
+      });
+
+      console.log('[markAsDelivered] transação aprovada — escrita concluída.');
     });
   }
 

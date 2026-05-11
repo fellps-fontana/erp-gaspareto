@@ -10,6 +10,7 @@ import { Order, OrderItem } from '../../models/order-model';
 import { PaymentMethod } from '../../models/sell-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { OrderService } from '../../services/order-service/order-service';
+import { NotificationService } from '../../services/notification-service/notification.service';
 import { Timestamp } from 'firebase/firestore';
 
 @Component({
@@ -23,6 +24,7 @@ export class OrdersComponent implements OnInit {
   private productService = inject(ProductService);
   private orderService = inject(OrderService);
   private router = inject(Router);
+  private notif = inject(NotificationService);
 
   // --- DADOS DO BANCO ---
   products$!: Observable<Product[]>;
@@ -43,10 +45,8 @@ export class OrdersComponent implements OnInit {
   }
 
   // --- CONTROLE DE UI (LOADING & FEEDBACK) ---
-  isLoadingOrders = true; // Começa carregando
+  isLoadingOrders = true;
   isProcessingAction = false;
-  errorMessage: string | null = null;
-  successMessage: string | null = null; // Para feedbacks rápidos
 
   // --- CONTROLE DO OVERLAY (NOVO PEDIDO) ---
   isNewOrderOpen: boolean = false;
@@ -87,7 +87,7 @@ export class OrdersComponent implements OnInit {
     this.orders$ = this.orderService.getPendingOrders().pipe(
       catchError(err => {
         console.error('OrdersComponent: Erro ao carregar pedidos', err);
-        this.errorMessage = 'Erro ao carregar pedidos. Verifique a conexão.';
+        this.notif.error('Erro ao carregar pedidos. Verifique a conexão.');
         this.isLoadingOrders = false;
         return of([]);
       })
@@ -164,12 +164,11 @@ export class OrdersComponent implements OnInit {
   openNewOrder() {
     this.clearForm();
     this.isNewOrderOpen = true;
-    this.errorMessage = null;
   }
 
   editOrder(order: Order) {
     if (order.status !== 'pending' && order.status !== 'open') {
-      this.showTemporaryError('Apenas pedidos pendentes podem ser editados.');
+      this.notif.warning('Apenas pedidos pendentes podem ser editados.');
       return;
     }
     this.clearForm();
@@ -225,20 +224,16 @@ export class OrdersComponent implements OnInit {
 
   // Salvar no Banco
   async saveOrder() {
-    this.errorMessage = null;
-
-    // Validações Básicas
     if (!this.customerName.trim()) {
-      this.showTemporaryError('Preencha o nome do cliente!');
+      this.notif.warning('Preencha o nome do cliente!');
       return;
     }
     if (this.cart.length === 0) {
-      this.showTemporaryError('Adicione produtos ao pedido!');
+      this.notif.warning('Adicione produtos ao pedido!');
       return;
     }
-
     if (this.deliveryType === 'delivery' && !this.address.trim()) {
-      this.showTemporaryError('Para entrega, informe o endereço!');
+      this.notif.warning('Para entrega, informe o endereço!');
       return;
     }
 
@@ -260,20 +255,18 @@ export class OrdersComponent implements OnInit {
       };
 
       if (this.editingOrderId) {
-        // ATUALIZAÇÃO
         await this.orderService.updateOrder(this.editingOrderId, orderData);
-        this.showTemporarySuccess('✅ Pedido Atualizado com Sucesso!');
+        this.notif.success('✅ Pedido Atualizado com Sucesso!');
       } else {
-        // CRIAÇÃO
         orderData.status = 'pending';
         await this.orderService.addOrder(orderData);
-        this.showTemporarySuccess('✅ Pedido Criado com Sucesso!');
+        this.notif.success('✅ Pedido Criado com Sucesso!');
       }
 
       this.closeNewOrder();
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      this.showTemporaryError('Erro ao salvar pedido. Verifique o console.');
+      this.notif.error('Erro ao salvar pedido. Verifique o console.');
     } finally {
       this.isProcessingAction = false;
     }
@@ -288,7 +281,6 @@ export class OrdersComponent implements OnInit {
     this.deliveryType = 'pickup';
     this.observations = '';
     this.editingOrderId = null;
-    this.errorMessage = null;
   }
 
   setDeliveryType(type: 'pickup' | 'delivery') {
@@ -338,9 +330,9 @@ export class OrdersComponent implements OnInit {
             this.isProcessingAction = true;
             try {
               await this.orderService.markAsDelivered(order.id!);
-              this.showTemporarySuccess('Pedido marcado como Entregue! ✅');
-            } catch (err) {
-              this.showTemporaryError('Erro ao registrar entrega.');
+              this.notif.success('Pedido marcado como Entregue! ✅');
+            } catch (err: any) {
+              this.notif.error(err?.message || 'Erro ao registrar entrega.');
             } finally {
               this.isProcessingAction = false;
               this.closeConfirmModal();
@@ -354,7 +346,7 @@ export class OrdersComponent implements OnInit {
       }
     } catch (err) {
       console.error(err);
-      this.showTemporaryError('Erro ao atualizar status do pedido.');
+      this.notif.error('Erro ao atualizar status do pedido.');
     } finally {
       this.isProcessingAction = false;
     }
@@ -369,9 +361,9 @@ export class OrdersComponent implements OnInit {
         this.isProcessingAction = true;
         try {
           await this.orderService.cancelOrder(order.id!);
-          this.showTemporarySuccess('Pedido cancelado.');
+          this.notif.success('Pedido cancelado.');
         } catch (err) {
-          this.showTemporaryError('Erro ao cancelar pedido.');
+          this.notif.error('Erro ao cancelar pedido.');
         } finally {
           this.isProcessingAction = false;
           this.closeConfirmModal();
@@ -388,7 +380,6 @@ export class OrdersComponent implements OnInit {
     this.selectedOrderToFinalize = order;
     this.selectedPaymentMethod = PaymentMethod.DINHEIRO;
     this.isPaymentModalOpen = true;
-    this.errorMessage = null;
   }
 
   closePaymentModal() {
@@ -406,12 +397,12 @@ export class OrdersComponent implements OnInit {
         this.selectedPaymentMethod
       );
 
-      this.showTemporarySuccess('💰 Venda Registrada e Pedido Finalizado!');
+      this.notif.success('💰 Venda Registrada e Pedido Finalizado!');
       this.closePaymentModal();
 
     } catch (error) {
       console.error(error);
-      this.showTemporaryError('Erro ao finalizar pagamento.');
+      this.notif.error('Erro ao finalizar pagamento.');
     } finally {
       this.isProcessingAction = false;
     }
@@ -433,16 +424,6 @@ export class OrdersComponent implements OnInit {
     }
     // Se já for Date ou string/number compatível
     return new Date(date);
-  }
-
-  private showTemporaryError(msg: string) {
-    this.errorMessage = msg;
-    setTimeout(() => this.errorMessage = null, 4000);
-  }
-
-  private showTemporarySuccess(msg: string) {
-    this.successMessage = msg;
-    setTimeout(() => this.successMessage = null, 3000);
   }
 
   // --- CONFIRMATION MODAL HELPERS ---

@@ -4,8 +4,7 @@
 .pdv-container {
   min-height: 100vh;
   width: 100%;
-  background-color: #121212;
-  /* Ajustado para o tema dark real */
+  background-color: var(--bg-app);
   padding: 15px;
   box-sizing: border-box;
   display: block;
@@ -37,7 +36,6 @@
 .card-produto {
   height: clamp(140px, 20vh, 180px);
   border-radius: 20px;
-  /* Bordas um pouco mais arredondadas para estilo moderno */
   display: flex;
   flex-direction: column;
   position: relative;
@@ -47,8 +45,6 @@
   user-select: none;
   touch-action: manipulation;
   overflow: hidden;
-
-  /* Configurações para Imagem de Fundo */
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -69,7 +65,6 @@
   z-index: 1;
 }
 
-/* Conteúdo interno do card */
 .card-content {
   position: relative;
   z-index: 2;
@@ -88,6 +83,7 @@
   filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.5));
 }
 
+/* Texto sobre imagem — sempre branco independente do tema */
 .card-produto h3 {
   margin: 0;
   font-size: 0.95rem;
@@ -101,8 +97,7 @@
   margin: 5px 0 0 0;
   font-size: 1.1rem;
   font-weight: 700;
-  color: #f4c042;
-  /* Preço sempre em destaque amarelado Vermeiolandia */
+  color: var(--color-primary);
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
 }
 
@@ -111,8 +106,8 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background: #f4c042;
-  color: #000;
+  background: var(--color-primary);
+  color: var(--text-on-primary);
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -139,15 +134,16 @@
 }
 
 .cart-popup {
-  background: white;
-  color: #333 !important;
+  background: var(--bg-card);
+  color: var(--text-primary);
   width: 92vw;
   max-width: 400px;
   max-height: 0;
   overflow: hidden;
   border-radius: 18px;
   margin-bottom: 15px;
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-color);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
   transform: translateY(20px);
   pointer-events: none;
@@ -166,13 +162,13 @@
 }
 
 .cart-header {
-  background: #f1f1f1;
+  background: var(--bg-muted);
   padding: 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-weight: 800;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .cart-list {
@@ -186,7 +182,7 @@
   display: flex;
   align-items: center;
   padding: 15px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .item-info {
@@ -196,24 +192,24 @@
 
 .item-info strong {
   font-size: 0.95rem;
-  color: #111;
+  color: var(--text-primary);
   display: block;
 }
 
 .item-info small {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
 .item-total {
   font-weight: 800;
-  color: #111;
+  color: var(--text-primary);
   font-size: 0.95rem;
 }
 
 .btn-remove {
-  background: #ffeaeb;
-  color: #d32f2f;
+  background: rgba(231, 76, 60, 0.1);
+  color: var(--color-danger);
   border: none;
   width: 36px;
   height: 36px;
@@ -225,8 +221,8 @@
 
 .cart-footer {
   padding: 20px;
-  background: #fff;
-  border-top: 2px solid #eee;
+  background: var(--bg-card);
+  border-top: 2px solid var(--border-color);
 }
 
 .total-row {
@@ -235,12 +231,12 @@
   font-size: 1.3rem;
   font-weight: 900;
   margin-bottom: 15px;
-  color: #000;
+  color: var(--text-primary);
 }
 
 .btn-checkout {
   width: 100%;
-  background: #27ae60;
+  background: var(--color-success);
   color: white;
   border: none;
   padding: 16px;
@@ -252,8 +248,8 @@
 }
 
 .cart-fab {
-  background-color: #f4c042;
-  color: #000;
+  background-color: var(--color-primary);
+  color: var(--text-on-primary);
   height: 65px;
   padding: 0 25px;
   border-radius: 35px;
@@ -310,7 +306,7 @@
   position: absolute;
   top: 0;
   right: 0;
-  background: #e74c3c;
+  background: var(--color-danger);
   color: white;
   min-width: 22px;
   height: 22px;
@@ -325,16 +321,16 @@
 }
 
 .comandas-popup {
-  background: white;
-  color: #333 !important;
+  background: var(--bg-card);
+  color: var(--text-primary);
   width: 92vw;
   max-width: 350px;
   max-height: 0;
   overflow: hidden;
   border-radius: 18px;
-  margin-bottom:
-    15px;
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6);
+  margin-bottom: 15px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-color);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
   transform: translateY(20px);
   pointer-events: none;
@@ -359,7 +355,7 @@
 }
 
 .comanda-group {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .comanda-item {
@@ -371,7 +367,7 @@
 }
 
 .comanda-item:hover {
-  background: #fcfcfc;
+  background: var(--bg-muted);
 }
 
 .c-info {
@@ -387,7 +383,7 @@
 
 .chevron {
   font-size: 0.8rem;
-  color: #bbb;
+  color: var(--text-muted);
   transition: transform 0.2s;
 }
 
@@ -400,32 +396,32 @@
   justify-content: space-between;
   padding: 8px 12px;
   font-size: 0.85rem;
-  color: #666;
-  background: #fdfdfd;
+  color: var(--text-secondary);
+  background: var(--bg-muted);
 }
 
 .comanda-items-detail {
   padding-bottom: 10px;
-  border-top: 1px dashed #eee;
+  border-top: 1px dashed var(--border-color);
 }
 
 .c-info strong {
   font-size: 0.95rem;
-  color: #111;
+  color: var(--text-primary);
 }
 
 .c-info small {
   font-size: 0.8rem;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .c-total {
   font-weight: 800;
-  color: #27ae60;
+  color: var(--color-success);
 }
 
 .btn-settle {
-  background: #27ae60;
+  background: var(--color-success);
   color: white;
   border: none;
   padding: 6px 12px;
@@ -437,7 +433,7 @@
 
 .btn-delete-comanda {
   background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
+  color: var(--color-danger);
   border: 1px solid rgba(220, 53, 69, 0.3);
   width: 32px;
   height: 32px;
@@ -451,7 +447,7 @@
 }
 
 .btn-delete-comanda:hover {
-  background: #dc3545;
+  background: var(--color-danger);
   color: white;
 }
 
@@ -459,9 +455,9 @@
 .change-calculator {
   margin-top: 15px;
   padding: 15px;
-  background: #f8f9fa;
+  background: var(--bg-muted);
   border-radius: 12px;
-  border: 1px solid #eee;
+  border: 1px solid var(--border-color);
 }
 
 .change-calculator .input-row {
@@ -472,41 +468,41 @@
 
 .change-calculator label {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
 .change-calculator input {
-  background: #fff;
-  border: 2px solid #ddd;
+  background: var(--bg-input);
+  border: 2px solid var(--border-color);
   padding: 10px;
   font-size: 1.1rem;
   border-radius: 10px;
   font-weight: 800;
-  color: #111;
+  color: var(--text-primary);
   outline: none;
 }
 
 .change-calculator input:focus {
-  border-color: #27ae60;
+  border-color: var(--color-success);
 }
 
 .change-calculator .change-row {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed #ddd;
+  border-top: 1px dashed var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .change-calculator .change-row strong {
-  color: #27ae60;
+  color: var(--color-success);
   font-size: 1.3rem;
   font-weight: 900;
 }
 
-/* --- ESTILOS PARA O MODAL DE EXCLUSÃO --- */
+/* --- MODAL DE EXCLUSÃO / CONFIRMAÇÃO --- */
 .delete-modal {
   text-align: center;
 }
@@ -517,7 +513,7 @@
 }
 
 .modal-icon-header.warning {
-  color: #f39c12;
+  color: var(--color-warning);
 }
 
 .delete-info {
@@ -525,30 +521,30 @@
 }
 
 .delete-info p {
-  color: #666;
+  color: var(--text-secondary);
   margin: 5px 0;
 }
 
 .delete-info strong {
   font-size: 1.2rem;
-  color: #111;
+  color: var(--text-primary);
   display: block;
   margin: 10px 0;
 }
 
 .warning-text {
   font-size: 0.85rem;
-  color: #dc3545 !important;
+  color: var(--color-danger) !important;
   font-weight: 600;
   margin-top: 15px !important;
 }
 
 .btn-confirm.danger {
-  background: #dc3545;
+  background: var(--color-danger);
 }
 
 .btn-confirm.danger:hover {
-  background: #c82333;
+  background: var(--color-danger-dark);
 }
 
 /* ==========================================================
@@ -570,8 +566,8 @@
 }
 
 .checkout-modal {
-  background: #fff;
-  color: #333;
+  background: var(--bg-card);
+  color: var(--text-primary);
   width: 100%;
   max-width: 450px;
   border-radius: 24px;
@@ -580,6 +576,7 @@
   animation: modalIn 0.3s ease-out;
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--border-color);
 }
 
 @keyframes modalIn {
@@ -598,7 +595,7 @@
   margin: 0 0 20px 0;
   text-align: center;
   font-weight: 900;
-  color: #111;
+  color: var(--text-primary);
 }
 
 .checkout-choices {
@@ -609,8 +606,8 @@
 }
 
 .choice-card {
-  background: #f9f9f9;
-  border: 2px solid #eee;
+  background: var(--bg-muted);
+  border: 2px solid var(--border-color);
   border-radius: 18px;
   padding: 20px;
   display: flex;
@@ -622,7 +619,7 @@
 
 .choice-card:hover {
   border-color: #37474F;
-  background: #fff;
+  background: var(--bg-card);
   transform: translateY(-2px);
 }
 
@@ -633,11 +630,11 @@
 
 .choice-card strong {
   font-size: 1.1rem;
-  color: #111;
+  color: var(--text-primary);
 }
 
 .choice-card small {
-  color: #666;
+  color: var(--text-secondary);
   margin-top: 5px;
 }
 
@@ -652,8 +649,8 @@
 }
 
 .comanda-select-btn {
-  background: #f9f9f9;
-  border: 2px solid #eee;
+  background: var(--bg-muted);
+  border: 2px solid var(--border-color);
   border-radius: 12px;
   padding: 12px 18px;
   display: flex;
@@ -664,22 +661,22 @@
 }
 
 .comanda-select-btn.selected {
-  border-color: #27ae60;
-  background: #e8f5e9;
+  border-color: var(--color-success);
+  background: rgba(39, 174, 96, 0.1);
 }
 
 .comanda-select-btn.new {
   border-style: dashed;
   justify-content: center;
-  color: #37474F;
-  background: #fff;
+  color: var(--text-secondary);
+  background: var(--bg-card);
 }
 
 .total-destaque {
   font-size: 1.8rem;
   font-weight: 900;
   text-align: center;
-  color: #27ae60;
+  color: var(--color-success);
   margin-bottom: 25px;
 }
 
@@ -693,8 +690,8 @@
 .payment-options button {
   padding: 15px;
   border-radius: 12px;
-  border: 2px solid #eee;
-  background: #f9f9f9;
+  border: 2px solid var(--border-color);
+  background: var(--bg-muted);
   font-weight: 800;
   cursor: pointer;
   display: flex;
@@ -702,18 +699,18 @@
   align-items: center;
   gap: 8px;
   transition: all 0.2s;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .payment-options button.active {
-  border-color: #27ae60;
-  background: #e8f5e9;
-  color: #27ae60;
+  border-color: var(--color-success);
+  background: rgba(39, 174, 96, 0.1);
+  color: var(--color-success);
 }
 
 .comanda-box {
   margin-bottom: 25px;
-  border-top: 1px dashed #ddd;
+  border-top: 1px dashed var(--border-color);
   padding-top: 20px;
 }
 
@@ -722,22 +719,22 @@
   font-size: 0.85rem;
   font-weight: 700;
   margin-bottom: 8px;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .comanda-box input {
   width: 100%;
   padding: 14px;
   border-radius: 10px;
-  border: 2px solid #37474F;
+  border: 2px solid var(--border-strong);
   font-size: 1rem;
   outline: none;
-  background: #fff;
-  color: #000;
+  background: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .comanda-box input:focus {
-  border-color: #37474F;
+  border-color: var(--color-primary);
 }
 
 .checkout-actions {
@@ -763,7 +760,7 @@
 }
 
 .btn-confirm.pay {
-  background: #27ae60;
+  background: var(--color-success);
   box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
 }
 
@@ -775,41 +772,40 @@
 .btn-cancel {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-weight: 700;
   cursor: pointer;
   padding: 10px;
 }
 
 /* ==========================================================
-   NOTIFICAÇÃO (TOAST)
+   CARD SEM ESTOQUE
    ========================================================== */
-.toast-notification {
-  position: fixed;
-  top: 25px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #27ae60;
-  color: white;
-  padding: 14px 28px;
-  border-radius: 40px;
-  z-index: 10001;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  font-weight: 800;
-  white-space: nowrap;
-  animation: slideDown 0.4s ease-out;
+.card-produto.sem-estoque {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-@keyframes slideDown {
-  from {
-    transform: translate(-50%, -50px);
-    opacity: 0;
-  }
+.sem-estoque-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  z-index: 3;
+}
 
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
+.sem-estoque-overlay span {
+  background: var(--color-danger);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 20px;
 }
 
 /* ==========================================================
@@ -818,10 +814,8 @@
 @media (max-width: 767px) {
   .cart-popup.open {
     max-height: 55vh;
-    /* Limite de altura no celular conforme solicitado */
   }
 
-  /* Ajuste leve no padding interno para ganhar espaço */
   .cart-header {
     padding: 12px 18px;
   }

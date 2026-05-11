@@ -6,7 +6,6 @@
   height: 100vh;
   width: 100%;
   max-width: 100%;
-  /* Mudado de 100vw para 100% para evitar scroll horizontal indesejado */
   background-color: var(--bg-app);
   color: var(--text-primary);
   font-family: 'Segoe UI', Roboto, sans-serif;
@@ -16,14 +15,13 @@
 }
 
 .sidebar {
-  /* 260px @ root 16px — mesma aparência no desktop */
   width: 16.25rem;
   max-width: 100%;
-  background-color: #0a0a0a;
+  background-color: var(--header-bg);
   display: flex;
   flex-direction: column;
   padding: 1.5625rem 1.25rem;
-  border-right: 1px solid #222;
+  border-right: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
@@ -35,7 +33,7 @@
 }
 
 .logo-area small {
-  color: #666;
+  color: var(--text-secondary);
   text-transform: uppercase;
   font-size: 0.7rem;
   font-weight: bold;
@@ -51,7 +49,7 @@
 
 .menu-botoes button {
   background: transparent;
-  color: #888;
+  color: var(--text-muted);
   border: none;
   padding: 15px;
   text-align: left;
@@ -62,8 +60,8 @@
 }
 
 .menu-botoes button:hover {
-  background: #1a1a1a;
-  color: white;
+  background: var(--bg-muted);
+  color: var(--text-primary);
 }
 
 .menu-botoes button.active {
@@ -73,8 +71,8 @@
 }
 
 .btn-voltar {
-  background: #222;
-  color: #ccc;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
   border: none;
   padding: 12px;
   border-radius: 8px;
@@ -89,7 +87,6 @@
 .conteudo {
   flex: 1;
   min-width: 0;
-  /* Evita overflow horizontal em filhos flex (grids, textos longos) */
   padding: 2.5rem;
   overflow-y: auto;
   overflow-x: hidden;
@@ -97,16 +94,13 @@
 }
 
 h1 {
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 15px;
   margin-bottom: 5px;
 }
 
 /* ==========================================================
-   ABA 1: RELATÓRIO FINANCEIRO (ESTILO ORIGINAL)
-   ========================================================== */
-/* ==========================================================
-   ABA 1: DASHBOARD FINANCEIRO (REFACTORED)
+   ABA 1: DASHBOARD FINANCEIRO
    ========================================================== */
 .header-section p {
   color: var(--text-secondary);
@@ -139,7 +133,7 @@ h1 {
 .date-presets {
   display: flex;
   gap: 8px;
-  background: #252525;
+  background: var(--bg-input);
   padding: 4px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
@@ -148,7 +142,7 @@ h1 {
 .btn-preset {
   background: transparent;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
@@ -157,30 +151,28 @@ h1 {
 }
 
 .btn-preset:hover {
-  color: white;
+  color: var(--text-primary);
 }
-
-/* Efeito ativo precisaria de lógica no TS para add classe, mas o hover já ajuda */
 
 .custom-dates {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #252525;
+  background: var(--bg-input);
   padding: 5px 15px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
 }
 
 .custom-dates span {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .custom-dates input[type="date"] {
   background: transparent;
   border: none;
-  color: white;
+  color: var(--text-primary);
   padding: 5px;
   font-family: inherit;
   width: auto;
@@ -188,9 +180,9 @@ h1 {
 
 .product-selection select,
 .source-selection select {
-  background: #252525;
+  background: var(--bg-input);
   border: 1px solid var(--border-color);
-  color: white;
+  color: var(--text-primary);
   padding: 8px 15px;
   border-radius: var(--radius-md);
   min-width: 9.375rem;
@@ -230,8 +222,8 @@ h1 {
 
 .btn-dashboard-action.secondary {
   background: transparent;
-  border: 1px solid #444;
-  color: #888;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
 }
 
 .btn-dashboard-action.secondary:hover {
@@ -310,7 +302,7 @@ h1 {
 .kpi-meta {
   display: block;
   font-size: 0.85rem;
-  color: #888;
+  color: var(--text-muted);
   margin-top: 5px;
 }
 
@@ -347,22 +339,19 @@ h1 {
   flex: 1;
   position: relative;
   min-height: 0;
-  /* Importante pro Chart.js não estourar */
 }
 
 .card small {
   font-size: 0.85rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.15);
   padding: 4px 8px;
   border-radius: 4px;
   align-self: flex-start;
   margin-top: 10px;
 }
 
-/* Antigos filtros removidos ou adaptados */
-
 /* ==========================================================
-   ABA 2: GESTÃO DE ESTOQUE (COM THUMB E COR DINÂMICA)
+   ABA 2: GESTÃO DE ESTOQUE
    ========================================================== */
 .header-estoque {
   display: flex;
@@ -391,7 +380,6 @@ h1 {
 .produto-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  /* A cor do border-left é definida pelo [style.border-left-color] no HTML */
   border-left: 6px solid var(--color-primary);
   padding: 15px 25px;
   border-radius: var(--radius-lg);
@@ -402,7 +390,7 @@ h1 {
 }
 
 .produto-card:hover {
-  background: #222;
+  background: var(--bg-muted);
 }
 
 /* Miniatura da Imagem */
@@ -412,8 +400,8 @@ h1 {
   border-radius: 0.625rem;
   overflow: hidden;
   margin-right: 1.25rem;
-  background: #252525;
-  border: 1px solid #333;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
@@ -438,7 +426,7 @@ h1 {
 
 .prod-details {
   font-size: 0.9rem;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .prod-details strong {
@@ -456,9 +444,9 @@ h1 {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 0.5rem;
-  border: 1px solid #333;
-  background: #252525;
-  color: white;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -467,18 +455,18 @@ h1 {
 }
 
 .btn-acao.compra:hover {
-  background: #27ae60;
-  border-color: #2ecc71;
+  background: var(--color-success);
+  border-color: var(--color-secondary-dark);
 }
 
 .btn-acao.edit:hover {
   background: #2980b9;
-  border-color: #3498db;
+  border-color: var(--color-info);
 }
 
 .btn-acao.delete:hover {
-  background: #c0392b;
-  border-color: #e74c3c;
+  background: var(--color-danger-dark);
+  border-color: var(--color-danger);
 }
 
 /* ==========================================================
@@ -493,7 +481,7 @@ h1 {
   max-width: 53.125rem;
   box-sizing: border-box;
   margin: 0 auto 1.875rem auto;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
   animation: slideUp 0.3s ease;
 }
 
@@ -547,7 +535,6 @@ input:focus {
   border-color: var(--color-primary);
 }
 
-/* Estilo para o seletor de cor */
 input[type="color"] {
   padding: 2px;
   cursor: pointer;
@@ -582,45 +569,140 @@ input[type="color"] {
 .btn-cancelar {
   background: none;
   border: none;
-  color: #666;
+  color: var(--text-muted);
   cursor: pointer;
   font-weight: 600;
   margin-bottom: 25px;
 }
 
 .btn-cancelar:hover {
-  color: #fff;
+  color: var(--text-primary);
 }
 
 /* ==========================================================
-   NOTIFICAÇÃO TOAST
+   MODAL DE EXCLUSÃO DE PRODUTO
    ========================================================== */
-.notification-toast {
+.checkout-overlay {
   position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--bg-card);
-  color: var(--color-primary);
-  padding: 15px 30px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-primary);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-  z-index: 10000;
-  font-weight: bold;
-  animation: fadeInDown 0.4s ease forwards;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 
-@keyframes fadeInDown {
+.checkout-modal {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  width: 100%;
+  max-width: 420px;
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: modalIn 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+}
+
+@keyframes modalIn {
   from {
+    transform: scale(0.9);
     opacity: 0;
-    transform: translate(-50%, -20px);
   }
 
   to {
+    transform: scale(1);
     opacity: 1;
-    transform: translate(-50%, 0);
   }
+}
+
+.checkout-modal h2 {
+  margin: 0 0 20px;
+  text-align: center;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.delete-modal {
+  text-align: center;
+}
+
+.modal-icon-header {
+  font-size: 3rem;
+  margin-bottom: 10px;
+}
+
+.modal-icon-header.warning {
+  color: var(--color-warning);
+}
+
+.delete-info {
+  margin-bottom: 25px;
+}
+
+.delete-info p {
+  color: var(--text-secondary);
+  margin: 5px 0;
+}
+
+.delete-info strong {
+  font-size: 1.2rem;
+  color: var(--text-primary);
+  display: block;
+  margin: 10px 0;
+}
+
+.warning-text {
+  font-size: 0.85rem;
+  color: var(--color-danger) !important;
+  font-weight: 600;
+  margin-top: 15px !important;
+}
+
+.checkout-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-confirm {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 900;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: white;
+  transition: transform 0.1s;
+}
+
+.btn-confirm:active {
+  transform: scale(0.98);
+}
+
+.btn-confirm.danger {
+  background: var(--color-danger);
+}
+
+.btn-confirm.danger:hover {
+  background: var(--color-danger-dark);
+}
+
+.btn-cancel {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 10px;
 }
 
 .upload-container {
@@ -630,7 +712,7 @@ input[type="color"] {
 }
 
 .btn-upload {
-  background: #333;
+  background: var(--bg-muted);
   color: var(--color-primary);
   border: 1px dashed var(--color-primary);
   padding: 12px 20px;
@@ -641,7 +723,7 @@ input[type="color"] {
 }
 
 .btn-upload:hover {
-  background: #444;
+  background: var(--border-strong);
 }
 
 .preview-upload {
@@ -650,7 +732,7 @@ input[type="color"] {
   height: 3.75rem;
   border-radius: 0.5rem;
   overflow: hidden;
-  border: 2px solid #27ae60;
+  border: 2px solid var(--color-success);
 }
 
 .preview-upload img {

@@ -10,6 +10,13 @@
   <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
+  <script>
+    try {
+      if (localStorage.getItem('erp-gaspareto-theme') === 'dark') {
+        document.body.classList.add('dark-theme');
+      }
+    } catch (_) {}
+  </script>
   <app-root></app-root>
   <noscript>Please enable JavaScript to continue using this application.</noscript>
 </body>

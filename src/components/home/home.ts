@@ -1,15 +1,15 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { ThemeService } from '../../services/theme/theme-service';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  // O RouterLink é obrigatório aqui para os botões levarem você ao PDV/Estoque
   imports: [CommonModule, RouterLink],
   templateUrl: './home.html',
-  styleUrls: ['./home.css']
+  styleUrls: ['./home.css'],
 })
 export class HomeComponent {
-  // Por enquanto não precisamos de lógica aqui, só dos imports acima!
+  readonly theme = inject(ThemeService);
 }

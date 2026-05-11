@@ -1,12 +1,9 @@
-<div *ngIf="notification" class="toast-notification">
-  {{ notification }}
-</div>
-
 <div class="pdv-container">
 
   <main class="grid-section">
     <div class="product-grid">
       <div *ngFor="let p of products$ | async; trackBy: trackByProductId; let i = index" class="card-produto"
+        [class.sem-estoque]="!p.stock || p.stock <= 0"
         [style.background-color]="p.color || '#37474F'"
         [style.background-image]="p.urlImage ? 'url(' + p.urlImage + ')' : 'none'" (click)="addToCart(p)">
 
@@ -15,6 +12,10 @@
         </div>
 
         <div class="card-overlay"></div>
+
+        <div *ngIf="!p.stock || p.stock <= 0" class="sem-estoque-overlay">
+          <span>Sem Estoque</span>
+        </div>
 
         <div class="card-content">
           <div class="icon" *ngIf="!p.urlImage">

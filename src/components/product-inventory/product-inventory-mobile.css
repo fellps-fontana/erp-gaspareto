@@ -102,8 +102,8 @@
     flex-direction: column;
     padding: 0.9375rem;
     border-right: none;
-    border-bottom: 1px solid #333;
-    background: #0a0a0a;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--sidebar-bg);
     z-index: 10;
     box-sizing: border-box;
   }
@@ -137,7 +137,7 @@
     padding: 0.625rem 0.9375rem;
     text-align: center;
     font-size: 0.9rem;
-    border: 1px solid #333;
+    border: 1px solid var(--border-color);
     box-sizing: border-box;
   }
 
@@ -403,7 +403,7 @@
     margin-bottom: 0;
     height: auto;
     border: none;
-    background: #151515;
+    background: var(--bg-deep);
     box-sizing: border-box;
   }
 

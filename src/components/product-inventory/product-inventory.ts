@@ -11,6 +11,7 @@ import { Product } from '../../models/product-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
+import { NotificationService } from '../../services/notification-service/notification.service';
 
 @Component({
   selector: 'app-estoque',
@@ -36,9 +37,9 @@ export class ProductInventoryComponent implements OnInit {
   filtroProdutoId: string = '';
   filtroOrigem: string = 'todos'; // 'todos' | 'pdv' | 'order'
 
-  // --- NOTIFICAÇÕES CUSTOMIZADAS ---
-  notification: string | null = null;
-  notificationTimeout: any;
+  // --- MODAL DE EXCLUSÃO DE PRODUTO ---
+  isDeleteModalOpen: boolean = false;
+  productToDelete: Product | null = null;
 
   // --- DADOS DO RELATÓRIO ---
   relatorio = {
@@ -73,7 +74,8 @@ export class ProductInventoryComponent implements OnInit {
   constructor(
     private productService: ProductService,
     private purchaseService: PurchaseService,
-    private saleService: SaleService
+    private saleService: SaleService,
+    private notif: NotificationService
   ) { }
 
   ngOnInit() {
@@ -91,12 +93,25 @@ export class ProductInventoryComponent implements OnInit {
     this.atualizarRelatorio();
   }
 
-  showNotification(message: string) {
-    this.notification = message;
-    if (this.notificationTimeout) clearTimeout(this.notificationTimeout);
-    this.notificationTimeout = setTimeout(() => {
-      this.notification = null;
-    }, 3000);
+  openDeleteModal(product: Product) {
+    this.productToDelete = product;
+    this.isDeleteModalOpen = true;
+  }
+
+  closeDeleteModal() {
+    this.isDeleteModalOpen = false;
+    this.productToDelete = null;
+  }
+
+  async confirmDeleteProduct() {
+    if (!this.productToDelete?.id) return;
+    try {
+      await this.productService.deleteProduct(this.productToDelete.id);
+      this.notif.success('Produto removido! 🗑️');
+      this.closeDeleteModal();
+    } catch (error) {
+      this.notif.error('Erro ao excluir produto. ❌');
+    }
   }
 
   formatDateToInput(date: Date): string {
@@ -370,33 +385,26 @@ export class ProductInventoryComponent implements OnInit {
 
   async salvarProduto() {
     if (!this.novoProduto.title || this.novoProduto.sellPrice <= 0) {
-      this.showNotification('Preencha os campos obrigatórios! ⚠️');
+      this.notif.warning('Preencha os campos obrigatórios! ⚠️');
       return;
     }
 
     try {
       if (this.produtoEmEdicao) {
         await this.productService.updateProduct(this.produtoEmEdicao.id!, this.novoProduto);
-        this.showNotification('Produto atualizado com sucesso! ✅');
+        this.notif.success('Produto atualizado com sucesso! ✅');
       } else {
         await this.productService.addProduct(this.novoProduto);
-        this.showNotification('Produto cadastrado com sucesso! ✨');
+        this.notif.success('Produto cadastrado com sucesso! ✨');
       }
       this.fecharFormulario();
     } catch (error) {
-      this.showNotification('Erro ao salvar produto ❌');
+      this.notif.error('Erro ao salvar produto. ❌');
     }
   }
 
-  async excluirProduto(id: string) {
-    if (confirm('Deseja realmente excluir este produto?')) {
-      try {
-        await this.productService.deleteProduct(id);
-        this.showNotification('Produto removido! 🗑️');
-      } catch (error) {
-        this.showNotification('Erro ao excluir ❌');
-      }
-    }
+  excluirProduto(product: Product) {
+    this.openDeleteModal(product);
   }
 
   selecionarParaCompra(p: Product) {
@@ -410,7 +418,7 @@ export class ProductInventoryComponent implements OnInit {
 
   async confirmarCompra() {
     if (!this.produtoSelecionadoCompra || this.dadosCompra.quantidade <= 0) {
-      this.showNotification('Informe uma quantidade válida! ⚠️');
+      this.notif.warning('Informe uma quantidade válida! ⚠️');
       return;
     }
 
@@ -422,10 +430,10 @@ export class ProductInventoryComponent implements OnInit {
         date: new Date()
       } as any);
 
-      this.showNotification(`Estoque de "${this.produtoSelecionadoCompra.title}" atualizado! 💰`);
+      this.notif.success(`Estoque de "${this.produtoSelecionadoCompra.title}" atualizado! 💰`);
       this.produtoSelecionadoCompra = null;
     } catch (error) {
-      this.showNotification('Erro ao registrar entrada ❌');
+      this.notif.error('Erro ao registrar entrada. ❌');
     }
   }
 

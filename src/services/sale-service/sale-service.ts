@@ -60,7 +60,10 @@ export class SaleService {
 
             const currentStock = productDoc.data()['stock'] || 0;
             if (currentStock < item.quantity) {
-              throw new Error(`Estoque insuficiente para: ${item.name || 'Produto'}`);
+              throw new Error(
+                `⚠️ Estoque insuficiente para "${item.productName || 'Produto'}": ` +
+                `disponível ${currentStock}, solicitado ${item.quantity}.`
+              );
             }
 
             productSnapshots.push({
