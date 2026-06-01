@@ -1,134 +1,59 @@
-import { Injectable, inject, NgZone } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, addDoc, updateDoc, serverTimestamp, query, orderBy,
-  CollectionReference, DocumentReference, onSnapshot, getDoc, runTransaction, increment
+  collection, doc, addDoc, updateDoc, serverTimestamp, query, where,
+  CollectionReference, DocumentReference, runTransaction, increment
 } from 'firebase/firestore';
-import { Observable, from, throwError, combineLatest, of } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { Order } from '../../models/order-model';
 import { SaleService } from '../sale-service/sale-service';
 import { PaymentMethod, Sale } from '../../models/sell-model';
-import { ProductService } from '../product-service/product-service';
+import { FirestoreBaseService } from '../firestore-base.service';
 
 @Injectable({
   providedIn: 'root',
 })
-export class OrderService {
+export class OrderService extends FirestoreBaseService {
   private firestore = inject(Firestore);
   private saleService = inject(SaleService);
-  private productService = inject(ProductService);
-  private ngZone = inject(NgZone);
 
   private readonly ORDERS_COLLECTION = 'orders';
   private ordersCollection: CollectionReference;
 
   constructor() {
+    super();
     this.ordersCollection = collection(this.firestore, this.ORDERS_COLLECTION);
   }
 
-  // --- LEITURA (COM NATIVE SDK PARA EVITAR ERROS DE INJECTION CONTEXT) ---
-
-  /**
-   * Helper privado para criar Observable a partir de query do Firestore
-   * Garante execução no NgZone e evita erros de 'Injection Context' do angular/fire
-   */
-  private collectionDataObservable<T>(queryFn: any): Observable<T[]> {
-    return new Observable<T[]>((observer) => {
-      console.log('OrderService: [onSnapshot] Iniciando listener...');
-      const unsubscribe = onSnapshot(queryFn,
-        (snapshot: any) => {
-          console.log(`OrderService: [onSnapshot] Snapshot recebido! Total docs: ${snapshot.docs.length}`);
-          const data = snapshot.docs.map((doc: any) => {
-            const rawData = doc.data();
-            return {
-              id: doc.id,
-              ...rawData
-            };
-          });
-
-          if (data.length > 0) {
-            console.log('OrderService: [onSnapshot] Primeiro item (debug):', {
-              id: data[0].id,
-              status: data[0].status,
-              hasCreatedAt: !!data[0].createdAt
-            });
-          } else {
-            console.warn('OrderService: [onSnapshot] Snapshot vazio! Documentos podem estar faltando ou filtros muito restritos.');
-          }
-
-          this.ngZone.run(() => observer.next(data));
-        },
-        (error: any) => {
-          console.error("OrderService: [onSnapshot] ERRO CRÍTICO:", error);
-          this.ngZone.run(() => observer.error(error));
-        }
-      );
-      return () => {
-        console.log('OrderService: [onSnapshot] Fechando listener.');
-        unsubscribe();
-      };
-    });
-  }
-
-  /**
-   * Retorna todos os pedidos.
-   * Ordenação no cliente para evitar problemas de Index.
-   */
   getOrders(): Observable<Order[]> {
     const q = query(this.ordersCollection);
     return this.collectionDataObservable<Order>(q).pipe(
-      map(orders => {
-        return [...orders].sort((a, b) => {
-          const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
-          const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
-          return dateB - dateA;
-        });
-      })
+      map(orders => [...orders].sort((a, b) => {
+        const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
+        const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+        return dateB - dateA;
+      }))
     );
   }
 
-  /**
-   * Retorna apenas pedidos pendentes (não finalizados nem cancelados).
-   * Filtragem feita no CLIENTE para evitar necessidade de Index Composto.
-   */
   getPendingOrders(): Observable<Order[]> {
     const activeStatuses = ['open', 'pending', 'preparing', 'ready', 'delivering', 'delivered'];
-
-    // 1. Busca exclusivamente na coleção 'orders'
-    const q = query(this.ordersCollection);
-
-    console.log('OrderService: MONITORANDO COLEÇÃO "orders"...');
+    const q = query(this.ordersCollection, where('status', 'in', activeStatuses));
 
     return this.collectionDataObservable<Order>(q).pipe(
-      map(orders => {
-        console.log(`OrderService: [DATA] Recebidos ${orders.length} documentos da coleção "orders"`);
-
-        if (orders.length > 0) {
-          console.log('OrderService: [SAMPLE] Primeiro doc:', orders[0]);
-        }
-
-        return orders
-          .filter(o => activeStatuses.includes(o.status))
-          .sort((a, b) => {
-            const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
-            const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
-            return dateB - dateA; // Decrescente
-          });
-      }),
+      map(orders => [...orders].sort((a, b) => {
+        const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
+        const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+        return dateB - dateA;
+      })),
       catchError(err => {
-        console.error('OrderService: Erro ao ler coleção "orders":', err);
+        console.error('OrderService: Erro ao buscar pedidos pendentes:', err);
         return of([]);
       })
     );
   }
 
-  // --- CRIAÇÃO ---
-
-  /**
-   * Cria um novo pedido.
-   * @param order Dados do pedido sem ID.
-   */
   addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<DocumentReference> {
     const newOrder = {
       ...order,
@@ -138,37 +63,22 @@ export class OrderService {
       shippingCost: Number(order.shippingCost || 0),
       total: Number(order.itemsTotal) + Number(order.shippingCost || 0)
     };
-
     return addDoc(this.ordersCollection, newOrder);
   }
 
-  /**
-   * Atualiza um pedido existente.
-   */
   async updateOrder(orderId: string, orderData: Partial<Order>): Promise<void> {
     if (!orderId) return Promise.reject('Order ID is required');
     const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
-
-    // Recalcula totais se os itens mudarem
     const data = { ...orderData };
     if (data.items) {
       data.itemsTotal = data.items.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
       data.total = Number(data.itemsTotal) + Number(data.shippingCost || 0);
     }
-
     return updateDoc(orderRef, data);
   }
 
-  // --- ATUALIZAÇÃO DE STATUS ---
-
-  /**
-   * Marca um pedido como entregue dentro de uma transação atômica.
-   * Valida estoque de cada item antes de qualquer escrita.
-   */
   async markAsDelivered(orderId: string): Promise<void> {
     if (!orderId) return Promise.reject('Order ID is required');
-
-    console.log('[markAsDelivered] iniciando para orderId:', orderId);
 
     await runTransaction(this.firestore, async (transaction) => {
       const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
@@ -177,7 +87,6 @@ export class OrderService {
       if (!orderSnap.exists()) throw new Error('Pedido não encontrado.');
 
       const order = orderSnap.data() as Order;
-      console.log('[markAsDelivered] order.items:', JSON.stringify(order.items));
 
       if (!order.items || order.items.length === 0) {
         throw new Error('Pedido sem itens — não é possível entregar.');
@@ -186,7 +95,6 @@ export class OrderService {
       const stockUpdates: { ref: any; quantity: number }[] = [];
 
       for (const item of order.items) {
-        console.log(`[markAsDelivered] verificando produto ${item.idProduct} qty=${item.quantity}`);
         const productRef = doc(this.firestore, `products/${item.idProduct}`);
         const productSnap = await transaction.get(productRef);
 
@@ -196,7 +104,6 @@ export class OrderService {
 
         const data = productSnap.data();
         const currentStock: number = (data['stock'] as number) ?? 0;
-        console.log(`[markAsDelivered] estoque atual de "${item.productName}": ${currentStock}, solicitado: ${item.quantity}`);
 
         if (currentStock < item.quantity) {
           throw new Error(
@@ -216,55 +123,36 @@ export class OrderService {
         status: 'delivered',
         actualDeliveryDate: serverTimestamp()
       });
-
-      console.log('[markAsDelivered] transação aprovada — escrita concluída.');
     });
   }
 
-  /**
-   * Atualiza o status de um pedido.
-   * @param orderId ID do pedido.
-   * @param status Novo status.
-   */
   async updateStatus(orderId: string, status: string): Promise<void> {
     if (!orderId) return Promise.reject('Order ID is required');
     const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
     return updateDoc(orderRef, { status });
   }
 
-  // --- FINALIZAR (PAGAMENTO) ---
-
-  /**
-   * Finaliza um pedido, gerando a venda correspondente e baixando estoque.
-   * @param order O pedido completo.
-   * @param paymentMethod Método de pagamento escolhido.
-   */
   async finalizeOrder(order: Order, paymentMethod: PaymentMethod): Promise<boolean> {
-    if (!order.id) {
-      throw new Error('Pedido sem ID não pode ser finalizado.');
-    }
+    if (!order.id) throw new Error('Pedido sem ID não pode ser finalizado.');
 
     try {
-      // 1. Prepara dados da Venda com tipagem correta
       const saleData: Sale = {
         items: order.items.map(item => ({
           idProduct: item.idProduct,
           productName: item.productName,
-          // Garante que números sejam números
           quantity: Number(item.quantity),
           priceAtSale: Number(item.priceAtSale),
           priceAtCost: Number(item.priceAtCost)
         })),
         total: Number(order.total),
-        sale_type: 'order', // Identifica que veio de um pedido
+        sale_type: 'order',
         paymentMethod: paymentMethod,
-        date: serverTimestamp() // O SaleService pode sobrescrever, mas garantimos aqui
+        date: serverTimestamp(),
+        ...(order.customerId ? { customerId: order.customerId } : {})
       };
 
-      // 2. Processa a Venda (Isso já baixa o estoque via SaleService) -> AGORA COM FLAG FALSE
       await this.saleService.processSale(saleData, false);
 
-      // 3. Atualiza o Pedido para 'finished'
       const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${order.id}`);
       await updateDoc(orderRef, {
         status: 'finished',
@@ -274,41 +162,30 @@ export class OrderService {
 
       return true;
     } catch (error) {
-      console.error("Erro ao finalizar pedido no OrderService:", error);
-      // Repassa o erro para ser tratado no componente (ex: mostrar toast)
+      console.error('OrderService: Erro ao finalizar pedido:', error);
       throw error;
     }
   }
 
-  // --- CANCELAMENTO ---
-
-  /**
-   * Cancela um pedido.
-   * @param orderId ID do pedido.
-   */
   async cancelOrder(orderId: string): Promise<void> {
     if (!orderId) return Promise.reject('Order ID is required');
 
-    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
-    const orderSnap = await getDoc(orderRef);
+    await runTransaction(this.firestore, async (transaction) => {
+      const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
+      const orderSnap = await transaction.get(orderRef);
 
-    if (!orderSnap.exists()) {
-      throw new Error('Order not found');
-    }
+      if (!orderSnap.exists()) throw new Error('Order not found');
 
-    const order = orderSnap.data() as Order;
+      const order = orderSnap.data() as Order;
 
-    // Se já foi entregue, devolve ao estoque
-    if (order.status === 'delivered') {
-      if (order.items && order.items.length > 0) {
+      if (order.status === 'delivered' && order.items?.length > 0) {
         for (const item of order.items) {
-          this.productService.increaseStock(item.idProduct, item.quantity);
+          const productRef = doc(this.firestore, `products/${item.idProduct}`);
+          transaction.update(productRef, { stock: increment(item.quantity) });
         }
       }
-    }
 
-    return updateDoc(orderRef, {
-      status: 'canceled'
+      transaction.update(orderRef, { status: 'canceled' });
     });
   }
 }

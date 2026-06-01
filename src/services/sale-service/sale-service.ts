@@ -1,53 +1,28 @@
-import { Injectable, inject, NgZone } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, runTransaction, query, where, orderBy, serverTimestamp, increment, onSnapshot
+  collection, doc, runTransaction, query, where, orderBy, serverTimestamp, increment
 } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { Sale } from '../../models/sell-model';
+import { FirestoreBaseService } from '../firestore-base.service';
 
 @Injectable({
   providedIn: 'root',
 })
-export class SaleService {
+export class SaleService extends FirestoreBaseService {
   private firestore = inject(Firestore);
-  private ngZone = inject(NgZone);
   private readonly COLLECTION_NAME = 'sales';
-
-  constructor() { }
-
-  /**
-   * Helper para Observable em tempo real usando Native SDK e NgZone
-   */
-  private collectionDataObservable<T>(queryFn: any): Observable<T[]> {
-    return new Observable<T[]>((observer) => {
-      const unsubscribe = onSnapshot(queryFn,
-        (snapshot: any) => {
-          const data = snapshot.docs.map((doc: any) => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          this.ngZone.run(() => observer.next(data));
-        },
-        (error: any) => {
-          console.error("SaleService [onSnapshot] ERRO:", error);
-          this.ngZone.run(() => observer.error(error));
-        }
-      );
-      return () => unsubscribe();
-    });
-  }
 
   getSales(): Observable<Sale[]> {
     const q = query(collection(this.firestore, this.COLLECTION_NAME));
     return this.collectionDataObservable<Sale>(q);
   }
 
-  async processSale(sale: any, updateStock: boolean = true) {
+  async processSale(sale: Sale, updateStock: boolean = true): Promise<void> {
     try {
       await runTransaction(this.firestore, async (transaction) => {
-
-        const productSnapshots = [];
+        const productSnapshots: { ref: any; quantity: number }[] = [];
 
         if (updateStock) {
           for (const item of sale.items) {
@@ -61,47 +36,39 @@ export class SaleService {
             const currentStock = productDoc.data()['stock'] || 0;
             if (currentStock < item.quantity) {
               throw new Error(
-                `⚠️ Estoque insuficiente para "${item.productName || 'Produto'}": ` +
+                `⚠️ Estoque insuficiente para "${item.productName}": ` +
                 `disponível ${currentStock}, solicitado ${item.quantity}.`
               );
             }
 
-            productSnapshots.push({
-              ref: productDocRef,
-              quantity: item.quantity
-            });
+            productSnapshots.push({ ref: productDocRef, quantity: item.quantity });
           }
-        }
 
-        if (updateStock) {
           for (const p of productSnapshots) {
-            transaction.update(p.ref, {
-              stock: increment(-p.quantity)
-            });
+            transaction.update(p.ref, { stock: increment(-p.quantity) });
           }
         }
 
         const newSaleRef = doc(collection(this.firestore, this.COLLECTION_NAME));
-        const saleData = {
-          items: sale.items.map((i: any) => ({
+        const saleDoc: any = {
+          items: sale.items.map(i => ({
             idProduct: i.idProduct,
-            productName: i.productName || 'Produto sem nome',
-            quantity: Number(i.quantity) || 1,
-            priceAtSale: Number(i.priceAtSale) || 0,
-            priceAtCost: Number(i.priceAtCost) || 0
+            productName: i.productName,
+            quantity: Number(i.quantity),
+            priceAtSale: Number(i.priceAtSale),
+            priceAtCost: Number(i.priceAtCost)
           })),
-          total: Number(sale.total || sale.value) || 0,
+          total: Number(sale.total) || 0,
           date: serverTimestamp(),
           status: 'completed',
-          sale_type: sale.sale_type || 'pdv'
+          sale_type: sale.sale_type,
+          paymentMethod: sale.paymentMethod
         };
-
-        transaction.set(newSaleRef, saleData);
+        if (sale.customerId) saleDoc['customerId'] = sale.customerId;
+        transaction.set(newSaleRef, saleDoc);
       });
-
-      console.log("Venda registrada com sucesso!");
     } catch (error) {
-      console.error("Erro na transação: ", error);
+      console.error('SaleService: Erro na transação:', error);
       throw error;
     }
   }
@@ -114,11 +81,10 @@ export class SaleService {
       where('date', '<=', endDate),
       orderBy('date', 'desc')
     );
-
     return this.collectionDataObservable<Sale>(salesQuery);
   }
 
-  async cancelSale(saleId: string) {
+  async cancelSale(saleId: string): Promise<boolean> {
     try {
       await runTransaction(this.firestore, async (transaction) => {
         const saleDocRef = doc(this.firestore, `${this.COLLECTION_NAME}/${saleId}`);
@@ -130,16 +96,14 @@ export class SaleService {
 
         for (const item of saleData.items) {
           const productRef = doc(this.firestore, `products/${item.idProduct}`);
-          transaction.update(productRef, {
-            stock: increment(item.quantity)
-          });
+          transaction.update(productRef, { stock: increment(item.quantity) });
         }
 
         transaction.update(saleDocRef, { status: 'canceled' });
       });
       return true;
     } catch (error) {
-      console.error("Erro ao cancelar: ", error);
+      console.error('SaleService: Erro ao cancelar venda:', error);
       throw error;
     }
   }

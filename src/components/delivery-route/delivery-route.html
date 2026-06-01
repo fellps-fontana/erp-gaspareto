@@ -1,0 +1,100 @@
+<div class="route-page">
+
+  <header class="page-header">
+    <button class="btn-back" (click)="goBack()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+    </button>
+    <div class="header-title">
+      <h1>Rotas de Entrega</h1>
+      <span class="subtitle" *ngIf="deliveryOrders.length > 0">
+        {{ selectedIds.size }} de {{ deliveryOrders.length }} selecionados
+      </span>
+    </div>
+    <button class="btn-route"
+      [disabled]="selectedIds.size === 0 || isGeneratingRoute"
+      (click)="generateRoute()">
+      <svg *ngIf="!isGeneratingRoute" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3"></circle>
+      </svg>
+      {{ isGeneratingRoute ? 'Otimizando...' : 'Gerar Rota' }}
+    </button>
+  </header>
+
+  <!-- LOADING -->
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <p>Carregando pedidos...</p>
+  </div>
+
+  <ng-container *ngIf="!isLoading">
+
+    <!-- EMPTY STATE -->
+    <div class="empty-state" *ngIf="deliveryOrders.length === 0">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4">
+        <rect x="1" y="3" width="15" height="13"></rect>
+        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+      </svg>
+      <p>Nenhum pedido de entrega pronto ou em rota.</p>
+      <small>Pedidos com status "Pronto" ou "Em Entrega" e tipo Delivery aparecem aqui.</small>
+    </div>
+
+    <!-- SELECT ALL BAR -->
+    <div class="select-bar" *ngIf="deliveryOrders.length > 0">
+      <label class="checkbox-label">
+        <input type="checkbox"
+          [checked]="selectedIds.size === deliveryOrders.length && deliveryOrders.length > 0"
+          (change)="toggleAll()">
+        Selecionar todos
+      </label>
+    </div>
+
+    <!-- ORDER LIST -->
+    <div class="orders-list">
+      <label *ngFor="let order of deliveryOrders; trackBy: trackByOrder"
+        class="order-row"
+        [class.selected]="selectedIds.has(order.id!)">
+        <input type="checkbox"
+          [checked]="selectedIds.has(order.id!)"
+          (change)="toggleSelect(order)">
+
+        <div class="order-info">
+          <div class="order-main">
+            <strong class="customer-name">{{ order.customerName }}</strong>
+            <span class="status-badge" [ngClass]="order.status">
+              {{ translateStatus(order.status) }}
+            </span>
+          </div>
+          <span class="order-address">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+            {{ order.address }}
+          </span>
+          <span class="order-items">
+            {{ order.items.length }} iten{{ order.items.length !== 1 ? 's' : '' }}
+            · R$ {{ order.total | number:'1.2-2' }}
+          </span>
+        </div>
+      </label>
+    </div>
+
+  </ng-container>
+
+  <!-- BOTTOM CTA (when orders selected) -->
+  <div class="bottom-cta" *ngIf="selectedIds.size > 0">
+    <div class="cta-info">
+      <strong>{{ selectedIds.size }} entrega{{ selectedIds.size !== 1 ? 's' : '' }} selecionada{{ selectedIds.size !== 1 ? 's' : '' }}</strong>
+    </div>
+    <button class="btn-route-cta" (click)="generateRoute()" [disabled]="isGeneratingRoute">
+      {{ isGeneratingRoute ? 'Otimizando rota...' : 'Abrir Rota no Maps →' }}
+    </button>
+  </div>
+
+</div>

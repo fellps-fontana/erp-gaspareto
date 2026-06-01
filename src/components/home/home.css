@@ -184,6 +184,24 @@
   border-color: var(--color-secondary);
 }
 
+/* Clientes: Roxo (Relacionamento) */
+.card-customers .icon {
+  color: #8b5cf6;
+}
+
+.card-customers:hover {
+  border-color: #8b5cf6;
+}
+
+/* Rotas: Verde-água (Logística) */
+.card-routes .icon {
+  color: #14b8a6;
+}
+
+.card-routes:hover {
+  border-color: #14b8a6;
+}
+
 /* Ícones */
 .icon {
   width: 80px;

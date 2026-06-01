@@ -16,8 +16,9 @@ export interface SaleItem {
 export interface Sale {
     id?: string; // Opcional porque o Firestore gera depois
     total: number; // Use total pra bater com o Service
-    date: Timestamp | any; 
+    date: Timestamp | any;
     items: SaleItem[];
     paymentMethod: PaymentMethod;
     sale_type: 'pdv' | 'order'; // Pra gente saber a origem
+    customerId?: string; // Só preenchido em pedidos (sale_type === 'order') com cliente vinculado
 }

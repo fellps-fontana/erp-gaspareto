@@ -7,7 +7,7 @@ import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { ComandaService } from '../../services/comanda-service/comanda-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
-import { PaymentMethod } from '../../models/sell-model';
+import { PaymentMethod, SaleItem } from '../../models/sell-model';
 import { Comanda } from '../../models/comanda-model';
 import { Subscription } from 'rxjs';
 
@@ -21,7 +21,8 @@ import { Subscription } from 'rxjs';
 })
 export class PdvComponent implements OnInit {
   products$!: Observable<Product[]>;
-  cart: any[] = [];
+  isLoadingProducts = true;
+  cart: SaleItem[] = [];
   total: number = 0;
   isCartOpen: boolean = false;
 
@@ -64,6 +65,7 @@ export class PdvComponent implements OnInit {
   ngOnInit() {
     // Carrega produtos em tempo real do Firestore
     this.products$ = this.productService.getProducts();
+    this.productService.getProducts().subscribe({ next: () => { this.isLoadingProducts = false; this.cdr.markForCheck(); } });
 
     // Carrega comandas abertas
     console.log('PdvComponent: Subscrita inicial em getOpenComandas()');
@@ -295,7 +297,7 @@ export class PdvComponent implements OnInit {
     return product.id || String(index);
   }
 
-  trackByCartItem(index: number, item: any): string {
+  trackByCartItem(index: number, item: SaleItem): string {
     return item.idProduct || String(index);
   }
 

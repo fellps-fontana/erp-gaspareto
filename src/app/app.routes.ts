@@ -3,11 +3,13 @@ import { ProductInventoryComponent } from '../components/product-inventory/produ
 import { PdvComponent } from '../components/pdv/pdv';
 import { HomeComponent } from '../components/home/home';
 import { OrdersComponent } from '../components/order/order';
+import { DeliveryRouteComponent } from '../components/delivery-route/delivery-route';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent }, // Tela inicial com os botões grandes
-  { path: 'pdv', component: PdvComponent }, // Tela de vendas
-  { path: 'estoque', component: ProductInventoryComponent }, // Tela de gestão
+  { path: '', component: HomeComponent },
+  { path: 'pdv', component: PdvComponent },
+  { path: 'estoque', component: ProductInventoryComponent },
   { path: 'orders', component: OrdersComponent },
-  { path: '**', redirectTo: '' } // Se digitar algo errado, volta para o início
+  { path: 'rotas', component: DeliveryRouteComponent },
+  { path: '**', redirectTo: '' }
 ];

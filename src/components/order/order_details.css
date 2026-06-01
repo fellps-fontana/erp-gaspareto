@@ -110,3 +110,263 @@
 .detail-items-list {
     background: var(--bg-input);
 }
+
+/* ── BUSCA DE CLIENTE (FORMULÁRIO DE PEDIDO) ────────────────── */
+.customer-search-wrapper {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.customer-search-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-input);
+    transition: border-color 0.2s;
+}
+
+.customer-search-wrapper.has-selection .customer-search-input-row {
+    border-color: var(--color-secondary);
+}
+
+.customer-search-input-row .search-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.customer-search-input-row input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    outline: none;
+}
+
+.search-check {
+    color: var(--color-secondary);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* DROPDOWN */
+.customer-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    z-index: 50;
+    overflow: hidden;
+}
+
+.dropdown-empty {
+    padding: 16px 14px;
+    text-align: center;
+    font-size: 0.83rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dropdown-item:last-child { border-bottom: none; }
+
+.dropdown-item:hover { background: var(--bg-chip-tint, var(--bg-muted)); }
+
+.dropdown-avatar {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+    color: #121212;
+    font-weight: 800;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dropdown-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.dropdown-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dropdown-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.dropdown-badge {
+    font-size: 0.71rem;
+    color: var(--text-muted);
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 1px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 13rem;
+}
+
+.dropdown-badge.loc { max-width: 11rem; }
+
+/* CHIP DE CLIENTE SELECIONADO */
+.selected-customer-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(52, 211, 153, 0.07);
+    border: 1px solid rgba(52, 211, 153, 0.3);
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.chip-avatar {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-secondary), var(--color-primary));
+    color: #121212;
+    font-weight: 800;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.chip-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.chip-name {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chip-phone {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.chip-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+    flex-shrink: 0;
+}
+
+.chip-clear:hover {
+    color: var(--color-danger);
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.no-customer-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 0 0 15px;
+    font-style: italic;
+    text-align: center;
+}
+
+/* ── BOTÃO MAPS NO MODAL DE DETALHES ────────────────────────── */
+.address-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.address-row .address-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.btn-maps {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: #0ea5e9;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-maps:hover { background: #0284c7; }
+
+/* ── BOTÃO MAPS NO CARD ─────────────────────────────────────── */
+.btn-maps-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 3px 8px;
+    background: #0ea5e9;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.btn-maps-card:hover { background: #0284c7; }
+
+/* ── CAMPOS READONLY (preenchidos pelo dropdown de cliente) ──── */
+.readonly-field {
+    background: var(--bg-muted, #f5f5f5) !important;
+    color: var(--text-muted) !important;
+    cursor: default !important;
+}

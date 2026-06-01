@@ -13,6 +13,9 @@
       <button [class.active]="activeTab === 'estoque'" (click)="activeTab = 'estoque'">
         📦 Gerenciar Estoque
       </button>
+      <button [class.active]="activeTab === 'clientes'" (click)="activeTab = 'clientes'">
+        👥 Clientes
+      </button>
     </nav>
 
     <button class="btn-voltar" [routerLink]="['/']">⬅ Voltar ao PDV</button>
@@ -56,6 +59,16 @@
               <option value="pdv">Vendas PDV</option>
               <option value="order">Massa (Pedidos)</option>
             </select>
+          </div>
+
+          <div class="client-selection">
+            <select [(ngModel)]="filtroClienteId" (change)="atualizarRelatorio()">
+              <option value="">Todos os Clientes</option>
+              <option *ngFor="let c of customers" [value]="c.id">{{ c.name }}</option>
+            </select>
+            <small class="filter-warning" *ngIf="filtroClienteId">
+              ⚠️ Vendas PDV não têm cliente associado e não aparecem neste filtro.
+            </small>
           </div>
 
           <div class="filter-actions">
@@ -160,7 +173,7 @@
               <input type="number" [(ngModel)]="novoProduto.stock">
             </div>
           </div>
-          <button class="btn-salvar" (click)="salvarProduto()">✅ SALVAR</button>
+          <button class="btn-salvar" (click)="salvarProduto()" [disabled]="isLoading">{{ isLoading ? '⏳ Sincronizando...' : '✅ SALVAR' }}</button>
         </div>
 
         <div *ngIf="produtoSelecionadoCompra">
@@ -204,7 +217,128 @@
 
     </section>
 
+    <!-- ABA CLIENTES -->
+    <section *ngIf="activeTab === 'clientes'" class="painel-estoque">
+
+      <div class="header-estoque">
+        <h1>Clientes</h1>
+        <button class="btn-novo" (click)="abrirNovoCliente()">+ Novo Cliente</button>
+      </div>
+
+      <!-- FORMULÁRIO -->
+      <div class="form-box modal-inline" *ngIf="exibirFormularioCliente">
+        <button class="btn-cancelar" (click)="fecharFormularioCliente()">⬅ Voltar para a lista</button>
+        <h2>{{ clienteEmEdicao ? 'Editar Cliente' : 'Novo Cliente' }}</h2>
+
+        <div class="row">
+          <div class="form-group" style="flex: 2;">
+            <label>Nome *</label>
+            <input type="text" [(ngModel)]="novoCliente.name" placeholder="Nome completo">
+          </div>
+          <div class="form-group">
+            <label>Telefone</label>
+            <input type="text" [(ngModel)]="novoCliente.phone" placeholder="(00) 00000-0000">
+          </div>
+        </div>
+
+        <!-- CEP e endereço -->
+        <div class="form-group">
+          <label>CEP</label>
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <input type="text" [(ngModel)]="clienteCep" (input)="onClienteCepInput()"
+              placeholder="00000-000" maxlength="9" inputmode="numeric" style="max-width:160px;">
+            <span *ngIf="clienteCepLoading" style="font-size:0.82rem;color:var(--text-secondary);">buscando...</span>
+          </div>
+          <small *ngIf="clienteCepError" style="color:#ef4444;font-size:0.78rem;">{{ clienteCepError }}</small>
+        </div>
+
+        <ng-container *ngIf="clienteRua">
+          <div class="form-group">
+            <label>Rua</label>
+            <input type="text" [(ngModel)]="clienteRua" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
+          </div>
+
+          <div class="row">
+            <div class="form-group" style="width:110px;flex-shrink:0;">
+              <label>Número *</label>
+              <input type="text" [(ngModel)]="clienteNumero" placeholder="Nº" inputmode="numeric">
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>Complemento</label>
+              <input type="text" [(ngModel)]="clienteComplemento" placeholder="Apto, Bloco...">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="form-group" style="flex:1;">
+              <label>Bairro</label>
+              <input type="text" [(ngModel)]="clienteBairro" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>Cidade</label>
+              <input type="text" [value]="clienteCidade + (clienteUf ? ' - ' + clienteUf : '')" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
+            </div>
+          </div>
+
+          <div *ngIf="clienteAddressReady"
+            style="display:flex;align-items:flex-start;gap:0.4rem;padding:0.6rem 0.875rem;background:rgba(79,70,229,0.08);border:1px solid rgba(79,70,229,0.25);border-radius:8px;font-size:0.85rem;">
+            📍 {{ clienteFormattedAddress }}
+          </div>
+        </ng-container>
+
+        <button class="btn-salvar" (click)="salvarCliente()" [disabled]="isLoading">{{ isLoading ? '⏳ Sincronizando...' : '✅ SALVAR' }}</button>
+      </div>
+
+      <!-- LISTA -->
+      <div class="clientes-grid" *ngIf="!exibirFormularioCliente">
+        <div *ngIf="customers.length === 0" class="clientes-vazio">
+          Nenhum cliente cadastrado.
+        </div>
+
+        <div class="cliente-card" *ngFor="let c of customers">
+          <div class="cliente-avatar">{{ c.name.charAt(0).toUpperCase() }}</div>
+
+          <div class="cliente-info">
+            <span class="cliente-nome">{{ c.name }}</span>
+            <div class="cliente-meta">
+              <span class="meta-badge" *ngIf="c.phone">📞 {{ c.phone }}</span>
+              <span class="meta-badge location" *ngIf="c.cidade || c.address">
+                📍 {{ c.cidade ? c.cidade + (c.uf ? ' - ' + c.uf : '') : c.address }}
+              </span>
+            </div>
+            <span class="cliente-endereco" *ngIf="c.rua">
+              {{ c.rua }}, {{ c.numero }}{{ c.complemento ? ', ' + c.complemento : '' }}
+              <span *ngIf="c.bairro"> · {{ c.bairro }}</span>
+            </span>
+          </div>
+
+          <div class="cliente-acoes">
+            <button class="btn-acao edit" (click)="abrirEdicaoCliente(c)" title="Editar">✏️</button>
+            <button class="btn-acao delete" (click)="openDeleteClienteModal(c)" title="Excluir">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
   </main>
+
+  <!-- MODAL DE EXCLUSÃO DE CLIENTE -->
+  <div class="checkout-overlay" *ngIf="isDeleteClienteModalOpen" (click)="closeDeleteClienteModal()">
+    <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <div class="modal-icon-header warning">⚠️</div>
+      <h2>Excluir Cliente?</h2>
+      <div class="delete-info" *ngIf="clienteToDelete">
+        <p>Você está prestes a excluir:</p>
+        <strong>{{ clienteToDelete.name }}</strong>
+        <p class="warning-text">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="checkout-actions">
+        <button class="btn-cancel" (click)="closeDeleteClienteModal()">CANCELAR</button>
+        <button class="btn-confirm danger" (click)="confirmDeleteCliente()">SIM, EXCLUIR</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL DE EXCLUSÃO DE PRODUTO -->
   <div class="checkout-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">

@@ -35,4 +35,8 @@ export interface Order {
   closingDate?: Timestamp;       // DATA DE FECHAMENTO (Preenchida no status 'finished')
 
   observations?: string;
+
+  customerId?: string;
+  addressLat?: number;
+  addressLng?: number;
 }

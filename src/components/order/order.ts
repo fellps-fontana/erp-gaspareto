@@ -1,15 +1,16 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Observable, map, catchError, of } from 'rxjs';
+import { Observable, map, catchError, of, Subscription } from 'rxjs';
 
-// Models
 import { Product } from '../../models/product-model';
 import { Order, OrderItem } from '../../models/order-model';
+import { Customer } from '../../models/customer-model';
 import { PaymentMethod } from '../../models/sell-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { OrderService } from '../../services/order-service/order-service';
+import { CustomerService } from '../../services/customer-service/customer-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { Timestamp } from 'firebase/firestore';
 
@@ -20,70 +21,97 @@ import { Timestamp } from 'firebase/firestore';
   templateUrl: './order.html',
   styleUrls: ['./order.css', './order_mobile.css', './order_details.css']
 })
-export class OrdersComponent implements OnInit {
-  private productService = inject(ProductService);
-  private orderService = inject(OrderService);
-  private router = inject(Router);
-  private notif = inject(NotificationService);
+export class OrdersComponent implements OnInit, OnDestroy {
+  private productService  = inject(ProductService);
+  private orderService    = inject(OrderService);
+  private customerService = inject(CustomerService);
+  private router          = inject(Router);
+  private notif           = inject(NotificationService);
 
-  // --- DADOS DO BANCO ---
+  // ── STREAMS ──────────────────────────────────────────────────────
   products$!: Observable<Product[]>;
   orders$!: Observable<Order[]>;
   filteredOrders$!: Observable<Order[]>;
-  orderSummary$!: Observable<{ productName: string, totalQuantity: number }[]>;
+  orderSummary$!: Observable<{ productName: string; totalQuantity: number }[]>;
 
-  // --- CONTROLE DE FILTROS ---
+  // ── FILTROS ───────────────────────────────────────────────────────
   private _filterStatus: 'all' | 'pending' | 'delivered' = 'all';
 
-  get filterStatus() {
-    return this._filterStatus;
-  }
+  get filterStatus() { return this._filterStatus; }
+  set filterStatus(v: 'all' | 'pending' | 'delivered') { this._filterStatus = v; this.updateFilter(); }
 
-  set filterStatus(value: 'all' | 'pending' | 'delivered') {
-    this._filterStatus = value;
-    this.updateFilter(); // Atualiza o filtro quando muda
-  }
-
-  // --- CONTROLE DE UI (LOADING & FEEDBACK) ---
+  // ── UI ────────────────────────────────────────────────────────────
   isLoadingOrders = true;
   isProcessingAction = false;
 
-  // --- CONTROLE DO OVERLAY (NOVO PEDIDO) ---
-  isNewOrderOpen: boolean = false;
-
-  // --- FORMULÁRIO DE NOVO PEDIDO ---
-  cart: OrderItem[] = []; // Tipagem estrita
-  customerName: string = '';
-  customerPhone: string = '';
+  // ── NOVO PEDIDO ───────────────────────────────────────────────────
+  isNewOrderOpen = false;
+  cart: OrderItem[] = [];
+  customerName  = '';
+  customerPhone = '';
   deliveryType: 'pickup' | 'delivery' = 'pickup';
-  address: string = '';
-  shippingCost: number = 0;
-  observations: string = '';
+  address       = '';
+  shippingCost  = 0;
+  observations  = '';
 
-  // --- CONTROLE DE PAGAMENTO (MODAL FINAL) ---
-  isPaymentModalOpen: boolean = false;
+  // ── BUSCA DE CLIENTE ──────────────────────────────────────────────
+  customerSearch       = '';
+  showCustomerDropdown = false;
+  selectedCustomerId: string | null = null;
+  addressLat?: number;
+  addressLng?: number;
+
+  private selectedCustomerAddress = '';
+  private selectedCustomerLat?: number;
+  private selectedCustomerLng?: number;
+
+  private allCustomers: Customer[] = [];
+  private customerSub?: Subscription;
+
+  get matchingCustomers(): Customer[] {
+    const term = this.customerSearch.trim().toLowerCase();
+    if (!term || term.length < 1) return [];
+    return this.allCustomers
+      .filter(c =>
+        c.name.toLowerCase().includes(term) ||
+        (c.phone && c.phone.includes(term))
+      )
+      .slice(0, 6);
+  }
+
+  // ── PAGAMENTO ─────────────────────────────────────────────────────
+  isPaymentModalOpen       = false;
   selectedOrderToFinalize: Order | null = null;
   selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
 
-  // --- CONTROLE DE EDIÇÃO ---
+  // ── EDIÇÃO ────────────────────────────────────────────────────────
   editingOrderId: string | null = null;
 
-  // --- CONTROLE DE CONFIRMAÇÃO (GENERIC MODAL) ---
-  isConfirmModalOpen: boolean = false;
-  confirmMessage: string = '';
+  // ── CONFIRMAÇÃO GENÉRICA ──────────────────────────────────────────
+  isConfirmModalOpen = false;
+  confirmMessage     = '';
   confirmAction: (() => void) | null = null;
 
+  // ── DETALHES ──────────────────────────────────────────────────────
+  isDetailsModalOpen   = false;
+  selectedOrderDetails: Order | null = null;
+
+  // =================================================================
   ngOnInit() {
-    console.log('OrdersComponent: ngOnInit');
     this.loadData();
+    this.customerSub = this.customerService.getCustomers().subscribe(
+      customers => this.allCustomers = customers
+    );
+  }
+
+  ngOnDestroy() {
+    this.customerSub?.unsubscribe();
   }
 
   loadData() {
-    console.log('OrdersComponent: loadData iniciado');
     this.isLoadingOrders = true;
     this.products$ = this.productService.getProducts();
 
-    // Inicia a stream de pedidos
     this.orders$ = this.orderService.getPendingOrders().pipe(
       catchError(err => {
         console.error('OrdersComponent: Erro ao carregar pedidos', err);
@@ -96,75 +124,92 @@ export class OrdersComponent implements OnInit {
     this.updateFilter();
   }
 
-  goBack() {
-    this.router.navigate(['/']);
-  }
+  goBack() { this.router.navigate(['/']); }
 
   updateFilter() {
-    if (!this.orders$) {
-      console.warn('OrdersComponent: updateFilter chamado mas orders$ está nulo');
-      return;
-    }
+    if (!this.orders$) return;
 
     this.filteredOrders$ = this.orders$.pipe(
       map(orders => {
-        console.log(`OrdersComponent: Processando ${orders?.length || 0} pedidos para filtro ${this._filterStatus}`);
-        this.isLoadingOrders = false; // Dados chegaram
-
+        this.isLoadingOrders = false;
         if (!orders) return [];
-
         if (this._filterStatus === 'all') return orders;
-
         if (this._filterStatus === 'pending') {
-          // Ativos: Tudo que não foi finalizado ou cancelado
-          const activeStatuses = ['open', 'pending', 'preparing', 'ready', 'delivering'];
-          const filtered = orders.filter(o => activeStatuses.includes(o.status));
-          console.log(`OrdersComponent: Filtro 'pending' retornou ${filtered.length} pedidos`);
-          return filtered;
+          return orders.filter(o =>
+            ['open', 'pending', 'preparing', 'ready', 'delivering'].includes(o.status)
+          );
         }
-
         if (this._filterStatus === 'delivered') {
-          // Histórico: Entregues e Finalizados
-          const finishedStatuses = ['delivered', 'finished'];
-          const filtered = orders.filter(o => finishedStatuses.includes(o.status));
-          console.log(`OrdersComponent: Filtro 'delivered' retornou ${filtered.length} pedidos`);
-          return filtered;
+          return orders.filter(o => ['delivered', 'finished'].includes(o.status));
         }
-
         return orders;
       })
     );
 
-    // Soma total de cada item para o resumo (preparação)
     this.orderSummary$ = this.filteredOrders$.pipe(
       map(orders => {
-        const summaryMap: Record<string, number> = {};
-
-        orders.forEach(order => {
-          order.items.forEach(item => {
-            const name = item.productName;
-            summaryMap[name] = (summaryMap[name] || 0) + item.quantity;
-          });
-        });
-
-        return Object.keys(summaryMap)
-          .map(name => ({
-            productName: name,
-            totalQuantity: summaryMap[name]
-          }))
+        const map: Record<string, number> = {};
+        orders.forEach(o => o.items.forEach(i => {
+          map[i.productName] = (map[i.productName] || 0) + i.quantity;
+        }));
+        return Object.entries(map)
+          .map(([productName, totalQuantity]) => ({ productName, totalQuantity }))
           .sort((a, b) => b.totalQuantity - a.totalQuantity);
       })
     );
   }
 
-  // =============================================================
-  // 🛒 LÓGICA DO CARRINHO (NOVO PEDIDO)
-  // =============================================================
+  // =================================================================
+  // BUSCA DE CLIENTE
+  // =================================================================
 
-  openNewOrder() {
-    this.clearForm();
-    this.isNewOrderOpen = true;
+  onCustomerSearchInput() {
+    this.selectedCustomerId = null;
+    this.showCustomerDropdown = this.customerSearch.trim().length > 0;
   }
+
+  selectCustomer(c: Customer) {
+    this.selectedCustomerId = c.id!;
+    this.customerSearch     = c.name;
+    this.customerName       = c.name;
+    this.customerPhone      = c.phone ?? '';
+    this.showCustomerDropdown = false;
+
+    this.selectedCustomerAddress = c.address ?? '';
+    this.selectedCustomerLat     = c.lat;
+    this.selectedCustomerLng     = c.lng;
+
+    if (this.deliveryType === 'delivery' && this.selectedCustomerAddress) {
+      this.address    = this.selectedCustomerAddress;
+      this.addressLat = this.selectedCustomerLat;
+      this.addressLng = this.selectedCustomerLng;
+    }
+  }
+
+  hideDropdownDelayed() {
+    setTimeout(() => { this.showCustomerDropdown = false; }, 200);
+  }
+
+  clearCustomer() {
+    this.selectedCustomerId      = null;
+    this.customerSearch          = '';
+    this.customerName            = '';
+    this.customerPhone           = '';
+    this.selectedCustomerAddress = '';
+    this.selectedCustomerLat     = undefined;
+    this.selectedCustomerLng     = undefined;
+    if (this.deliveryType === 'delivery') {
+      this.address    = '';
+      this.addressLat = undefined;
+      this.addressLng = undefined;
+    }
+  }
+
+  // =================================================================
+  // CARRINHO
+  // =================================================================
+
+  openNewOrder() { this.clearForm(); this.isNewOrderOpen = true; }
 
   editOrder(order: Order) {
     if (order.status !== 'pending' && order.status !== 'open') {
@@ -172,60 +217,54 @@ export class OrdersComponent implements OnInit {
       return;
     }
     this.clearForm();
-    this.editingOrderId = order.id || null;
-    this.customerName = order.customerName;
-    this.customerPhone = order.customerPhone || '';
-    this.deliveryType = order.deliveryType;
-    this.address = order.address || '';
-    this.shippingCost = order.shippingCost || 0;
-    this.observations = order.observations || '';
-    this.cart = [...order.items];
-    this.isNewOrderOpen = true;
+    this.editingOrderId       = order.id ?? null;
+    this.customerSearch       = order.customerName;
+    this.customerName         = order.customerName;
+    this.customerPhone        = order.customerPhone ?? '';
+    this.selectedCustomerId   = order.customerId ?? null;
+    this.deliveryType         = order.deliveryType;
+    this.address              = order.address ?? '';
+    this.addressLat           = order.addressLat;
+    this.addressLng           = order.addressLng;
+    this.shippingCost         = order.shippingCost ?? 0;
+    this.observations         = order.observations ?? '';
+    this.cart                 = [...order.items];
+    this.isNewOrderOpen       = true;
   }
 
-  closeNewOrder() {
-    this.isNewOrderOpen = false;
-    this.clearForm();
-  }
+  closeNewOrder() { this.isNewOrderOpen = false; this.clearForm(); }
 
   addToCart(p: Product) {
-    const existingItem = this.cart.find(i => i.idProduct === p.id);
-
-    if (existingItem) {
-      existingItem.quantity++;
+    const existing = this.cart.find(i => i.idProduct === p.id);
+    if (existing) {
+      existing.quantity++;
     } else {
-      // Cria um OrderItem válido
-      const newItem: OrderItem = {
-        idProduct: p.id!, // Assumindo ID existe
+      this.cart.push({
+        idProduct:   p.id!,
         productName: p.title || 'Produto sem nome',
-        quantity: 1,
+        quantity:    1,
         priceAtSale: Number(p.sellPrice) || 0,
-        priceAtCost: Number(p.buyPrice) || 0
-      };
-      this.cart.push(newItem);
+        priceAtCost: Number(p.buyPrice)  || 0
+      });
     }
   }
 
   removeFromCart(item: OrderItem) {
-    const index = this.cart.indexOf(item);
-    if (index > -1) {
-      this.cart.splice(index, 1);
-    }
+    const idx = this.cart.indexOf(item);
+    if (idx > -1) this.cart.splice(idx, 1);
   }
 
-  // Cálculos de Totais
   get itemsTotal(): number {
-    return this.cart.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
+    return this.cart.reduce((acc, i) => acc + i.priceAtSale * i.quantity, 0);
   }
 
   get finalTotal(): number {
     return this.itemsTotal + Number(this.shippingCost);
   }
 
-  // Salvar no Banco
   async saveOrder() {
-    if (!this.customerName.trim()) {
-      this.notif.warning('Preencha o nome do cliente!');
+    if (!this.selectedCustomerId) {
+      this.notif.warning('Selecione um cliente cadastrado para criar o pedido!');
       return;
     }
     if (this.cart.length === 0) {
@@ -238,20 +277,21 @@ export class OrdersComponent implements OnInit {
     }
 
     this.isProcessingAction = true;
-
     try {
-      // Monta o objeto dos dados (sem ID no caso de novo)
       const orderData: any = {
-        customerName: this.customerName,
-        customerPhone: this.customerPhone,
-        items: this.cart,
-        itemsTotal: this.itemsTotal,
-        shippingCost: Number(this.shippingCost),
-        total: this.finalTotal,
-        deliveryType: this.deliveryType,
-        address: this.address,
-        observations: this.observations,
-        scheduledDate: Timestamp.now()
+        customerName:  this.customerName.trim(),
+        customerPhone: this.customerPhone.trim(),
+        items:         this.cart,
+        itemsTotal:    this.itemsTotal,
+        shippingCost:  Number(this.shippingCost),
+        total:         this.finalTotal,
+        deliveryType:  this.deliveryType,
+        address:       this.address.trim(),
+        observations:  this.observations,
+        scheduledDate: Timestamp.now(),
+        ...(this.selectedCustomerId ? { customerId: this.selectedCustomerId } : {}),
+        ...(this.addressLat != null ? { addressLat: this.addressLat } : {}),
+        ...(this.addressLng != null ? { addressLng: this.addressLng } : {})
       };
 
       if (this.editingOrderId) {
@@ -262,10 +302,9 @@ export class OrdersComponent implements OnInit {
         await this.orderService.addOrder(orderData);
         this.notif.success('✅ Pedido Criado com Sucesso!');
       }
-
       this.closeNewOrder();
     } catch (error) {
-      console.error('Erro ao salvar:', error);
+      console.error('Erro ao salvar pedido:', error);
       this.notif.error('Erro ao salvar pedido. Verifique o console.');
     } finally {
       this.isProcessingAction = false;
@@ -273,38 +312,55 @@ export class OrdersComponent implements OnInit {
   }
 
   clearForm() {
-    this.cart = [];
-    this.customerName = '';
-    this.customerPhone = '';
-    this.address = '';
-    this.shippingCost = 0;
-    this.deliveryType = 'pickup';
-    this.observations = '';
-    this.editingOrderId = null;
+    this.cart                 = [];
+    this.customerSearch       = '';
+    this.customerName         = '';
+    this.customerPhone        = '';
+    this.selectedCustomerId   = null;
+    this.showCustomerDropdown = false;
+    this.address                 = '';
+    this.addressLat              = undefined;
+    this.addressLng              = undefined;
+    this.selectedCustomerAddress = '';
+    this.selectedCustomerLat     = undefined;
+    this.selectedCustomerLng     = undefined;
+    this.shippingCost            = 0;
+    this.deliveryType         = 'pickup';
+    this.observations         = '';
+    this.editingOrderId       = null;
   }
 
   setDeliveryType(type: 'pickup' | 'delivery') {
     this.deliveryType = type;
     if (type === 'pickup') {
       this.shippingCost = 0;
-      this.address = '';
+      this.address      = '';
+      this.addressLat   = undefined;
+      this.addressLng   = undefined;
+    } else if (type === 'delivery' && this.selectedCustomerAddress) {
+      this.address    = this.selectedCustomerAddress;
+      this.addressLat = this.selectedCustomerLat;
+      this.addressLng = this.selectedCustomerLng;
     }
   }
 
-  // =============================================================
-  // 🚀 LÓGICA DE STATUS (KANBAN / FLUXO)
-  // =============================================================
+  // =================================================================
+  // MAPS
+  // =================================================================
+
+  openMapsAddress(address: string) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`, '_blank');
+  }
+
+  // =================================================================
+  // STATUS / FLUXO
+  // =================================================================
 
   translateStatus(status: string): string {
     const map: Record<string, string> = {
-      'open': 'Aberto',
-      'pending': 'Pendente',
-      'preparing': 'Preparando',
-      'ready': 'Pronto',
-      'delivering': 'Em Entrega',
-      'delivered': 'Entregue',
-      'finished': 'Finalizado',
-      'canceled': 'Cancelado'
+      open: 'Aberto', pending: 'Pendente', preparing: 'Preparando',
+      ready: 'Pronto', delivering: 'Em Entrega', delivered: 'Entregue',
+      finished: 'Finalizado', canceled: 'Cancelado'
     };
     return map[status] || status;
   }
@@ -316,14 +372,11 @@ export class OrdersComponent implements OnInit {
     return '';
   }
 
-  // Move o fluxo
   async advanceStatus(order: Order) {
     if (!order.id) return;
-
     this.isProcessingAction = true;
     try {
-      // Pendente -> Entregar -> Entregue (Confirma entrega e baixa estoque)
-      if (order.status === 'open' || order.status === 'pending' || order.status === 'delivering') {
+      if (['open', 'pending', 'delivering'].includes(order.status)) {
         this.openConfirmModal(
           `Confirmar entrega do pedido de ${order.customerName}? (O estoque será baixado)`,
           async () => {
@@ -339,9 +392,7 @@ export class OrdersComponent implements OnInit {
             }
           }
         );
-      }
-      // Entregue -> Pagar (Abre modal de pagamento)
-      else if (order.status === 'delivered') {
+      } else if (order.status === 'delivered') {
         this.openPaymentModal(order);
       }
     } catch (err) {
@@ -354,7 +405,6 @@ export class OrdersComponent implements OnInit {
 
   async cancelAction(order: Order) {
     if (!order.id) return;
-
     this.openConfirmModal(
       `Tem certeza que deseja CANCELAR o pedido de ${order.customerName}?`,
       async () => {
@@ -362,7 +412,7 @@ export class OrdersComponent implements OnInit {
         try {
           await this.orderService.cancelOrder(order.id!);
           this.notif.success('Pedido cancelado.');
-        } catch (err) {
+        } catch {
           this.notif.error('Erro ao cancelar pedido.');
         } finally {
           this.isProcessingAction = false;
@@ -372,34 +422,25 @@ export class OrdersComponent implements OnInit {
     );
   }
 
-  // =============================================================
-  // 💰 PAGAMENTO & FINALIZAÇÃO
-  // =============================================================
+  // =================================================================
+  // PAGAMENTO
+  // =================================================================
 
   openPaymentModal(order: Order) {
-    this.selectedOrderToFinalize = order;
-    this.selectedPaymentMethod = PaymentMethod.DINHEIRO;
-    this.isPaymentModalOpen = true;
+    this.selectedOrderToFinalize  = order;
+    this.selectedPaymentMethod    = PaymentMethod.DINHEIRO;
+    this.isPaymentModalOpen       = true;
   }
 
-  closePaymentModal() {
-    this.isPaymentModalOpen = false;
-    this.selectedOrderToFinalize = null;
-  }
+  closePaymentModal() { this.isPaymentModalOpen = false; this.selectedOrderToFinalize = null; }
 
   async confirmPayment() {
     if (!this.selectedOrderToFinalize) return;
-
     this.isProcessingAction = true;
     try {
-      await this.orderService.finalizeOrder(
-        this.selectedOrderToFinalize,
-        this.selectedPaymentMethod
-      );
-
+      await this.orderService.finalizeOrder(this.selectedOrderToFinalize, this.selectedPaymentMethod);
       this.notif.success('💰 Venda Registrada e Pedido Finalizado!');
       this.closePaymentModal();
-
     } catch (error) {
       console.error(error);
       this.notif.error('Erro ao finalizar pagamento.');
@@ -408,59 +449,43 @@ export class OrdersComponent implements OnInit {
     }
   }
 
-  // =============================================================
-  // 🛠️ HELPERS UI
-  // =============================================================
+  // =================================================================
+  // HELPERS UI
+  // =================================================================
 
-  trackByOrder(index: number, order: Order): string {
-    return order.id || index.toString();
+  trackByOrder(_: number, order: Order): string {
+    return order.id || _.toString();
   }
 
   getOrderDate(date: any): Date | null {
     if (!date) return null;
-    // Se for Timestamp do Firestore
-    if (typeof date.toDate === 'function') {
-      return date.toDate();
-    }
-    // Se já for Date ou string/number compatível
+    if (typeof date.toDate === 'function') return date.toDate();
     return new Date(date);
   }
 
-  // --- CONFIRMATION MODAL HELPERS ---
   openConfirmModal(message: string, action: () => void) {
     this.confirmMessage = message;
-    this.confirmAction = action;
+    this.confirmAction  = action;
     this.isConfirmModalOpen = true;
   }
 
   closeConfirmModal() {
     this.isConfirmModalOpen = false;
-    this.confirmMessage = '';
-    this.confirmAction = null;
+    this.confirmMessage     = '';
+    this.confirmAction      = null;
   }
 
   onConfirmYes() {
-    if (this.confirmAction) {
-      this.confirmAction();
-    }
-    // Não fecha aqui, a action fecha ou mantemos aberto se for async.
-    // Mas no meu implementacao acima, eu chamo closeConfirmModal() no finally da action.
-    // Então aqui só executamos.
+    this.confirmAction?.();
   }
-
-  // =============================================================
-  // 👁️ DETALHES DO PEDIDO (MODAL)
-  // =============================================================
-  isDetailsModalOpen = false;
-  selectedOrderDetails: Order | null = null;
 
   viewDetails(order: Order) {
     this.selectedOrderDetails = order;
-    this.isDetailsModalOpen = true;
+    this.isDetailsModalOpen   = true;
   }
 
   closeDetails() {
-    this.isDetailsModalOpen = false;
+    this.isDetailsModalOpen   = false;
     this.selectedOrderDetails = null;
   }
 }

@@ -8,9 +8,11 @@ Chart.register(...registerables);
 
 // Models e Services
 import { Product } from '../../models/product-model';
+import { Customer } from '../../models/customer-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
+import { CustomerService } from '../../services/customer-service/customer-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 
 @Component({
@@ -22,13 +24,14 @@ import { NotificationService } from '../../services/notification-service/notific
 })
 export class ProductInventoryComponent implements OnInit {
   // Controle das Abas
-  activeTab: 'relatorio' | 'estoque' = 'relatorio';
+  activeTab: 'relatorio' | 'estoque' | 'clientes' = 'relatorio';
 
   // Controle de Visualização do Formulário
   exibirFormularioNovo: boolean = false;
   produtoEmEdicao: Product | null = null;
 
   // Lista de produtos
+  isLoading = true;
   products: Product[] = [];
 
   // --- FILTROS ---
@@ -36,6 +39,7 @@ export class ProductInventoryComponent implements OnInit {
   filtroDataFim: string = '';
   filtroProdutoId: string = '';
   filtroOrigem: string = 'todos'; // 'todos' | 'pdv' | 'order'
+  filtroClienteId: string = '';
 
   // --- MODAL DE EXCLUSÃO DE PRODUTO ---
   isDeleteModalOpen: boolean = false;
@@ -71,10 +75,42 @@ export class ProductInventoryComponent implements OnInit {
     novoPrecoCusto: 0
   };
 
+  // --- CLIENTES ---
+  customers: Customer[] = [];
+  clienteEmEdicao: Customer | null = null;
+  exibirFormularioCliente: boolean = false;
+  novoCliente: Omit<Customer, 'id'> = { name: '', phone: '', address: '' };
+  isDeleteClienteModalOpen: boolean = false;
+  clienteToDelete: Customer | null = null;
+
+  // campos de endereço por CEP
+  clienteCep = '';
+  clienteRua = '';
+  clienteBairro = '';
+  clienteCidade = '';
+  clienteUf = '';
+  clienteNumero = '';
+  clienteComplemento = '';
+  clienteCepLoading = false;
+  clienteCepError = '';
+
+  get clienteFormattedAddress(): string {
+    if (!this.clienteRua || !this.clienteNumero.trim() || !this.clienteBairro || !this.clienteCidade) return '';
+    const num = this.clienteComplemento.trim()
+      ? `${this.clienteNumero.trim()}, ${this.clienteComplemento.trim()}`
+      : this.clienteNumero.trim();
+    return `${this.clienteRua}, ${num}, ${this.clienteBairro}, ${this.clienteCidade} - ${this.clienteUf}`;
+  }
+
+  get clienteAddressReady(): boolean {
+    return !!this.clienteRua && !!this.clienteNumero.trim() && !!this.clienteBairro && !!this.clienteCidade;
+  }
+
   constructor(
     private productService: ProductService,
     private purchaseService: PurchaseService,
     private saleService: SaleService,
+    private customerService: CustomerService,
     private notif: NotificationService
   ) { }
 
@@ -82,6 +118,7 @@ export class ProductInventoryComponent implements OnInit {
     // 1. Carrega produtos em tempo real
     this.productService.getProducts().subscribe(data => {
       this.products = data;
+      this.isLoading = false;
     });
 
     // 2. Define datas iniciais como HOJE
@@ -91,6 +128,11 @@ export class ProductInventoryComponent implements OnInit {
 
     // 3. Calcula o relatório inicial
     this.atualizarRelatorio();
+
+    // 4. Carrega clientes em tempo real
+    this.customerService.getCustomers().subscribe(data => {
+      this.customers = data;
+    });
   }
 
   openDeleteModal(product: Product) {
@@ -136,6 +178,9 @@ export class ProductInventoryComponent implements OnInit {
       vendas.forEach((venda: any) => {
         // Filtro por Origem (PDV vs Pedidos/Massa)
         if (this.filtroOrigem !== 'todos' && venda.sale_type !== this.filtroOrigem) return;
+
+        // Filtro por Cliente — PDV nunca terá customerId, só pedidos com vínculo passam
+        if (this.filtroClienteId && venda.customerId !== this.filtroClienteId) return;
 
         let vendaEntrouNoFiltro = false;
         if (venda.items) {
@@ -217,6 +262,8 @@ export class ProductInventoryComponent implements OnInit {
     vendas.forEach(v => {
       // Filtro por Origem
       if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
+      // Filtro por Cliente
+      if (this.filtroClienteId && v.customerId !== this.filtroClienteId) return;
 
       const vDate = (v.date?.toDate ? v.date.toDate() : new Date(v.date));
       const dayKey = vDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -283,6 +330,8 @@ export class ProductInventoryComponent implements OnInit {
     vendas.forEach(v => {
       // Filtro por Origem
       if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
+      // Filtro por Cliente
+      if (this.filtroClienteId && v.customerId !== this.filtroClienteId) return;
 
       v.items?.forEach((item: any) => {
         if (!productsMap[item.idProduct]) {
@@ -345,6 +394,7 @@ export class ProductInventoryComponent implements OnInit {
     this.filtroDataFim = this.formatDateToInput(hoje);
     this.filtroProdutoId = '';
     this.filtroOrigem = 'todos';
+    this.filtroClienteId = '';
     this.atualizarRelatorio();
   }
 
@@ -439,6 +489,134 @@ export class ProductInventoryComponent implements OnInit {
 
   cancelarSelecaoCompra() {
     this.produtoSelecionadoCompra = null;
+  }
+
+  // ==========================================================
+  // ABA 3: CLIENTES
+  // ==========================================================
+
+  abrirNovoCliente() {
+    this.clienteEmEdicao = null;
+    this.novoCliente = { name: '', phone: '', address: '' };
+    this.limparCamposCep();
+    this.exibirFormularioCliente = true;
+  }
+
+  abrirEdicaoCliente(c: Customer) {
+    this.clienteEmEdicao = c;
+    this.novoCliente     = { name: c.name, phone: c.phone || '', address: c.address || '' };
+    this.clienteCep          = c.cep         ?? '';
+    this.clienteRua          = c.rua         ?? c.address ?? '';
+    this.clienteNumero       = c.numero      ?? '';
+    this.clienteComplemento  = c.complemento ?? '';
+    this.clienteBairro       = c.bairro      ?? '';
+    this.clienteCidade       = c.cidade      ?? '';
+    this.clienteUf           = c.uf          ?? '';
+    this.clienteCepError     = '';
+    this.exibirFormularioCliente = true;
+  }
+
+  fecharFormularioCliente() {
+    this.exibirFormularioCliente = false;
+    this.clienteEmEdicao = null;
+  }
+
+  private limparCamposCep() {
+    this.clienteCep = '';
+    this.clienteRua = '';
+    this.clienteBairro = '';
+    this.clienteCidade = '';
+    this.clienteUf = '';
+    this.clienteNumero = '';
+    this.clienteComplemento = '';
+    this.clienteCepError = '';
+  }
+
+  onClienteCepInput() {
+    const digits = this.clienteCep.replace(/\D/g, '');
+    if (digits.length > 8) { this.clienteCep = this.clienteCep.slice(0, 9); return; }
+    this.clienteCep = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+    this.clienteCepError = '';
+    if (digits.length === 8) {
+      this.buscarCep(digits);
+    } else {
+      this.clienteRua = '';
+      this.clienteBairro = '';
+      this.clienteCidade = '';
+      this.clienteUf = '';
+      this.clienteNumero = '';
+      this.clienteComplemento = '';
+    }
+  }
+
+  private async buscarCep(cep: string) {
+    this.clienteCepLoading = true;
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await res.json();
+      if (data.erro) { this.clienteCepError = 'CEP não encontrado.'; return; }
+      this.clienteRua    = data.logradouro || '';
+      this.clienteBairro = data.bairro     || '';
+      this.clienteCidade = data.localidade || '';
+      this.clienteUf     = data.uf         || '';
+    } catch {
+      this.clienteCepError = 'Erro ao buscar CEP.';
+    } finally {
+      this.clienteCepLoading = false;
+    }
+  }
+
+  async salvarCliente() {
+    if (!this.novoCliente.name?.trim()) {
+      this.notif.warning('O nome do cliente é obrigatório!');
+      return;
+    }
+    const address = this.clienteFormattedAddress || this.novoCliente.address || '';
+    const data: Omit<Customer, 'id'> = {
+      name:        this.novoCliente.name.trim(),
+      phone:       this.novoCliente.phone?.trim() || '',
+      address,
+      cep:         this.clienteCep,
+      rua:         this.clienteRua,
+      numero:      this.clienteNumero,
+      complemento: this.clienteComplemento,
+      bairro:      this.clienteBairro,
+      cidade:      this.clienteCidade,
+      uf:          this.clienteUf,
+    };
+    try {
+      if (this.clienteEmEdicao?.id) {
+        await this.customerService.updateCustomer(this.clienteEmEdicao.id, data);
+        this.notif.success('Cliente atualizado!');
+      } else {
+        await this.customerService.addCustomer(data);
+        this.notif.success('Cliente cadastrado!');
+      }
+      this.fecharFormularioCliente();
+    } catch {
+      this.notif.error('Erro ao salvar cliente.');
+    }
+  }
+
+  openDeleteClienteModal(c: Customer) {
+    this.clienteToDelete = c;
+    this.isDeleteClienteModalOpen = true;
+  }
+
+  closeDeleteClienteModal() {
+    this.isDeleteClienteModalOpen = false;
+    this.clienteToDelete = null;
+  }
+
+  async confirmDeleteCliente() {
+    if (!this.clienteToDelete?.id) return;
+    try {
+      await this.customerService.deleteCustomer(this.clienteToDelete.id);
+      this.notif.success('Cliente removido!');
+      this.closeDeleteClienteModal();
+    } catch {
+      this.notif.error('Erro ao excluir cliente.');
+    }
   }
 
   // No seu ProductInventoryComponent

@@ -61,8 +61,8 @@
           <span>TOTAL</span>
           <span>R$ {{ total | number:'1.2-2' }}</span>
         </div>
-        <button class="btn-checkout" (click)="openCheckout()" [disabled]="cart.length === 0">
-          CONFIRMAR PEDIDO
+        <button class="btn-checkout" (click)="openCheckout()" [disabled]="cart.length === 0 || isLoadingProducts">
+          {{ isLoadingProducts ? 'Sincronizando...' : 'CONFIRMAR PEDIDO' }}
         </button>
       </div>
     </div>

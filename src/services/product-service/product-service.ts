@@ -1,96 +1,52 @@
-import { Injectable, inject, NgZone } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection,
-  addDoc,
-  doc,
-  updateDoc,
-  deleteDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  increment
+  collection, addDoc, doc, updateDoc, deleteDoc, query, increment, UpdateData
 } from 'firebase/firestore';
 import { Product } from '../../models/product-model';
 import { Observable } from 'rxjs';
+import { FirestoreBaseService } from '../firestore-base.service';
 
 @Injectable({
   providedIn: 'root',
 })
-export class ProductService {
+export class ProductService extends FirestoreBaseService {
   private firestore = inject(Firestore);
-  private ngZone = inject(NgZone);
   private productsCollection;
 
   constructor() {
+    super();
     this.productsCollection = collection(this.firestore, 'products');
   }
 
   getProducts(): Observable<Product[]> {
-    return new Observable<Product[]>((observer) => {
-      // Ordenar por título se possível, ou padrão
-      const q = query(this.productsCollection); // Pode adicionar orderBy('title') se tiver index
-
-      const unsubscribe = onSnapshot(q,
-        (snapshot) => {
-          const data = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          } as Product));
-          this.ngZone.run(() => observer.next(data));
-        },
-        (error) => {
-          console.error("ProductService Error:", error);
-          this.ngZone.run(() => observer.error(error));
-        }
-      );
-
-      return () => unsubscribe();
-    });
+    return this.collectionDataObservable<Product>(query(this.productsCollection));
   }
 
   addProduct(product: Product) {
-    // Remove o ID para que o Firestore gere um automático
     const { id, ...productData } = product;
     return addDoc(this.productsCollection, productData);
   }
 
   deleteProduct(id: string) {
-    const productDocRef = doc(this.firestore, `products/${id}`);
-    return deleteDoc(productDocRef);
+    return deleteDoc(doc(this.firestore, `products/${id}`));
   }
 
-  /**
-   * AJUSTE: Inverti a ordem dos parâmetros para bater com a chamada do componente: (id, dados)
-   * E usei a tipagem correta para o Firestore não reclamar.
-   */
-  updateProduct(id: string, product: Partial<Product>) {
-    const productDocRef = doc(this.firestore, `products/${id}`);
-
-    // Cria uma cópia e remove o ID para não dar erro de escrita no Firestore
-    const data = { ...product };
-    delete data.id;
-
-    // O cast 'as any' ou 'UpdateData' resolve o erro de propriedades incompatíveis (ts 2559)
-    return updateDoc(productDocRef, data as any);
+  updateProduct(id: string, product: Partial<Omit<Product, 'id'>>) {
+    return updateDoc(
+      doc(this.firestore, `products/${id}`),
+      product as UpdateData<Product>
+    );
   }
 
-  /**
-   * Diminui o estoque de um produto atomicamente.
-   */
   decreaseStock(id: string, quantity: number) {
-    const productRef = doc(this.firestore, `products/${id}`);
-    return updateDoc(productRef, {
+    return updateDoc(doc(this.firestore, `products/${id}`), {
       stock: increment(-quantity)
     });
   }
 
-  /**
-   * Aumenta o estoque de um produto atomicamente.
-   */
   increaseStock(id: string, quantity: number) {
-    const productRef = doc(this.firestore, `products/${id}`);
-    return updateDoc(productRef, {
+    return updateDoc(doc(this.firestore, `products/${id}`), {
       stock: increment(quantity)
     });
   }
