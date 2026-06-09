@@ -16,6 +16,9 @@
       <button [class.active]="activeTab === 'clientes'" (click)="activeTab = 'clientes'">
         👥 Clientes
       </button>
+      <button [class.active]="activeTab === 'compras'" (click)="activeTab = 'compras'">
+        🛒 Compras
+      </button>
     </nav>
 
     <button class="btn-voltar" [routerLink]="['/']">⬅ Voltar ao PDV</button>
@@ -29,6 +32,16 @@
         <h1>Dashboard Financeiro</h1>
         <p>Visão geral de desempenho e tendências.</p>
       </div>
+
+      <!-- SUB-TABS DO RELATÓRIO -->
+      <div class="report-tabs">
+        <button [class.active]="reportTab === 'vendas'" (click)="reportTab = 'vendas'">📊 Vendas</button>
+        <button [class.active]="reportTab === 'contas'" (click)="reportTab = 'contas'">💸 Contas a Pagar</button>
+        <button [class.active]="reportTab === 'balanco'" (click)="reportTab = 'balanco'">⚖️ Balanço</button>
+      </div>
+
+      <!-- ===================== ABA VENDAS ===================== -->
+      <div *ngIf="reportTab === 'vendas'">
 
       <!-- FILTROS AVANÇADOS -->
       <div class="filtros-dashboard card-base">
@@ -121,6 +134,162 @@
         </div>
       </div>
 
+      </div><!-- /reportTab vendas -->
+
+      <!-- ===================== ABA CONTAS A PAGAR ===================== -->
+      <div *ngIf="reportTab === 'contas'" class="tab-contas">
+
+        <!-- Filtro de período (mini) -->
+        <div class="filtros-dashboard card-base">
+          <div class="filter-row main-filters">
+            <div class="date-presets">
+              <button class="btn-preset" (click)="setPreset('hoje')">Hoje</button>
+              <button class="btn-preset" (click)="setPreset('7dias')">7 Dias</button>
+              <button class="btn-preset" (click)="setPreset('mes')">Este Mês</button>
+              <button class="btn-preset" (click)="setPreset('mesAnterior')">Mês Passado</button>
+            </div>
+            <div class="custom-dates">
+              <input type="date" [(ngModel)]="filtroDataInicio">
+              <span>até</span>
+              <input type="date" [(ngModel)]="filtroDataFim">
+            </div>
+            <div class="filter-actions">
+              <button class="btn-dashboard-action secondary" (click)="limparFiltros()">LIMPAR</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPIs Contas -->
+        <div class="cards-kpi">
+          <div class="card kpi-warning">
+            <span class="kpi-label">Pendente</span>
+            <strong class="kpi-value" style="color: var(--color-warning);">R$ {{ totalContasPendentes | number:'1.2-2' }}</strong>
+            <small class="kpi-meta">total em aberto</small>
+          </div>
+          <div class="card kpi-info">
+            <span class="kpi-label">A Pagar (Recebido)</span>
+            <strong class="kpi-value" style="color: var(--color-info);">R$ {{ totalContasRecebidas | number:'1.2-2' }}</strong>
+            <small class="kpi-meta">chegou, aguardando pag.</small>
+          </div>
+          <div class="card kpi-success">
+            <span class="kpi-label">Pago no Período</span>
+            <strong class="kpi-value" style="color: var(--color-success);">R$ {{ gastosPeriodo | number:'1.2-2' }}</strong>
+            <small class="kpi-meta">no período selecionado</small>
+          </div>
+        </div>
+
+        <!-- Filtro status + link para /contas -->
+        <div class="contas-bar">
+          <div class="status-filter-inline">
+            <button [class.active]="filtroContasStatus === 'todos'" (click)="filtroContasStatus = 'todos'">Todas</button>
+            <button [class.active]="filtroContasStatus === 'pendente'" (click)="filtroContasStatus = 'pendente'">Pendente</button>
+            <button [class.active]="filtroContasStatus === 'recebido'" (click)="filtroContasStatus = 'recebido'">A Pagar</button>
+            <button [class.active]="filtroContasStatus === 'pago'" (click)="filtroContasStatus = 'pago'">Pago</button>
+          </div>
+          <a [routerLink]="['/contas']" class="btn-link-contas">Gerenciar Contas →</a>
+        </div>
+
+        <!-- Lista de contas do período -->
+        <div class="bills-lista-rel">
+          <div class="bills-vazio-rel" *ngIf="billsFiltradosRelatorio.length === 0">
+            Nenhuma conta no período selecionado.
+          </div>
+
+          <div class="bill-card-rel" *ngFor="let bill of billsFiltradosRelatorio">
+            <div class="bill-info-rel">
+              <span class="bill-name-rel">{{ bill.name }}</span>
+              <div class="bill-meta-rel">
+                <span *ngIf="bill.dueDate" class="meta-chip-rel">📅 {{ formatBillDate(bill.dueDate) }}</span>
+                <span *ngIf="bill.recurring" class="meta-chip-rel">🔄 {{ bill.recurrencePeriod }}</span>
+                <span *ngIf="bill.paidAt" class="meta-chip-rel pago-on">✅ Pago {{ formatBillDate(bill.paidAt) }}</span>
+              </div>
+            </div>
+            <span class="bill-valor-rel">R$ {{ bill.value | number:'1.2-2' }}</span>
+            <button
+              class="status-chip-rel status-{{ bill.status }}"
+              (click)="avancarStatusBill(bill)"
+              [title]="bill.status !== 'pago' ? 'Avançar status' : 'Conta finalizada'"
+            >
+              {{ billStatusLabel(bill.status) }}
+              <span *ngIf="bill.status !== 'pago'">›</span>
+            </button>
+          </div>
+        </div>
+      </div><!-- /reportTab contas -->
+
+      <!-- ===================== ABA BALANÇO ===================== -->
+      <div *ngIf="reportTab === 'balanco'" class="tab-balanco">
+
+        <!-- Filtro de período (mini) -->
+        <div class="filtros-dashboard card-base">
+          <div class="filter-row main-filters">
+            <div class="date-presets">
+              <button class="btn-preset" (click)="setPreset('hoje'); atualizarRelatorio()">Hoje</button>
+              <button class="btn-preset" (click)="setPreset('7dias'); atualizarRelatorio()">7 Dias</button>
+              <button class="btn-preset" (click)="setPreset('mes'); atualizarRelatorio()">Este Mês</button>
+              <button class="btn-preset" (click)="setPreset('mesAnterior'); atualizarRelatorio()">Mês Passado</button>
+            </div>
+            <div class="custom-dates">
+              <input type="date" [(ngModel)]="filtroDataInicio" (change)="atualizarRelatorio()">
+              <span>até</span>
+              <input type="date" [(ngModel)]="filtroDataFim" (change)="atualizarRelatorio()">
+            </div>
+            <div class="filter-actions">
+              <button class="btn-dashboard-action primary" (click)="atualizarRelatorio()">
+                <span>🔍</span> FILTRAR
+              </button>
+              <button class="btn-dashboard-action secondary" (click)="limparFiltros()">LIMPAR</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPIs Balanço -->
+        <div class="cards-kpi balanco-kpis">
+          <div class="card kpi-venda">
+            <span class="kpi-label">Faturamento</span>
+            <strong class="kpi-value">R$ {{ relatorio.faturamento | number:'1.2-2' }}</strong>
+            <small class="kpi-meta">{{ relatorio.qtdVendas }} vendas</small>
+          </div>
+          <div class="card kpi-custo">
+            <span class="kpi-label">CMV (Custo)</span>
+            <strong class="kpi-value">R$ {{ relatorio.custoTotal | number:'1.2-2' }}</strong>
+          </div>
+          <div class="card kpi-gastos">
+            <span class="kpi-label">Gastos (Contas Pagas)</span>
+            <strong class="kpi-value" style="color: var(--color-danger);">R$ {{ gastosPeriodo | number:'1.2-2' }}</strong>
+          </div>
+          <div class="card" [class.kpi-lucro]="resultadoFinal >= 0" [class.kpi-prejuizo]="resultadoFinal < 0">
+            <span class="kpi-label">Resultado Final</span>
+            <strong class="kpi-value">R$ {{ resultadoFinal | number:'1.2-2' }}</strong>
+            <small class="kpi-meta" *ngIf="relatorio.faturamento > 0">
+              Margem: {{ relatorio.margem | number:'1.0-0' }}%
+            </small>
+          </div>
+        </div>
+
+        <!-- Fórmula do Balanço -->
+        <div class="balanco-formula card-base">
+          <h3>Composição do Resultado</h3>
+          <div class="formula-linha">
+            <span class="formula-label">Faturamento</span>
+            <span class="formula-valor positivo">+ R$ {{ relatorio.faturamento | number:'1.2-2' }}</span>
+          </div>
+          <div class="formula-linha">
+            <span class="formula-label">CMV (Custo dos Produtos)</span>
+            <span class="formula-valor negativo">− R$ {{ relatorio.custoTotal | number:'1.2-2' }}</span>
+          </div>
+          <div class="formula-linha">
+            <span class="formula-label">Gastos (Contas Pagas no Período)</span>
+            <span class="formula-valor negativo">− R$ {{ gastosPeriodo | number:'1.2-2' }}</span>
+          </div>
+          <div class="formula-separador"></div>
+          <div class="formula-linha formula-resultado" [class.positivo]="resultadoFinal >= 0" [class.negativo]="resultadoFinal < 0">
+            <span class="formula-label">= Resultado Final</span>
+            <span class="formula-valor">R$ {{ resultadoFinal | number:'1.2-2' }}</span>
+          </div>
+        </div>
+
+      </div><!-- /reportTab balanco -->
 
     </section>
 
@@ -188,6 +357,24 @@
               <input type="number" [(ngModel)]="dadosCompra.novoPrecoCusto">
             </div>
           </div>
+
+          <div class="total-compra-preview" *ngIf="dadosCompra.quantidade > 0 && dadosCompra.novoPrecoCusto > 0">
+            Total da entrada: <strong>R$ {{ (dadosCompra.quantidade * dadosCompra.novoPrecoCusto) | number:'1.2-2' }}</strong>
+          </div>
+
+          <div class="form-group compra-check-group">
+            <label class="compra-checkbox-label">
+              <input type="checkbox" [(ngModel)]="gerarContaPagar">
+              Gerar conta a pagar vinculada
+            </label>
+          </div>
+
+          <div class="form-group" *ngIf="gerarContaPagar">
+            <label>Descrição da conta</label>
+            <input type="text" [(ngModel)]="nomeConta"
+              [placeholder]="'Compra: ' + produtoSelecionadoCompra.title">
+          </div>
+
           <button class="btn-confirmar-compra" (click)="confirmarCompra()">💰 REGISTRAR ENTRADA</button>
         </div>
       </div>
@@ -321,7 +508,100 @@
 
     </section>
 
+    <!-- ABA COMPRAS -->
+    <section *ngIf="activeTab === 'compras'" class="painel-estoque">
+
+      <div class="header-estoque">
+        <h1>Produtos de Compra</h1>
+        <button class="btn-novo" (click)="abrirNovoCompra()" *ngIf="!exibirFormularioCompra">+ Novo Produto</button>
+      </div>
+
+      <!-- FORMULÁRIO -->
+      <div class="form-box modal-inline" *ngIf="exibirFormularioCompra">
+        <button class="btn-cancelar" (click)="fecharFormularioCompra()">⬅ Voltar para a lista</button>
+        <h2>{{ produtoCompraEmEdicao ? 'Editar Produto de Compra' : 'Novo Produto de Compra' }}</h2>
+
+        <div class="row">
+          <div class="form-group" style="flex: 2;">
+            <label>Nome *</label>
+            <input type="text" [(ngModel)]="novoProdutoCompra.name" placeholder="Ex: Ovos">
+          </div>
+          <div class="form-group">
+            <label>Valor Padrão (R$) *</label>
+            <input type="number" [(ngModel)]="novoProdutoCompra.defaultValue" min="0.01" step="0.01">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="form-group">
+            <label class="compra-checkbox-label" style="padding-top:1.8rem;">
+              <input type="checkbox" [(ngModel)]="novoProdutoCompra.recurring">
+              Recorrente
+            </label>
+          </div>
+          <div class="form-group" *ngIf="novoProdutoCompra.recurring">
+            <label>Período</label>
+            <select [(ngModel)]="novoProdutoCompra.recurrencePeriod">
+              <option value="weekly">Semanal</option>
+              <option value="monthly">Mensal</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="compra-info-box" *ngIf="!produtoCompraEmEdicao">
+          💡 Ao cadastrar, uma fatura pendente será gerada automaticamente.
+        </div>
+
+        <button class="btn-salvar" (click)="salvarProdutoCompra()">✅ SALVAR</button>
+      </div>
+
+      <!-- LISTA -->
+      <div class="compra-produtos-lista" *ngIf="!exibirFormularioCompra">
+        <div class="clientes-vazio" *ngIf="purchaseProducts.length === 0">
+          Nenhum produto de compra cadastrado.
+        </div>
+
+        <div class="compra-card" *ngFor="let p of purchaseProducts">
+          <div class="compra-info">
+            <span class="compra-nome">{{ p.name }}</span>
+            <div class="compra-meta">
+              <span class="meta-badge valor-badge">R$ {{ p.defaultValue | number:'1.2-2' }}</span>
+              <span class="meta-badge recorrente-badge" *ngIf="p.recurring">
+                🔄 {{ recurrenceLabel(p.recurrencePeriod) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="compra-acoes">
+            <button class="btn-gerar-fatura" (click)="gerarBillDeProdutoCompra(p)" title="Gerar nova fatura pendente">
+              + Fatura
+            </button>
+            <button class="btn-acao edit" (click)="abrirEdicaoCompra(p)" title="Editar">✏️</button>
+            <button class="btn-acao delete" (click)="openDeleteCompraModal(p)" title="Excluir">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
   </main>
+
+  <!-- MODAL EXCLUIR PRODUTO DE COMPRA -->
+  <div class="checkout-overlay" *ngIf="isDeleteCompraModalOpen" (click)="closeDeleteCompraModal()">
+    <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <div class="modal-icon-header warning">⚠️</div>
+      <h2>Excluir Produto?</h2>
+      <div class="delete-info" *ngIf="produtoCompraToDelete">
+        <p>Você está prestes a excluir:</p>
+        <strong>{{ produtoCompraToDelete.name }}</strong>
+        <p class="warning-text">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="checkout-actions">
+        <button class="btn-cancel" (click)="closeDeleteCompraModal()">CANCELAR</button>
+        <button class="btn-confirm danger" (click)="confirmDeleteCompra()">SIM, EXCLUIR</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL DE EXCLUSÃO DE CLIENTE -->
   <div class="checkout-overlay" *ngIf="isDeleteClienteModalOpen" (click)="closeDeleteClienteModal()">

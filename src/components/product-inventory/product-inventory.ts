@@ -9,10 +9,14 @@ Chart.register(...registerables);
 // Models e Services
 import { Product } from '../../models/product-model';
 import { Customer } from '../../models/customer-model';
+import { Bill } from '../../models/bill-model';
+import { PurchaseProduct } from '../../models/purchase-product-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
 import { CustomerService } from '../../services/customer-service/customer-service';
+import { BillService } from '../../services/bill-service/bill-service';
+import { PurchaseProductService } from '../../services/purchase-product-service/purchase-product-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 
 @Component({
@@ -24,7 +28,8 @@ import { NotificationService } from '../../services/notification-service/notific
 })
 export class ProductInventoryComponent implements OnInit {
   // Controle das Abas
-  activeTab: 'relatorio' | 'estoque' | 'clientes' = 'relatorio';
+  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' = 'relatorio';
+  reportTab: 'vendas' | 'contas' | 'balanco' = 'vendas';
 
   // Controle de Visualização do Formulário
   exibirFormularioNovo: boolean = false;
@@ -74,6 +79,25 @@ export class ProductInventoryComponent implements OnInit {
     quantidade: 0,
     novoPrecoCusto: 0
   };
+  gerarContaPagar: boolean = false;
+  nomeConta: string = '';
+
+  // --- CONTAS A PAGAR ---
+  bills: Bill[] = [];
+  filtroContasStatus: 'todos' | 'pendente' | 'recebido' | 'pago' = 'todos';
+
+  // --- PRODUTOS DE COMPRA ---
+  purchaseProducts: PurchaseProduct[] = [];
+  exibirFormularioCompra: boolean = false;
+  produtoCompraEmEdicao: PurchaseProduct | null = null;
+  isDeleteCompraModalOpen: boolean = false;
+  produtoCompraToDelete: PurchaseProduct | null = null;
+  novoProdutoCompra: Omit<PurchaseProduct, 'id' | 'createdAt'> = {
+    name: '',
+    defaultValue: 0,
+    recurring: false,
+    recurrencePeriod: undefined
+  };
 
   // --- CLIENTES ---
   customers: Customer[] = [];
@@ -111,6 +135,8 @@ export class ProductInventoryComponent implements OnInit {
     private purchaseService: PurchaseService,
     private saleService: SaleService,
     private customerService: CustomerService,
+    private billService: BillService,
+    private purchaseProductService: PurchaseProductService,
     private notif: NotificationService
   ) { }
 
@@ -133,6 +159,80 @@ export class ProductInventoryComponent implements OnInit {
     this.customerService.getCustomers().subscribe(data => {
       this.customers = data;
     });
+
+    // 5. Carrega contas a pagar em tempo real
+    this.billService.getBills().subscribe(data => {
+      this.bills = data;
+    });
+
+    // 6. Carrega produtos de compra em tempo real
+    this.purchaseProductService.getPurchaseProducts().subscribe(data => {
+      this.purchaseProducts = data;
+    });
+  }
+
+  // ==========================================================
+  // GETTERS: CONTAS A PAGAR (aba relatorio sub-tab)
+  // ==========================================================
+
+  get totalContasPendentes(): number {
+    return this.bills.filter(b => b.status === 'pendente').reduce((s, b) => s + b.value, 0);
+  }
+
+  get totalContasRecebidas(): number {
+    return this.bills.filter(b => b.status === 'recebido').reduce((s, b) => s + b.value, 0);
+  }
+
+  get gastosPeriodo(): number {
+    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
+    const fim = new Date(this.filtroDataFim + 'T23:59:59');
+    return this.bills
+      .filter(b => b.status === 'pago' && b.paidAt)
+      .filter(b => {
+        const d = (b.paidAt as any)?.toDate ? (b.paidAt as any).toDate() : new Date(b.paidAt as any);
+        return d >= inicio && d <= fim;
+      })
+      .reduce((s, b) => s + b.value, 0);
+  }
+
+  get resultadoFinal(): number {
+    return this.relatorio.faturamento - this.relatorio.custoTotal - this.gastosPeriodo;
+  }
+
+  get billsFiltradosRelatorio(): Bill[] {
+    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
+    const fim = new Date(this.filtroDataFim + 'T23:59:59');
+    let filtered = this.bills.filter(b => {
+      const d = (b.createdAt as any)?.toDate ? (b.createdAt as any).toDate() : new Date();
+      return d >= inicio && d <= fim;
+    });
+    if (this.filtroContasStatus !== 'todos') {
+      filtered = filtered.filter(b => b.status === this.filtroContasStatus);
+    }
+    return filtered;
+  }
+
+  async avancarStatusBill(bill: Bill) {
+    if (!bill.id || bill.status === 'pago') return;
+    const next: Bill['status'] = bill.status === 'pendente' ? 'recebido' : 'pago';
+    try {
+      await this.billService.updateBillStatus(bill.id, next);
+    } catch {
+      this.notif.error('Erro ao atualizar status da conta.');
+    }
+  }
+
+  billStatusLabel(status: Bill['status']): string {
+    const labels: Record<Bill['status'], string> = {
+      pendente: 'Pendente', recebido: 'A Pagar', pago: 'Pago'
+    };
+    return labels[status];
+  }
+
+  formatBillDate(ts: any): string {
+    if (!ts) return '';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString('pt-BR');
   }
 
   openDeleteModal(product: Product) {
@@ -464,6 +564,8 @@ export class ProductInventoryComponent implements OnInit {
       novoPrecoCusto: p.buyPrice || 0
     };
     this.exibirFormularioNovo = false;
+    this.gerarContaPagar = false;
+    this.nomeConta = '';
   }
 
   async confirmarCompra() {
@@ -471,6 +573,8 @@ export class ProductInventoryComponent implements OnInit {
       this.notif.warning('Informe uma quantidade válida! ⚠️');
       return;
     }
+
+    const totalCompra = this.dadosCompra.quantidade * this.dadosCompra.novoPrecoCusto;
 
     try {
       await this.purchaseService.addPurchase({
@@ -480,8 +584,20 @@ export class ProductInventoryComponent implements OnInit {
         date: new Date()
       } as any);
 
+      if (this.gerarContaPagar && totalCompra > 0) {
+        const nome = this.nomeConta.trim() || `Compra: ${this.produtoSelecionadoCompra.title}`;
+        await this.billService.addBill({
+          name: nome,
+          value: totalCompra,
+          status: 'pendente',
+          recurring: false
+        });
+      }
+
       this.notif.success(`Estoque de "${this.produtoSelecionadoCompra.title}" atualizado! 💰`);
       this.produtoSelecionadoCompra = null;
+      this.gerarContaPagar = false;
+      this.nomeConta = '';
     } catch (error) {
       this.notif.error('Erro ao registrar entrada. ❌');
     }
@@ -617,6 +733,97 @@ export class ProductInventoryComponent implements OnInit {
     } catch {
       this.notif.error('Erro ao excluir cliente.');
     }
+  }
+
+  // ==========================================================
+  // ABA 4: COMPRAS (PRODUTOS DE COMPRA)
+  // ==========================================================
+
+  abrirNovoCompra() {
+    this.produtoCompraEmEdicao = null;
+    this.novoProdutoCompra = { name: '', defaultValue: 0, recurring: false, recurrencePeriod: undefined };
+    this.exibirFormularioCompra = true;
+  }
+
+  abrirEdicaoCompra(p: PurchaseProduct) {
+    this.produtoCompraEmEdicao = p;
+    this.novoProdutoCompra = {
+      name: p.name,
+      defaultValue: p.defaultValue,
+      recurring: p.recurring,
+      recurrencePeriod: p.recurrencePeriod
+    };
+    this.exibirFormularioCompra = true;
+  }
+
+  fecharFormularioCompra() {
+    this.exibirFormularioCompra = false;
+    this.produtoCompraEmEdicao = null;
+  }
+
+  async salvarProdutoCompra() {
+    if (!this.novoProdutoCompra.name.trim() || this.novoProdutoCompra.defaultValue <= 0) {
+      this.notif.warning('Preencha nome e valor.');
+      return;
+    }
+    const data: Omit<PurchaseProduct, 'id' | 'createdAt'> = {
+      name: this.novoProdutoCompra.name.trim(),
+      defaultValue: Number(this.novoProdutoCompra.defaultValue),
+      recurring: this.novoProdutoCompra.recurring,
+      ...(this.novoProdutoCompra.recurring && this.novoProdutoCompra.recurrencePeriod
+        ? { recurrencePeriod: this.novoProdutoCompra.recurrencePeriod }
+        : {})
+    };
+    try {
+      if (this.produtoCompraEmEdicao?.id) {
+        await this.purchaseProductService.updatePurchaseProduct(this.produtoCompraEmEdicao.id, data);
+        this.notif.success('Produto atualizado!');
+      } else {
+        const newId = await this.purchaseProductService.addPurchaseProduct(data);
+        await this.gerarBillDeProdutoCompra({ id: newId, ...data } as PurchaseProduct);
+        this.notif.success('Produto cadastrado e fatura gerada!');
+      }
+      this.fecharFormularioCompra();
+    } catch {
+      this.notif.error('Erro ao salvar produto de compra.');
+    }
+  }
+
+  async gerarBillDeProdutoCompra(p: PurchaseProduct) {
+    const recPeriodMap: Record<string, 'semanal' | 'mensal'> = { weekly: 'semanal', monthly: 'mensal' };
+    await this.billService.addBill({
+      name: p.name,
+      value: p.defaultValue,
+      status: 'pendente',
+      recurring: p.recurring,
+      ...(p.recurring && p.recurrencePeriod ? { recurrencePeriod: recPeriodMap[p.recurrencePeriod!] } : {}),
+      purchaseProductId: p.id
+    });
+  }
+
+  openDeleteCompraModal(p: PurchaseProduct) {
+    this.produtoCompraToDelete = p;
+    this.isDeleteCompraModalOpen = true;
+  }
+
+  closeDeleteCompraModal() {
+    this.isDeleteCompraModalOpen = false;
+    this.produtoCompraToDelete = null;
+  }
+
+  async confirmDeleteCompra() {
+    if (!this.produtoCompraToDelete?.id) return;
+    try {
+      await this.purchaseProductService.deletePurchaseProduct(this.produtoCompraToDelete.id);
+      this.notif.success('Produto removido!');
+      this.closeDeleteCompraModal();
+    } catch {
+      this.notif.error('Erro ao excluir produto de compra.');
+    }
+  }
+
+  recurrenceLabel(period?: 'weekly' | 'monthly'): string {
+    return period === 'weekly' ? 'Semanal' : period === 'monthly' ? 'Mensal' : '';
   }
 
   // No seu ProductInventoryComponent

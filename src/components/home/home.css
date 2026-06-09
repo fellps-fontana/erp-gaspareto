@@ -202,6 +202,15 @@
   border-color: #14b8a6;
 }
 
+/* Contas: Laranja (Finanças) */
+.card-bills .icon {
+  color: #f97316;
+}
+
+.card-bills:hover {
+  border-color: #f97316;
+}
+
 /* Ícones */
 .icon {
   width: 80px;

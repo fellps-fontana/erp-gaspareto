@@ -1,0 +1,138 @@
+<div class="bills-page">
+
+  <div class="bills-header">
+    <div class="header-left">
+      <button class="btn-voltar" [routerLink]="['/']">⬅ Início</button>
+      <div>
+        <h1>Contas a Pagar</h1>
+        <p>Gestão de despesas e recebimentos</p>
+      </div>
+    </div>
+    <button class="btn-novo" (click)="abrirFormulario()" *ngIf="!exibirFormulario">+ Nova Conta</button>
+  </div>
+
+  <!-- FORMULÁRIO INLINE -->
+  <div class="form-box" *ngIf="exibirFormulario">
+    <button class="btn-cancelar" (click)="fecharFormulario()">⬅ Voltar para a lista</button>
+    <h2>Nova Conta a Pagar</h2>
+
+    <div class="form-group">
+      <label>Produto de Compra (opcional)</label>
+      <select [(ngModel)]="novaConta.purchaseProductId" (change)="onPurchaseProductChange(novaConta.purchaseProductId)">
+        <option value="">— Conta avulsa —</option>
+        <option *ngFor="let p of purchaseProducts" [value]="p.id">{{ p.name }} (R$ {{ p.defaultValue | number:'1.2-2' }})</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <div class="form-group" style="flex: 2;">
+        <label>Descrição *</label>
+        <input type="text" [(ngModel)]="novaConta.name" placeholder="Ex: Fornecedor ABC">
+      </div>
+      <div class="form-group">
+        <label>Valor (R$) *</label>
+        <input type="number" [(ngModel)]="novaConta.value" min="0.01" step="0.01">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Vencimento</label>
+        <input type="date" [(ngModel)]="novaConta.dueDate">
+      </div>
+      <div class="form-group">
+        <label class="label-check">
+          <input type="checkbox" [(ngModel)]="novaConta.recurring">
+          Recorrente
+        </label>
+      </div>
+      <div class="form-group" *ngIf="novaConta.recurring">
+        <label>Período</label>
+        <select [(ngModel)]="novaConta.recurrencePeriod">
+          <option value="semanal">Semanal</option>
+          <option value="mensal">Mensal</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-salvar" (click)="salvarConta()">✅ CADASTRAR CONTA</button>
+  </div>
+
+  <!-- TOTAIS -->
+  <div class="cards-kpi" *ngIf="!exibirFormulario">
+    <div class="card kpi-pendente">
+      <span class="kpi-label">Pendente</span>
+      <strong class="kpi-value">R$ {{ totalPendente | number:'1.2-2' }}</strong>
+      <small class="kpi-meta">{{ countByStatus('pendente') }} conta(s)</small>
+    </div>
+    <div class="card kpi-recebido">
+      <span class="kpi-label">A Pagar</span>
+      <strong class="kpi-value">R$ {{ totalRecebido | number:'1.2-2' }}</strong>
+      <small class="kpi-meta">{{ countByStatus('recebido') }} conta(s)</small>
+    </div>
+    <div class="card kpi-pago">
+      <span class="kpi-label">Pago</span>
+      <strong class="kpi-value">R$ {{ totalPago | number:'1.2-2' }}</strong>
+      <small class="kpi-meta">{{ countByStatus('pago') }} conta(s)</small>
+    </div>
+  </div>
+
+  <!-- FILTRO STATUS -->
+  <div class="status-filter" *ngIf="!exibirFormulario">
+    <button [class.active]="filtroStatus === 'todos'" (click)="filtroStatus = 'todos'">Todas</button>
+    <button [class.active]="filtroStatus === 'pendente'" (click)="filtroStatus = 'pendente'">Pendente</button>
+    <button [class.active]="filtroStatus === 'recebido'" (click)="filtroStatus = 'recebido'">A Pagar</button>
+    <button [class.active]="filtroStatus === 'pago'" (click)="filtroStatus = 'pago'">Pago</button>
+  </div>
+
+  <!-- LISTA -->
+  <div class="bills-lista" *ngIf="!exibirFormulario">
+    <div class="bills-vazio" *ngIf="billsFiltradas.length === 0">
+      Nenhuma conta encontrada.
+    </div>
+
+    <div class="bill-card" *ngFor="let bill of billsFiltradas">
+      <div class="bill-info">
+        <span class="bill-name">{{ bill.name }}</span>
+        <div class="bill-meta">
+          <span *ngIf="bill.purchaseProductId" class="meta-chip product-link">🛒 {{ getPurchaseProductName(bill.purchaseProductId) }}</span>
+          <span *ngIf="bill.dueDate" class="meta-chip">📅 Vence {{ formatDate(bill.dueDate) }}</span>
+          <span *ngIf="bill.recurring" class="meta-chip recurring">🔄 {{ bill.recurrencePeriod }}</span>
+          <span *ngIf="bill.receivedAt" class="meta-chip">📦 Recebido {{ formatDate(bill.receivedAt) }}</span>
+          <span *ngIf="bill.paidAt" class="meta-chip paid-on">✅ Pago {{ formatDate(bill.paidAt) }}</span>
+        </div>
+      </div>
+
+      <div class="bill-valor">R$ {{ bill.value | number:'1.2-2' }}</div>
+
+      <button
+        class="status-chip status-{{ bill.status }}"
+        (click)="avancarStatus(bill)"
+        [title]="bill.status !== 'pago' ? 'Clique para avançar status' : 'Conta finalizada'"
+      >
+        {{ statusLabel(bill.status) }}
+        <span *ngIf="bill.status !== 'pago'" class="chip-arrow">›</span>
+      </button>
+
+      <button class="btn-acao delete" (click)="openDeleteModal(bill)" title="Excluir">🗑️</button>
+    </div>
+  </div>
+
+  <!-- MODAL DE EXCLUSÃO -->
+  <div class="checkout-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
+    <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <div class="modal-icon-header warning">⚠️</div>
+      <h2>Excluir Conta?</h2>
+      <div class="delete-info" *ngIf="billToDelete">
+        <p>Você está prestes a excluir:</p>
+        <strong>{{ billToDelete.name }}</strong>
+        <p class="warning-text">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="checkout-actions">
+        <button class="btn-cancel" (click)="closeDeleteModal()">CANCELAR</button>
+        <button class="btn-confirm danger" (click)="confirmDelete()">SIM, EXCLUIR</button>
+      </div>
+    </div>
+  </div>
+
+</div>

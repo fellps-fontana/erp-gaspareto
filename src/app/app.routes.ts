@@ -4,6 +4,7 @@ import { PdvComponent } from '../components/pdv/pdv';
 import { HomeComponent } from '../components/home/home';
 import { OrdersComponent } from '../components/order/order';
 import { DeliveryRouteComponent } from '../components/delivery-route/delivery-route';
+import { BillsComponent } from '../components/bills/bills';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -11,5 +12,6 @@ export const routes: Routes = [
   { path: 'estoque', component: ProductInventoryComponent },
   { path: 'orders', component: OrdersComponent },
   { path: 'rotas', component: DeliveryRouteComponent },
+  { path: 'contas', component: BillsComponent },
   { path: '**', redirectTo: '' }
 ];
