@@ -40,6 +40,12 @@ export class OrdersComponent implements OnInit, OnDestroy {
   get filterStatus() { return this._filterStatus; }
   set filterStatus(v: 'all' | 'pending' | 'delivered') { this._filterStatus = v; this.updateFilter(); }
 
+  // ── ORDENAÇÃO ─────────────────────────────────────────────────────
+  private _sortOrder: 'recent' | 'oldest' = 'recent';
+
+  get sortOrder() { return this._sortOrder; }
+  set sortOrder(v: 'recent' | 'oldest') { this._sortOrder = v; this.updateFilter(); }
+
   // ── UI ────────────────────────────────────────────────────────────
   isLoadingOrders = true;
   isProcessingAction = false;
@@ -133,16 +139,23 @@ export class OrdersComponent implements OnInit, OnDestroy {
       map(orders => {
         this.isLoadingOrders = false;
         if (!orders) return [];
-        if (this._filterStatus === 'all') return orders;
+
+        let result = orders;
         if (this._filterStatus === 'pending') {
-          return orders.filter(o =>
+          result = orders.filter(o =>
             ['open', 'pending', 'preparing', 'ready', 'delivering'].includes(o.status)
           );
+        } else if (this._filterStatus === 'delivered') {
+          result = orders.filter(o => ['delivered', 'finished'].includes(o.status));
         }
-        if (this._filterStatus === 'delivered') {
-          return orders.filter(o => ['delivered', 'finished'].includes(o.status));
+
+        if (this._sortOrder === 'oldest') {
+          result = [...result].sort(
+            (a, b) => this.getTimestampMillis(a.createdAt) - this.getTimestampMillis(b.createdAt)
+          );
         }
-        return orders;
+
+        return result;
       })
     );
 
@@ -461,6 +474,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (!date) return null;
     if (typeof date.toDate === 'function') return date.toDate();
     return new Date(date);
+  }
+
+  private getTimestampMillis(date: any): number {
+    return date?.toMillis?.() || (date as any)?.seconds * 1000 || 0;
   }
 
   openConfirmModal(message: string, action: () => void) {

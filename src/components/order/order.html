@@ -14,6 +14,10 @@
         <button [class.active]="filterStatus === 'pending'"   (click)="filterStatus = 'pending'">Pendente</button>
         <button [class.active]="filterStatus === 'delivered'" (click)="filterStatus = 'delivered'">Entregues</button>
       </div>
+      <div class="filters sort-filters">
+        <button [class.active]="sortOrder === 'recent'" (click)="sortOrder = 'recent'">Mais recente</button>
+        <button [class.active]="sortOrder === 'oldest'" (click)="sortOrder = 'oldest'">Mais antigo</button>
+      </div>
     </div>
     <button class="btn-new-order" (click)="openNewOrder()">
       <span class="plus">+</span> NOVO PEDIDO

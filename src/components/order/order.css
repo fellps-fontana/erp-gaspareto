@@ -50,6 +50,10 @@
   font-weight: bold;
 }
 
+.filters.sort-filters {
+  margin-top: 10px;
+}
+
 /* BOTÃO NOVO PEDIDO (DESTAQUE) */
 .btn-new-order {
   background: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-secondary-dark) 100%);
