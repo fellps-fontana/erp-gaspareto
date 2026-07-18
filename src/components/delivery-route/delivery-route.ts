@@ -26,14 +26,9 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
   orders: Order[] = [];
   selectedIds = new Set<string>();
   isLoading = true;
-<<<<<<< Updated upstream
   isGeneratingRoute = false;
   loadingTooLong = false;
   routeUrl: string | null = null;
-=======
-  currentLat: number | null = null;
-  currentLng: number | null = null;
->>>>>>> Stashed changes
   private sub?: Subscription;
   private loadingTimer?: ReturnType<typeof setTimeout>;
 
@@ -54,15 +49,6 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
       next: orders => { this.orders = orders; this.isLoading = false; },
       error: () => { this.notif.error('Erro ao carregar pedidos.'); this.isLoading = false; }
     });
-
-    // Pega localizacao ao entrar na tela — antes de qualquer clique
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        p => { this.currentLat = p.coords.latitude; this.currentLng = p.coords.longitude; },
-        () => { /* sem localizacao, usa primeiro endereco como ponto de partida */ },
-        { timeout: 8000, enableHighAccuracy: false }
-      );
-    }
   }
 
   ngOnDestroy() { this.sub?.unsubscribe(); clearTimeout(this.loadingTimer); }
@@ -86,11 +72,10 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
     this.routeUrl = null;
   }
 
-  generateRoute() {
+  async generateRoute() {
     const orders = this.selectedOrders;
     if (orders.length === 0) { this.notif.warning('Selecione ao menos um pedido.'); return; }
 
-<<<<<<< Updated upstream
     this.routeUrl = null;
     this.loadingTooLong = false;
     this.isGeneratingRoute = true;
@@ -169,35 +154,6 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
         { timeout: 5000 }
       );
     });
-=======
-    // Ordena pelos coords salvos no pedido se disponiveis, caso contrario mantém ordem original
-    const withCoords: OrderWithCoords[] = orders.map(o => ({
-      ...o,
-      _lat: o.addressLat ?? 0,
-      _lng: o.addressLng ?? 0
-    }));
-
-    const hasCoords = withCoords.every(o => o._lat !== 0 && o._lng !== 0);
-    const startLat = this.currentLat ?? (hasCoords ? withCoords[0]._lat : 0);
-    const startLng = this.currentLng ?? (hasCoords ? withCoords[0]._lng : 0);
-    const sorted = hasCoords
-      ? this.nearestNeighbor(withCoords, startLat, startLng)
-      : withCoords;
-
-    const addresses = sorted.map(o => encodeURIComponent(o.address!));
-    const url = addresses.length === 1
-      ? `https://www.google.com/maps/dir/?api=1&destination=${addresses[0]}`
-      : `https://www.google.com/maps/dir/${addresses.join('/')}`;
-
-    // Usa elemento <a> para compatibilidade com Safari PWA
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
->>>>>>> Stashed changes
   }
 
   // ── Nearest-Neighbor greedy ─────────────────────────────────────────

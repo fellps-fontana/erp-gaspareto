@@ -92,7 +92,6 @@
     <div class="cta-info">
       <strong>{{ selectedIds.size }} entrega{{ selectedIds.size !== 1 ? 's' : '' }} selecionada{{ selectedIds.size !== 1 ? 's' : '' }}</strong>
     </div>
-<<<<<<< Updated upstream
     <!-- Aviso apos 5s calculando -->
     <p class="loading-slow" *ngIf="loadingTooLong">
       Calculando enderecos, aguarde...
@@ -101,10 +100,6 @@
     <!-- Antes de gerar: botao principal -->
     <button *ngIf="!routeUrl" class="btn-route-cta" (click)="generateRoute()" [disabled]="isGeneratingRoute">
       {{ isGeneratingRoute ? 'Otimizando rota...' : 'Gerar Rota no Maps →' }}
-=======
-    <button class="btn-route-cta" (click)="generateRoute()">
-      Abrir Rota no Maps →
->>>>>>> Stashed changes
     </button>
 
     <!-- Apos gerar: link para abrir no Maps -->
