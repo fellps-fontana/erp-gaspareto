@@ -223,7 +223,8 @@ export class PdvComponent implements OnInit {
           date: new Date()
         };
 
-        await this.saleService.processSale(sale as any);
+        const shouldUpdateStock = !this.comandaBeingPaid;
+        await this.saleService.processSale(sale as any, shouldUpdateStock);
 
         if (this.comandaBeingPaid) {
           await this.comandaService.closeComanda(this.comandaBeingPaid.id!);

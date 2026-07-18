@@ -1,5 +1,6 @@
 export const environment = {
   production: false,
+  useMock: true,
   firebase: {
       apiKey: "AIzaSyAKeaJqPLIZrAmXQuokvaw4PAEY0q0GDYM",
       authDomain: "projetosfelipe-9e458.firebaseapp.com",
