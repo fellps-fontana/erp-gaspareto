@@ -117,6 +117,17 @@
         gap: 15px;
     }
 
+    .header-info {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .header-info .btn-back {
+        align-self: flex-start;
+        margin-right: 0;
+    }
+
     .header-info h1 {
         font-size: 1.5rem;
         text-align: center;
@@ -124,17 +135,20 @@
 
     .filters {
         display: flex;
-        overflow-x: auto;
+        flex-wrap: wrap;
+        gap: 8px;
         padding-bottom: 5px;
         justify-content: flex-start;
-        /* Permite scroll horizontal se preciso */
     }
 
     .filters button {
-        flex: 1;
-        /* Botões ocupam largura total disponível */
+        flex: 1 1 auto;
+        min-width: fit-content;
+        /* Cada botão mantém o texto inteiro e quebra linha em grupo, em vez de espremer */
         white-space: nowrap;
-        padding: 10px;
+        padding: 10px 14px;
+        margin-right: 0;
+        /* substitui o espaçamento por margin (order.css) pelo gap acima */
     }
 
     .btn-new-order {

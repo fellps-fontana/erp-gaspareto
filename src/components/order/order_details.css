@@ -40,11 +40,43 @@
     color: var(--text-primary);
 }
 
+.phone-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
 .customer-info .phone {
-    display: block;
     font-size: 0.9rem;
     color: var(--text-muted);
-    margin-top: 4px;
+}
+
+/* ── BOTÃO WHATSAPP ──────────────────────────────────────────── */
+.btn-whatsapp {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    color: #25D366;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-whatsapp:hover {
+    background: rgba(37, 211, 102, 0.12);
+    border-color: #25D366;
+}
+
+.btn-whatsapp-sm {
+    width: 26px;
+    height: 26px;
 }
 
 .status-tag {
@@ -279,6 +311,12 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.chip-phone-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .chip-phone {

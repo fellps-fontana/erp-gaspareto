@@ -366,6 +366,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   // =================================================================
+  // WHATSAPP
+  // =================================================================
+
+  openWhatsApp(phone: string) {
+    if (!phone) return;
+    const digits = phone.replace(/\D/g, '');
+    if (!digits) return;
+    const withCountryCode = digits.length <= 11 ? `55${digits}` : digits;
+    window.open(`https://wa.me/${withCountryCode}`, '_blank');
+  }
+
+  // =================================================================
   // STATUS / FLUXO
   // =================================================================
 

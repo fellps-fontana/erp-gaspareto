@@ -982,10 +982,6 @@ textarea:focus {
     text-align: center;
   }
 
-  .filters {
-    flex-wrap: wrap;
-    justify-content: center;
-    display: flex;
-    gap: 5px;
-  }
+  /* Regra de .filters para mobile centralizada em order_mobile.css
+     (evita duas fontes conflitantes de flex-wrap/gap na mesma media query) */
 }
