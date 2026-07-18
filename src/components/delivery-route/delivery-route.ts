@@ -11,6 +11,8 @@ interface OrderWithCoords extends Order {
   _lng: number;
 }
 
+const NOMINATIM_THROTTLE_MS = 1100;
+
 @Component({
   selector: 'app-delivery-route',
   standalone: true,
@@ -86,18 +88,35 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
     try {
       let url: string;
 
-      // Resolve coordenadas: usa as salvas no pedido ou geocodifica pelo endereco
-      const withCoords = await Promise.all(
-        orders.map(async o => {
-          if (o.addressLat != null && o.addressLng != null) {
-            return { ...o, _lat: o.addressLat, _lng: o.addressLng } as OrderWithCoords;
-          }
-          const coords = await this.geocode(o.address!);
-          return { ...o, _lat: coords?.lat ?? 0, _lng: coords?.lng ?? 0 } as OrderWithCoords;
-        })
-      );
+      // Resolve coordenadas em serie (throttle) ou usa as salvas no pedido
+      const withCoords: OrderWithCoords[] = [];
+      const withoutCoords: OrderWithCoords[] = [];
+      const failedGeocodes: string[] = [];
 
-      // Pega localizacao atual e otimiza com nearest-neighbor
+      for (const order of orders) {
+        if (order.addressLat != null && order.addressLng != null) {
+          withCoords.push({ ...order, _lat: order.addressLat, _lng: order.addressLng } as OrderWithCoords);
+        } else {
+          const coords = await this.geocode(order.address!);
+          if (coords) {
+            withCoords.push({ ...order, _lat: coords.lat, _lng: coords.lng } as OrderWithCoords);
+          } else {
+            // Geocodificacao falhou — pedido vai pro final sem otimizacao
+            withoutCoords.push({ ...order, _lat: 0, _lng: 0 } as OrderWithCoords);
+            failedGeocodes.push(order.address || `Pedido ${order.id}`);
+          }
+          // Delay entre chamadas de rede (respeita rate limit 1 req/s do Nominatim)
+          await new Promise(resolve => setTimeout(resolve, NOMINATIM_THROTTLE_MS));
+        }
+      }
+
+      // Se nenhum pedido tem coordenada valida, e erro
+      if (withCoords.length === 0) {
+        this.notif.error('Erro ao gerar rota.');
+        return;
+      }
+
+      // Otimiza apenas os pedidos com coordenadas, depois anexa os que falharam
       const startPos = await this.getCurrentPosition();
       const sorted = this.nearestNeighbor(
         withCoords,
@@ -105,11 +124,19 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
         startPos?.lng ?? withCoords[0]._lng
       );
 
+      // Anexa os pedidos que nao foram geocodificados ao final
+      const finalSorted = [...sorted, ...withoutCoords];
+
+      // Avisa o usuario sobre os enderecos nao geocodificados
+      if (failedGeocodes.length > 0) {
+        this.notif.warning(`${failedGeocodes.length} endereço(s) não localizado(s), colocado(s) no fim da rota. ⚠️`);
+      }
+
       // Enderecos brutos na URL — sem encodeURIComponent.
       // O browser (Safari incluido) codifica corretamente ao navegar via <a href>,
       // evitando dupla codificacao que faz o Maps exibir %20, %2C etc. como texto.
-      const dest   = sorted[sorted.length - 1].address!;
-      const waypts = sorted.slice(0, -1).map(o => o.address!).join('|');
+      const dest   = finalSorted[finalSorted.length - 1].address!;
+      const waypts = finalSorted.slice(0, -1).map(o => o.address!).join('|');
 
       url = `https://www.google.com/maps/dir/?api=1`;
       if (startPos) url += `&origin=${startPos.lat},${startPos.lng}`;
