@@ -54,6 +54,21 @@ export class OrderService extends FirestoreBaseService {
     );
   }
 
+  getOrdersByCustomer(customerId: string): Observable<Order[]> {
+    const q = query(this.ordersCollection, where('customerId', '==', customerId));
+    return this.collectionDataObservable<Order>(q).pipe(
+      map(orders => [...orders].sort((a, b) => {
+        const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
+        const dateB = b.createdAt?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+        return dateB - dateA;
+      })),
+      catchError(err => {
+        console.error('OrderService: Erro ao buscar pedidos do cliente:', err);
+        return of([]);
+      })
+    );
+  }
+
   addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<DocumentReference> {
     const newOrder = {
       ...order,

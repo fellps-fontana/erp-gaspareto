@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Chart, registerables } from 'chart.js';
+import { Observable, of } from 'rxjs';
 
 Chart.register(...registerables);
 
@@ -11,6 +12,7 @@ import { Product } from '../../models/product-model';
 import { Customer } from '../../models/customer-model';
 import { Bill } from '../../models/bill-model';
 import { PurchaseProduct } from '../../models/purchase-product-model';
+import { Order } from '../../models/order-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
@@ -18,6 +20,8 @@ import { CustomerService } from '../../services/customer-service/customer-servic
 import { BillService } from '../../services/bill-service/bill-service';
 import { PurchaseProductService } from '../../services/purchase-product-service/purchase-product-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
+import { ConfigService } from '../../services/config/config.service';
+import { OrderService } from '../../services/order-service/order-service';
 
 @Component({
   selector: 'app-estoque',
@@ -27,6 +31,8 @@ import { NotificationService } from '../../services/notification-service/notific
   styleUrls: ['./product-inventory.css', './product-inventory-mobile.css']
 })
 export class ProductInventoryComponent implements OnInit {
+  readonly config = inject(ConfigService);
+
   // Controle das Abas
   activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' = 'relatorio';
   reportTab: 'vendas' | 'contas' | 'balanco' = 'vendas';
@@ -107,6 +113,11 @@ export class ProductInventoryComponent implements OnInit {
   isDeleteClienteModalOpen: boolean = false;
   clienteToDelete: Customer | null = null;
 
+  // --- HISTÓRICO DE PEDIDOS DO CLIENTE ---
+  isHistoricoClienteOpen = false;
+  clienteHistorico: Customer | null = null;
+  pedidosCliente$: Observable<Order[]> = of([]);
+
   // campos de endereço por CEP
   clienteCep = '';
   clienteRua = '';
@@ -137,10 +148,19 @@ export class ProductInventoryComponent implements OnInit {
     private customerService: CustomerService,
     private billService: BillService,
     private purchaseProductService: PurchaseProductService,
+    private orderService: OrderService,
     private notif: NotificationService
   ) { }
 
   ngOnInit() {
+    // 0. Se a aba ativa for de um módulo desativado, volta para o relatório
+    this.config.modules$.subscribe(m => {
+      if ((this.activeTab === 'clientes' && !m.clientes) ||
+          (this.activeTab === 'compras' && !m.compras)) {
+        this.activeTab = 'relatorio';
+      }
+    });
+
     // 1. Carrega produtos em tempo real
     this.productService.getProducts().subscribe(data => {
       this.products = data;
@@ -733,6 +753,43 @@ export class ProductInventoryComponent implements OnInit {
     } catch {
       this.notif.error('Erro ao excluir cliente.');
     }
+  }
+
+  // --- HISTÓRICO DE PEDIDOS DO CLIENTE ---
+
+  abrirHistoricoCliente(c: Customer) {
+    this.clienteHistorico = c;
+    this.pedidosCliente$ = this.orderService.getOrdersByCustomer(c.id!);
+    this.isHistoricoClienteOpen = true;
+  }
+
+  fecharHistoricoCliente() {
+    this.isHistoricoClienteOpen = false;
+    this.clienteHistorico = null;
+    this.pedidosCliente$ = of([]);
+  }
+
+  traduzirStatusPedido(status: string): string {
+    const map: Record<string, string> = {
+      open: 'Aberto', pending: 'Pendente', preparing: 'Preparando',
+      ready: 'Pronto', delivering: 'Em Entrega', delivered: 'Entregue',
+      finished: 'Finalizado', canceled: 'Cancelado'
+    };
+    return map[status] || status;
+  }
+
+  tipoEntregaLabel(tipo: 'pickup' | 'delivery'): string {
+    return tipo === 'delivery' ? 'Entrega' : 'Retirada';
+  }
+
+  dataDoPedido(date: any): Date | null {
+    if (!date) return null;
+    if (typeof date.toDate === 'function') return date.toDate();
+    return new Date(date);
+  }
+
+  trackByPedido(index: number, pedido: Order): string {
+    return pedido.id || index.toString();
   }
 
   // ==========================================================

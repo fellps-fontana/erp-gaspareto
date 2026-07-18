@@ -13,10 +13,10 @@
       <button [class.active]="activeTab === 'estoque'" (click)="activeTab = 'estoque'">
         📦 Gerenciar Estoque
       </button>
-      <button [class.active]="activeTab === 'clientes'" (click)="activeTab = 'clientes'">
+      <button *ngIf="config.modules().clientes" [class.active]="activeTab === 'clientes'" (click)="activeTab = 'clientes'">
         👥 Clientes
       </button>
-      <button [class.active]="activeTab === 'compras'" (click)="activeTab = 'compras'">
+      <button *ngIf="config.modules().compras" [class.active]="activeTab === 'compras'" (click)="activeTab = 'compras'">
         🛒 Compras
       </button>
     </nav>
@@ -500,6 +500,7 @@
           </div>
 
           <div class="cliente-acoes">
+            <button class="btn-acao historico" (click)="abrirHistoricoCliente(c)" title="Histórico de Pedidos">🕒</button>
             <button class="btn-acao edit" (click)="abrirEdicaoCliente(c)" title="Editar">✏️</button>
             <button class="btn-acao delete" (click)="openDeleteClienteModal(c)" title="Excluir">🗑️</button>
           </div>
@@ -616,6 +617,48 @@
       <div class="checkout-actions">
         <button class="btn-cancel" (click)="closeDeleteClienteModal()">CANCELAR</button>
         <button class="btn-confirm danger" (click)="confirmDeleteCliente()">SIM, EXCLUIR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL HISTÓRICO DE PEDIDOS DO CLIENTE -->
+  <div class="checkout-overlay" *ngIf="isHistoricoClienteOpen" (click)="fecharHistoricoCliente()">
+    <div class="checkout-modal historico-modal" (click)="$event.stopPropagation()">
+      <h2>Histórico de {{ clienteHistorico?.name }}</h2>
+
+      <div class="historico-lista">
+        <ng-container *ngIf="pedidosCliente$ | async as pedidos; else carregandoHistorico">
+          <div class="clientes-vazio" *ngIf="pedidos.length === 0">Nenhum pedido registrado para este cliente.</div>
+
+          <div class="pedido-historico-card" *ngFor="let pedido of pedidos; trackBy: trackByPedido">
+            <div class="pedido-historico-header">
+              <span class="pedido-historico-data">{{ dataDoPedido(pedido.createdAt) | date:'dd/MM/yyyy HH:mm' }}</span>
+              <span class="status-badge" [ngClass]="pedido.status">{{ traduzirStatusPedido(pedido.status) }}</span>
+            </div>
+
+            <div class="pedido-historico-entrega">
+              {{ tipoEntregaLabel(pedido.deliveryType) }}
+              <span *ngIf="pedido.deliveryType === 'delivery' && pedido.address"> — {{ pedido.address }}</span>
+            </div>
+
+            <ul class="pedido-historico-itens">
+              <li *ngFor="let item of pedido.items">{{ item.quantity }}x {{ item.productName }}</li>
+            </ul>
+
+            <div class="pedido-historico-total">
+              <span class="pedido-historico-frete" *ngIf="pedido.shippingCost > 0">Frete: R$ {{ pedido.shippingCost | number:'1.2-2' }}</span>
+              <strong>Total: R$ {{ pedido.total | number:'1.2-2' }}</strong>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-template #carregandoHistorico>
+          <div class="clientes-vazio">Carregando histórico...</div>
+        </ng-template>
+      </div>
+
+      <div class="checkout-actions">
+        <button class="btn-cancel" (click)="fecharHistoricoCliente()">FECHAR</button>
       </div>
     </div>
   </div>
