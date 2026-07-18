@@ -254,3 +254,36 @@
   .select-bar  { padding: 0.6rem 1rem; }
   .btn-route span { display: none; }
 }
+
+.loading-slow {
+  width: 100%;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted, #888);
+  margin: 0.25rem 0 0;
+}
+
+.btn-open-route {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1.4rem;
+  background: #1a73e8;
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: center;
+  text-decoration: none;
+  margin-top: 0.5rem;
+}
+
+.btn-recalculate {
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-top: 0.25rem;
+  padding: 0;
+}

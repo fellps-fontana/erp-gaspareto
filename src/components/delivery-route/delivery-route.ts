@@ -26,8 +26,16 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
   orders: Order[] = [];
   selectedIds = new Set<string>();
   isLoading = true;
+<<<<<<< Updated upstream
   isGeneratingRoute = false;
+  loadingTooLong = false;
+  routeUrl: string | null = null;
+=======
+  currentLat: number | null = null;
+  currentLng: number | null = null;
+>>>>>>> Stashed changes
   private sub?: Subscription;
+  private loadingTimer?: ReturnType<typeof setTimeout>;
 
   get deliveryOrders(): Order[] {
     return this.orders.filter(o =>
@@ -46,9 +54,18 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
       next: orders => { this.orders = orders; this.isLoading = false; },
       error: () => { this.notif.error('Erro ao carregar pedidos.'); this.isLoading = false; }
     });
+
+    // Pega localizacao ao entrar na tela — antes de qualquer clique
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        p => { this.currentLat = p.coords.latitude; this.currentLng = p.coords.longitude; },
+        () => { /* sem localizacao, usa primeiro endereco como ponto de partida */ },
+        { timeout: 8000, enableHighAccuracy: false }
+      );
+    }
   }
 
-  ngOnDestroy() { this.sub?.unsubscribe(); }
+  ngOnDestroy() { this.sub?.unsubscribe(); clearTimeout(this.loadingTimer); }
 
   goBack() { this.router.navigate(['/']); }
 
@@ -57,6 +74,7 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
     this.selectedIds.has(order.id)
       ? this.selectedIds.delete(order.id)
       : this.selectedIds.add(order.id);
+    this.routeUrl = null;
   }
 
   toggleAll() {
@@ -65,21 +83,25 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
     } else {
       this.deliveryOrders.forEach(o => o.id && this.selectedIds.add(o.id));
     }
+    this.routeUrl = null;
   }
 
-  async generateRoute() {
+  generateRoute() {
     const orders = this.selectedOrders;
     if (orders.length === 0) { this.notif.warning('Selecione ao menos um pedido.'); return; }
 
-    if (orders.length === 1) {
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(orders[0].address!)}`, '_blank');
-      return;
-    }
-
+<<<<<<< Updated upstream
+    this.routeUrl = null;
+    this.loadingTooLong = false;
     this.isGeneratingRoute = true;
 
+    // Apos 5s ainda calculando, avisa o usuario
+    this.loadingTimer = setTimeout(() => { this.loadingTooLong = true; }, 5000);
+
     try {
-      // Resolve coordenadas: usa as salvas no pedido ou geocodifica pelo endereço
+      let url: string;
+
+      // Resolve coordenadas: usa as salvas no pedido ou geocodifica pelo endereco
       const withCoords = await Promise.all(
         orders.map(async o => {
           if (o.addressLat != null && o.addressLng != null) {
@@ -90,7 +112,7 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
         })
       );
 
-      // Pega localização atual e otimiza com nearest-neighbor
+      // Pega localizacao atual e otimiza com nearest-neighbor
       const startPos = await this.getCurrentPosition();
       const sorted = this.nearestNeighbor(
         withCoords,
@@ -98,26 +120,42 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
         startPos?.lng ?? withCoords[0]._lng
       );
 
-      const destination = encodeURIComponent(sorted[sorted.length - 1].address!);
-      const waypoints   = sorted.slice(0, -1).map(o => encodeURIComponent(o.address!)).join('|');
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&waypoints=${waypoints}`;
-      window.open(url, '_blank');
+      // Enderecos brutos na URL — sem encodeURIComponent.
+      // O browser (Safari incluido) codifica corretamente ao navegar via <a href>,
+      // evitando dupla codificacao que faz o Maps exibir %20, %2C etc. como texto.
+      const dest   = sorted[sorted.length - 1].address!;
+      const waypts = sorted.slice(0, -1).map(o => o.address!).join('|');
+
+      url = `https://www.google.com/maps/dir/?api=1`;
+      if (startPos) url += `&origin=${startPos.lat},${startPos.lng}`;
+      url += `&destination=${dest}`;
+      if (waypts) url += `&waypoints=${waypts}`;
+
+      this.routeUrl = url;
 
     } catch {
       this.notif.error('Erro ao gerar rota.');
     } finally {
+      clearTimeout(this.loadingTimer);
       this.isGeneratingRoute = false;
+      this.loadingTooLong = false;
     }
   }
 
   // ── Geocodificação via Nominatim (OpenStreetMap, gratuito) ──────────
   private async geocode(address: string): Promise<{ lat: number; lng: number } | null> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=br`;
-      const res  = await fetch(url, { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'ERP-Gaspareto/1.0' } });
+      const res  = await fetch(url, { signal: controller.signal, headers: { 'Accept-Language': 'pt-BR' } });
       const data = await res.json();
       if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    } catch {}
+    } catch {
+      // timeout ou erro de rede — ignora, retorna null
+    } finally {
+      clearTimeout(timer);
+    }
     return null;
   }
 
@@ -131,6 +169,35 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
         { timeout: 5000 }
       );
     });
+=======
+    // Ordena pelos coords salvos no pedido se disponiveis, caso contrario mantém ordem original
+    const withCoords: OrderWithCoords[] = orders.map(o => ({
+      ...o,
+      _lat: o.addressLat ?? 0,
+      _lng: o.addressLng ?? 0
+    }));
+
+    const hasCoords = withCoords.every(o => o._lat !== 0 && o._lng !== 0);
+    const startLat = this.currentLat ?? (hasCoords ? withCoords[0]._lat : 0);
+    const startLng = this.currentLng ?? (hasCoords ? withCoords[0]._lng : 0);
+    const sorted = hasCoords
+      ? this.nearestNeighbor(withCoords, startLat, startLng)
+      : withCoords;
+
+    const addresses = sorted.map(o => encodeURIComponent(o.address!));
+    const url = addresses.length === 1
+      ? `https://www.google.com/maps/dir/?api=1&destination=${addresses[0]}`
+      : `https://www.google.com/maps/dir/${addresses.join('/')}`;
+
+    // Usa elemento <a> para compatibilidade com Safari PWA
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+>>>>>>> Stashed changes
   }
 
   // ── Nearest-Neighbor greedy ─────────────────────────────────────────

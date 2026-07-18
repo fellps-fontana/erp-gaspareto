@@ -1,0 +1,39 @@
+<div class="config-container">
+  <div class="config-card">
+    <header class="config-header">
+      <div>
+        <h1>⚙️ Configurações</h1>
+        <p>Ative ou desative os módulos do sistema</p>
+      </div>
+      <span class="saving-badge" *ngIf="saving()">
+        <span class="spinner" aria-hidden="true"></span> Salvando...
+      </span>
+    </header>
+
+    <ul class="module-list">
+      <li
+        *ngFor="let mod of moduleOptions"
+        class="module-item"
+        [class.module-item--sub]="mod.sub"
+        [class.module-item--saving]="saving() === mod.key"
+      >
+        <div class="module-info">
+          <span class="module-label">{{ mod.label }}</span>
+          <span class="module-description">{{ mod.description }}</span>
+        </div>
+        <label class="switch">
+          <input
+            type="checkbox"
+            [checked]="config.modules()[mod.key]"
+            [disabled]="saving() !== null"
+            (change)="toggleModule(mod.key)"
+            [attr.aria-label]="'Ativar ou desativar módulo ' + mod.label"
+          />
+          <span class="slider"></span>
+        </label>
+      </li>
+    </ul>
+
+    <button class="btn-voltar" [routerLink]="['/']">⬅ Voltar</button>
+  </div>
+</div>

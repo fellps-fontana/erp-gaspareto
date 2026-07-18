@@ -1,0 +1,123 @@
+// Schema — ERP Gaspareto
+// Gerado a partir das interfaces em src/models/*.ts e das coleções Firestore
+// referenciadas nos services (collection(this.firestore, '<nome>')).
+//
+// IMPORTANTE: o banco real é Firestore (NoSQL, documentos), não relacional.
+// Este DBML é uma representação aproximada para visualização/documentação —
+// não existem chaves estrangeiras de fato nem integridade referencial no
+// banco; os relacionamentos abaixo (Ref:) são inferidos de campos que guardam
+// o id de outro documento (ex.: idProduct, customerId) e são reforçados só
+// pela lógica das transações no código-cliente, não pelo Firestore.
+
+Table products {
+  id            string    [pk, note: 'doc id gerado pelo Firestore']
+  title         string
+  buyPrice      number    [note: 'sobrescrito pela última compra registrada (ver regra-de-negocio.md)']
+  sellPrice     number
+  stock         number
+  urlImage      string    [null, note: 'base64 da imagem, salvo direto no doc']
+  color         string    [null]
+}
+
+Table customers {
+  id            string    [pk]
+  name          string
+  phone         string    [null]
+  address       string    [null, note: 'endereço formatado livre, fallback']
+  cep           string    [null]
+  rua           string    [null]
+  numero        string    [null]
+  complemento   string    [null]
+  bairro        string    [null]
+  cidade        string    [null]
+  uf            string    [null]
+  lat           number    [null]
+  lng           number    [null]
+}
+
+Table sales {
+  id             string    [pk]
+  total          number
+  date           timestamp
+  items          json      [note: 'array de SaleItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
+  paymentMethod  string    [note: 'enum: dinheiro | pix']
+  sale_type      string    [note: 'pdv | order']
+  customerId     string    [null, ref: > customers.id, note: 'só preenchido quando sale_type = order']
+  status         string    [note: 'completed | canceled — não está na interface TS, escrito direto pelo service']
+}
+
+Table orders {
+  id                    string    [pk]
+  customerName          string
+  customerPhone         string    [null]
+  customerId            string    [null, ref: > customers.id]
+  items                 json      [note: 'array de OrderItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
+  itemsTotal            number
+  shippingCost          number
+  total                 number    [note: 'itemsTotal + shippingCost']
+  deliveryType          string    [note: 'pickup | delivery']
+  address               string    [null]
+  addressLat            number    [null]
+  addressLng            number    [null]
+  status                string    [note: 'open|pending|preparing|ready|delivering|delivered|finished|canceled']
+  createdAt             timestamp
+  scheduledDate         timestamp
+  actualDeliveryDate    timestamp [null]
+  paymentDate           timestamp [null]
+  closingDate           timestamp [null]
+  observations          string    [null]
+}
+
+Table comandas {
+  id            string    [pk]
+  customerName  string
+  items         json      [note: 'array de ComandaItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
+  total         number
+  createdAt     timestamp
+  status        string    [note: 'open | closed']
+}
+
+Table purchases {
+  id            string    [pk]
+  date          timestamp
+  idProduct     string    [ref: > products.id]
+  unityValue    number
+  amount        number
+}
+
+Table purchaseProducts {
+  id                string    [pk]
+  name              string
+  defaultValue      number
+  recurring         boolean
+  recurrencePeriod  string    [null, note: 'weekly | monthly (inglês, diferente de bills)']
+  createdAt         timestamp
+}
+
+Table bills {
+  id                  string    [pk]
+  name                string
+  value               number
+  dueDate             timestamp [null]
+  status              string    [note: 'pendente | recebido | pago']
+  recurring           boolean
+  recurrencePeriod    string    [null, note: 'semanal | mensal (português, diferente de purchaseProducts)']
+  paidAt              timestamp [null]
+  receivedAt          timestamp [null]
+  createdAt           timestamp
+  purchaseProductId   string    [null, ref: > purchaseProducts.id]
+}
+
+Table config {
+  id       string  [pk, note: "único doc usado: id = 'company'"]
+  modules  json    [note: 'ModuleConfig: pdv, pedidos, gestao, rotas, contas, clientes, compras (booleans)']
+}
+
+// Observações:
+// - items dentro de sales/orders/comandas são arrays embutidos no próprio
+//   documento (subcoleção não é usada) — cada item referencia products.id
+//   via idProduct, mas sem enforcement do banco.
+// - Não existe tabela/coleção "users" — não há autenticação implementada
+//   hoje (ver stack.md). Se autenticação for adicionada, este schema precisa
+//   de uma tabela users e provavelmente um campo createdBy/ownerId nas
+//   coleções operacionais.

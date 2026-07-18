@@ -14,13 +14,13 @@
       </span>
     </div>
     <button class="btn-route"
-      [disabled]="selectedIds.size === 0 || isGeneratingRoute"
+      [disabled]="selectedIds.size === 0"
       (click)="generateRoute()">
-      <svg *ngIf="!isGeneratingRoute" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
         <circle cx="12" cy="10" r="3"></circle>
       </svg>
-      {{ isGeneratingRoute ? 'Otimizando...' : 'Gerar Rota' }}
+      Gerar Rota
     </button>
   </header>
 
@@ -92,9 +92,25 @@
     <div class="cta-info">
       <strong>{{ selectedIds.size }} entrega{{ selectedIds.size !== 1 ? 's' : '' }} selecionada{{ selectedIds.size !== 1 ? 's' : '' }}</strong>
     </div>
-    <button class="btn-route-cta" (click)="generateRoute()" [disabled]="isGeneratingRoute">
-      {{ isGeneratingRoute ? 'Otimizando rota...' : 'Abrir Rota no Maps →' }}
+<<<<<<< Updated upstream
+    <!-- Aviso apos 5s calculando -->
+    <p class="loading-slow" *ngIf="loadingTooLong">
+      Calculando enderecos, aguarde...
+    </p>
+
+    <!-- Antes de gerar: botao principal -->
+    <button *ngIf="!routeUrl" class="btn-route-cta" (click)="generateRoute()" [disabled]="isGeneratingRoute">
+      {{ isGeneratingRoute ? 'Otimizando rota...' : 'Gerar Rota no Maps →' }}
+=======
+    <button class="btn-route-cta" (click)="generateRoute()">
+      Abrir Rota no Maps →
+>>>>>>> Stashed changes
     </button>
+
+    <!-- Apos gerar: link para abrir no Maps -->
+    <a *ngIf="routeUrl" [href]="routeUrl" target="_blank" rel="noopener" class="btn-open-route">
+      Abrir rota no Maps →
+    </a>
   </div>
 
 </div>

@@ -4,6 +4,7 @@ import { RouterOutlet } from '@angular/router';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter } from 'rxjs/operators';
 import { ThemeService } from '../services/theme/theme-service';
+import { ConfigService } from '../services/config/config.service';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +19,7 @@ export class AppComponent implements OnInit {
 
   constructor() {
     inject(ThemeService);
+    inject(ConfigService);
   }
 
   ngOnInit() {

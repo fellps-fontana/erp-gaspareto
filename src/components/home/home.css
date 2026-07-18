@@ -211,6 +211,15 @@
   border-color: #f97316;
 }
 
+/* Configurações: Cinza (Sistema) */
+.card-config .icon {
+  color: var(--text-secondary);
+}
+
+.card-config:hover {
+  border-color: var(--text-secondary);
+}
+
 /* Ícones */
 .icon {
   width: 80px;

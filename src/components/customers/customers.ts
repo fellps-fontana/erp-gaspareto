@@ -2,9 +2,11 @@ import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Observable, of, Subscription } from 'rxjs';
 import { Customer } from '../../models/customer-model';
+import { Order } from '../../models/order-model';
 import { CustomerService } from '../../services/customer-service/customer-service';
+import { OrderService } from '../../services/order-service/order-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 
 interface CustomerForm {
@@ -28,6 +30,7 @@ interface CustomerForm {
 })
 export class CustomersComponent implements OnInit, OnDestroy {
   private customerService = inject(CustomerService);
+  private orderService = inject(OrderService);
   private notif = inject(NotificationService);
   private router = inject(Router);
 
@@ -42,6 +45,10 @@ export class CustomersComponent implements OnInit, OnDestroy {
   form: CustomerForm = this.emptyForm();
   editingId: string | null = null;
   customerToDelete: Customer | null = null;
+
+  isHistoryModalOpen = false;
+  selectedCustomerForHistory: Customer | null = null;
+  customerOrders$: Observable<Order[]> = of([]);
 
   private sub?: Subscription;
 
@@ -221,6 +228,41 @@ export class CustomersComponent implements OnInit, OnDestroy {
   openMaps(c: Customer) {
     if (!c.address) return;
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.address)}`, '_blank');
+  }
+
+  openHistory(c: Customer) {
+    this.selectedCustomerForHistory = c;
+    this.customerOrders$ = this.orderService.getOrdersByCustomer(c.id!);
+    this.isHistoryModalOpen = true;
+  }
+
+  closeHistory() {
+    this.isHistoryModalOpen = false;
+    this.selectedCustomerForHistory = null;
+    this.customerOrders$ = of([]);
+  }
+
+  translateOrderStatus(status: string): string {
+    const map: Record<string, string> = {
+      open: 'Aberto', pending: 'Pendente', preparing: 'Preparando',
+      ready: 'Pronto', delivering: 'Em Entrega', delivered: 'Entregue',
+      finished: 'Finalizado', canceled: 'Cancelado'
+    };
+    return map[status] || status;
+  }
+
+  deliveryTypeLabel(type: 'pickup' | 'delivery'): string {
+    return type === 'delivery' ? 'Entrega' : 'Retirada';
+  }
+
+  getOrderDate(date: any): Date | null {
+    if (!date) return null;
+    if (typeof date.toDate === 'function') return date.toDate();
+    return new Date(date);
+  }
+
+  trackByOrderId(_: number, order: Order): string {
+    return order.id || _.toString();
   }
 
   private emptyForm(): CustomerForm {
