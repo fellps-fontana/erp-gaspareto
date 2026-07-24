@@ -33,7 +33,7 @@ em `currentUser()`/`companyId()`, senão reintroduz o bug de F5 redirecionando
 indevidamente pra /login.
 
 ## TASK-003 — Criar AuthGuard
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-002
 FLUXO: Implementacao
@@ -43,6 +43,15 @@ CRITERIO DE ACEITE: sem sessão ativa (e auth já inicializado), qualquer rota c
 ARQUIVOS PERMITIDOS: src/guards/auth.guard.ts (novo)
 NAO FAZER: não aplicar o guard nas rotas ainda (isso é TASK-006).
 RETORNO ESPERADO: arquivo criado, assinatura da função.
+NOTA POS-EXECUCAO: 1 rodada de correção pelo style — a implementação original
+chamava toObservable() duas vezes (uma dentro de switchMap), o que lança
+NG0203 em runtime sempre que authInitialized resolve de forma assíncrona
+(exatamente o caso de F5 com sessão persistida que a task existe pra cobrir).
+Corrigido combinando authInitialized+currentUser num único computed() e
+chamando toObservable() uma única vez, na janela síncrona garantida do
+guard. Aprovado com evidência de leitura do código-fonte instalado do
+Angular (sem node_modules no worktree pra rodar ng serve real — sinalizado
+como limitação, não como validação em runtime).
 
 ## TASK-004 — Tela de Login
 STATUS: PENDENTE
