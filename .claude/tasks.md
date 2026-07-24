@@ -54,7 +54,7 @@ Angular (sem node_modules no worktree pra rodar ng serve real — sinalizado
 como limitação, não como validação em runtime).
 
 ## TASK-004 — Tela de Login
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-002
 FLUXO: Implementacao
