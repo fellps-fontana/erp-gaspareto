@@ -1,5 +1,5 @@
 ## TASK-001 — Criar models Company e AppUser
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: vazio
 FLUXO: Implementacao
