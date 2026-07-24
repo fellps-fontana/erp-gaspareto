@@ -66,7 +66,7 @@ NAO FAZER: não criar lógica de cadastro de empresa aqui (ver TASK-005).
 RETORNO ESPERADO: componente criado, standalone, pronto pra ser referenciado na rota.
 
 ## TASK-005 — Tela de Signup (cadastro de empresa)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-001, TASK-002
 FLUXO: Implementacao
