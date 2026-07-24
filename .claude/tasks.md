@@ -11,25 +11,35 @@ NAO FAZER: não tocar em company-config.ts nem em nenhum model existente.
 RETORNO ESPERADO: os dois arquivos criados, conteúdo final.
 
 ## TASK-002 — Criar AuthService + TenantService
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-001
 FLUXO: Implementacao
 CONTEXTO A LER: regra-de-negocio.md seção 10 (fluxo de auth, custom claims, cadastro de empresa); stack.md seção Backend/dados; src/services/config/config.service.ts (padrão de signal + Observable já usado no projeto)
 ESCOPO: criar AuthService (login, logout, currentUser$/currentUser signal, busca users/{uid} pós-login pra expor companyId/role, e signup(email,senha,nomeEmpresa) que cria o usuário no Firebase Auth + companies/{id} com DEFAULT_MODULES/plan trial/status active + users/{uid} com role owner) e TenantService (signal global companyId(), null se deslogado).
 CRITERIO DE ACEITE: nenhum service de dado consegue montar query com companyId null (TenantService só emite companyId depois do lookup em users/{uid} completar); login/logout mudam currentUser corretamente; signup cria os 2 documentos (companies + users) antes de resolver a promise.
-ARQUIVOS PERMITIDOS: src/services/auth/auth-service.ts (novo), src/services/tenant/tenant-service.ts (novo)
+ARQUIVOS PERMITIDOS: src/services/auth-service/auth-service.ts, src/services/tenant-service/tenant-service.ts
 NAO FAZER: não implementar a Cloud Function de custom claims aqui (ver TASK-023); não criar UI.
 RETORNO ESPERADO: os dois services criados, com assinatura pública clara (métodos e o que cada um retorna).
+NOTA POS-EXECUCAO: caminho real diverge do original (pasta `<dominio>-service/`,
+convenção majoritária do projeto — `auth-service/` e `tenant-service/`, não
+`auth/`/`tenant/`); tasks seguintes já corrigidas abaixo. 1 rodada de correção
+pelo style (conta órfã no Auth se a transaction do signup falhar, race entre
+o listener onAuthStateChanged e a atribuição explícita de currentUser, e
+ausência de sinal "auth inicializando") — todas resolvidas e aprovadas.
+AuthService agora expõe também `authInitialized` (signal) e TenantService
+`isAuthInitialized()` — TASK-003 deve checar isso antes de decidir com base
+em `currentUser()`/`companyId()`, senão reintroduz o bug de F5 redirecionando
+indevidamente pra /login.
 
 ## TASK-003 — Criar AuthGuard
 STATUS: PENDENTE
 AGENT: levi
 DEPENDENCIAS: TASK-002
 FLUXO: Implementacao
-CONTEXTO A LER: regra-de-negocio.md seção 10 (nota sobre guard ser UX, não segurança); src/guards/module.guard.ts (padrão de CanActivateFn já usado no projeto)
+CONTEXTO A LER: regra-de-negocio.md seção 10 (nota sobre guard ser UX, não segurança); src/guards/module.guard.ts (padrão de CanActivateFn já usado no projeto); src/services/auth-service/auth-service.ts (authInitialized) e src/services/tenant-service/tenant-service.ts (isAuthInitialized) — caminho real, corrigido pós TASK-002
 ESCOPO: criar authGuard (CanActivateFn) que bloqueia acesso a rotas protegidas quando não há usuário logado, redirecionando pra /login.
-CRITERIO DE ACEITE: sem sessão ativa, qualquer rota com o guard redireciona pra /login; com sessão ativa, deixa passar.
+CRITERIO DE ACEITE: sem sessão ativa (e auth já inicializado), qualquer rota com o guard redireciona pra /login; com sessão ativa, deixa passar; enquanto authInitialized() ainda for false (boot/F5 com sessão persistida), o guard aguarda a resolução antes de decidir — nunca redireciona com base em currentUser() ainda não resolvido.
 ARQUIVOS PERMITIDOS: src/guards/auth.guard.ts (novo)
 NAO FAZER: não aplicar o guard nas rotas ainda (isso é TASK-006).
 RETORNO ESPERADO: arquivo criado, assinatura da função.
@@ -39,7 +49,7 @@ STATUS: PENDENTE
 AGENT: hanzo
 DEPENDENCIAS: TASK-002
 FLUXO: Implementacao
-CONTEXTO A LER: identidade-visual.md; regra-de-negocio.md seção 10 (fluxo de login); src/services/auth/auth-service.ts (métodos disponíveis)
+CONTEXTO A LER: identidade-visual.md; regra-de-negocio.md seção 10 (fluxo de login); src/services/auth-service/auth-service.ts (métodos disponíveis) — caminho real, corrigido pós TASK-002
 ESCOPO: criar tela de login (form email/senha) que chama AuthService.login e redireciona pra / em caso de sucesso, mostrando erro em caso de falha.
 CRITERIO DE ACEITE: login com credencial válida redireciona pra /; login inválido mostra mensagem de erro sem quebrar a tela; segue identidade visual do projeto (Bootstrap + design tokens de styles.css).
 ARQUIVOS PERMITIDOS: src/components/login/login.ts (novo), src/components/login/login.html (novo), src/components/login/login.css (novo)
@@ -51,7 +61,7 @@ STATUS: PENDENTE
 AGENT: hanzo
 DEPENDENCIAS: TASK-001, TASK-002
 FLUXO: Implementacao
-CONTEXTO A LER: identidade-visual.md; regra-de-negocio.md seção 10 (cadastro self-service); src/services/auth/auth-service.ts (método signup)
+CONTEXTO A LER: identidade-visual.md; regra-de-negocio.md seção 10 (cadastro self-service); src/services/auth-service/auth-service.ts (método signup) — caminho real, corrigido pós TASK-002
 ESCOPO: criar tela de signup (nome da empresa, email, senha) que chama AuthService.signup e redireciona pra / autenticado ao concluir.
 CRITERIO DE ACEITE: cadastro cria a sessão autenticada e redireciona pra /; campos obrigatórios validados antes de chamar o service; erro de email já em uso é exibido ao usuário.
 ARQUIVOS PERMITIDOS: src/components/signup/signup.ts (novo), src/components/signup/signup.html (novo), src/components/signup/signup.css (novo)

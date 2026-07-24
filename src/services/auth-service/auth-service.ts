@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
-import { Auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from '@angular/fire/auth';
+import { Auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from '@angular/fire/auth';
 import { Firestore, doc, getDoc, runTransaction, serverTimestamp, Timestamp } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 import { AppUser } from '../../models/user-model';
@@ -15,7 +15,10 @@ export class AuthService {
   private firestore = inject(Firestore);
 
   readonly currentUser = signal<AppUser | null>(null);
+  readonly authInitialized = signal<boolean>(false);
   readonly currentUser$: Observable<AppUser | null> = toObservable(this.currentUser);
+
+  private isUpdatingAuthManually = false;
 
   constructor() {
     this.initAuthStateListener();
@@ -23,6 +26,10 @@ export class AuthService {
 
   private initAuthStateListener(): void {
     onAuthStateChanged(this.auth, async (user) => {
+      if (this.isUpdatingAuthManually) {
+        return;
+      }
+
       if (user) {
         try {
           const appUser = await this.fetchUserFromFirestore(user.uid);
@@ -34,67 +41,98 @@ export class AuthService {
       } else {
         this.currentUser.set(null);
       }
+
+      this.authInitialized.set(true);
     });
   }
 
   async login(email: string, password: string): Promise<AppUser> {
-    const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
-    const appUser = await this.fetchUserFromFirestore(userCredential.user.uid);
-    this.currentUser.set(appUser);
-    return appUser;
+    this.isUpdatingAuthManually = true;
+    try {
+      const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
+      const appUser = await this.fetchUserFromFirestore(userCredential.user.uid);
+      this.currentUser.set(appUser);
+      this.authInitialized.set(true);
+      return appUser;
+    } finally {
+      this.isUpdatingAuthManually = false;
+    }
   }
 
   async logout(): Promise<void> {
-    await signOut(this.auth);
-    this.currentUser.set(null);
+    this.isUpdatingAuthManually = true;
+    try {
+      await signOut(this.auth);
+      this.currentUser.set(null);
+    } finally {
+      this.isUpdatingAuthManually = false;
+    }
   }
 
   async signup(email: string, password: string, companyName: string): Promise<AppUser> {
-    let userCredential;
-    let appUser: AppUser;
+    let userCredential: { user: User };
+    let appUser: AppUser | null = null;
 
+    this.isUpdatingAuthManually = true;
     try {
       userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
       const uid = userCredential.user.uid;
 
-      await runTransaction(this.firestore, async (transaction) => {
-        const companyRef = doc(this.firestore, `companies/${uid}`);
-        const userRef = doc(this.firestore, `users/${uid}`);
+      try {
+        await runTransaction(this.firestore, async (transaction) => {
+          const companyRef = doc(this.firestore, `companies/${uid}`);
+          const userRef = doc(this.firestore, `users/${uid}`);
 
-        const companyData: any = {
-          id: uid,
-          name: companyName,
-          modules: { ...DEFAULT_MODULES },
-          plan: 'trial',
-          status: 'active',
-          createdAt: serverTimestamp(),
-        };
+          const companyData = {
+            name: companyName,
+            modules: { ...DEFAULT_MODULES },
+            plan: 'trial' as const,
+            status: 'active' as const,
+            createdAt: serverTimestamp(),
+          };
 
-        const userData: any = {
-          uid,
-          email,
-          companyId: uid,
-          role: 'owner',
-          createdAt: serverTimestamp(),
-        };
+          const userData = {
+            uid,
+            email,
+            companyId: uid,
+            role: 'owner' as const,
+            createdAt: serverTimestamp(),
+          };
 
-        transaction.set(companyRef, companyData);
-        transaction.set(userRef, userData);
+          transaction.set(companyRef, companyData as Omit<Company, 'id'>);
+          transaction.set(userRef, userData as AppUser);
 
-        appUser = {
-          uid,
-          email,
-          companyId: uid,
-          role: 'owner',
-          createdAt: Timestamp.now(),
-        };
-      });
+          appUser = {
+            uid,
+            email,
+            companyId: uid,
+            role: 'owner',
+            createdAt: Timestamp.now(),
+          };
+        });
 
-      this.currentUser.set(appUser!);
-      return appUser!;
-    } catch (error) {
-      console.error('AuthService: Erro ao registrar usuário:', error);
-      throw error;
+        if (!appUser) {
+          throw new Error('Falha ao criar documentos da empresa e usuário.');
+        }
+
+        this.currentUser.set(appUser);
+        this.authInitialized.set(true);
+        return appUser;
+      } catch (transactionError) {
+        await this.deleteAuthUserIfExists(userCredential.user);
+        throw transactionError;
+      }
+    } finally {
+      this.isUpdatingAuthManually = false;
+    }
+  }
+
+  private async deleteAuthUserIfExists(user: User): Promise<void> {
+    try {
+      await user.delete();
+      console.info('AuthService: Usuário removido do Auth após falha de transação.');
+    } catch (deleteError) {
+      console.error('AuthService: Erro ao remover usuário orfão do Auth:', deleteError);
     }
   }
 
