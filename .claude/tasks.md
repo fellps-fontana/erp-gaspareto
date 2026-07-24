@@ -78,7 +78,7 @@ NAO FAZER: não implementar a chamada à Cloud Function de custom claims (fase 2
 RETORNO ESPERADO: componente criado, standalone, pronto pra ser referenciado na rota.
 
 ## TASK-006 — Atualizar app.routes.ts
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-003, TASK-004, TASK-005
 FLUXO: Implementacao
