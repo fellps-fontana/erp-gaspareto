@@ -10,6 +10,7 @@ export interface ComandaItem {
 
 export interface Comanda {
     id?: string;
+    companyId: string;
     customerName: string;
     items: ComandaItem[];
     total: number;

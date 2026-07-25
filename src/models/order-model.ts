@@ -10,6 +10,7 @@ export interface OrderItem {
 
 export interface Order {
   id?: string;
+  companyId: string;
   customerName: string;
   customerPhone?: string;
 

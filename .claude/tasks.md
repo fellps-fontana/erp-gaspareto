@@ -111,7 +111,7 @@ só refletia após relogin). Corrigido com novo método
 real (ex.: futura leitura direta do doc da empresa em outros pontos).
 
 ## TASK-008 — Adicionar companyId nos 8 models existentes
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: vazio
 FLUXO: Melhoria
@@ -121,6 +121,11 @@ CRITERIO DE ACEITE: campo adicionado só na interface do documento raiz de cada 
 ARQUIVOS PERMITIDOS: src/models/product-model.ts, src/models/sell-model.ts, src/models/comanda-model.ts, src/models/order-model.ts, src/models/bill-model.ts, src/models/customer-model.ts, src/models/buy-model.ts, src/models/purchase-product-model.ts
 NAO FAZER: não renomear nenhum arquivo (a inconsistência de nome é conhecida e documentada em stack.md — não corrigir aqui).
 RETORNO ESPERADO: diff dos 8 arquivos.
+NOTA POS-EXECUCAO: build do projeto agora FALHA propositalmente (15 erros de
+tipo) em arquivos fora do escopo desta task — components/services que criam
+objetos Product/Sale/Comanda/Order/Bill/Customer/PurchaseProduct sem
+companyId ainda. Esperado: fica quebrado até TASK-010 a TASK-017 (isolamento
+nos 8 services) fecharem. Não é regressão a corrigir agora.
 
 ## TASK-009 — [TDD RED] Testes de isolamento companyId nos 8 services
 STATUS: PENDENTE

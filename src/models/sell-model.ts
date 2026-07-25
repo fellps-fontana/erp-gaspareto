@@ -15,6 +15,7 @@ export interface SaleItem {
 
 export interface Sale {
     id?: string; // Opcional porque o Firestore gera depois
+    companyId: string;
     total: number; // Use total pra bater com o Service
     date: Timestamp | any;
     items: SaleItem[];
