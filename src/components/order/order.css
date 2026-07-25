@@ -740,6 +740,55 @@ textarea:focus {
   outline: none;
 }
 
+.schedule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-muted);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  margin-bottom: 15px;
+}
+
+.schedule-row label {
+  color: var(--color-primary);
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.schedule-date-input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1rem;
+  width: 100%;
+}
+
+.schedule-date-input:focus {
+  outline: none;
+}
+
+.btn-calendar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--color-info);
+  color: var(--text-inverse);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-calendar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .toggle-delivery {
   display: flex;
   gap: 10px;

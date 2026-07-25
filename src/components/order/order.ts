@@ -59,6 +59,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   address       = '';
   shippingCost  = 0;
   observations  = '';
+  scheduledDate = ''; // Data de entrega prevista (formato yyyy-MM-dd, do <input type="date">)
 
   // ── BUSCA DE CLIENTE ──────────────────────────────────────────────
   customerSearch       = '';
@@ -241,6 +242,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.addressLng           = order.addressLng;
     this.shippingCost         = order.shippingCost ?? 0;
     this.observations         = order.observations ?? '';
+    this.scheduledDate        = this.toDateInputValue(order.scheduledDate);
     this.cart                 = [...order.items];
     this.isNewOrderOpen       = true;
   }
@@ -301,7 +303,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
         deliveryType:  this.deliveryType,
         address:       this.address.trim(),
         observations:  this.observations,
-        scheduledDate: Timestamp.now(),
+        scheduledDate: this.scheduledDate
+          ? Timestamp.fromDate(new Date(`${this.scheduledDate}T00:00:00`))
+          : Timestamp.now(),
         ...(this.selectedCustomerId ? { customerId: this.selectedCustomerId } : {}),
         ...(this.addressLat != null ? { addressLat: this.addressLat } : {}),
         ...(this.addressLng != null ? { addressLng: this.addressLng } : {})
@@ -340,6 +344,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.shippingCost            = 0;
     this.deliveryType         = 'pickup';
     this.observations         = '';
+    this.scheduledDate        = this.toDateInputValue(new Date());
     this.editingOrderId       = null;
   }
 
@@ -355,6 +360,67 @@ export class OrdersComponent implements OnInit, OnDestroy {
       this.addressLat = this.selectedCustomerLat;
       this.addressLng = this.selectedCustomerLng;
     }
+  }
+
+  // =================================================================
+  // CALENDÁRIO (Google Calendar)
+  // =================================================================
+
+  /** Converte um Timestamp/Date do Firestore para o formato yyyy-MM-dd usado pelo <input type="date">. */
+  private toDateInputValue(date: any): string {
+    const d = this.getOrderDate(date);
+    if (!d) return '';
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth() + 1).padStart(2, '0');
+    const dd   = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  /** Rótulo do campo de data: muda conforme o tipo de logística escolhido. */
+  get scheduleDateLabel(): string {
+    return this.deliveryType === 'pickup' ? 'Data de Retirada:' : 'Data de Entrega:';
+  }
+
+  /** true quando já dá pra montar o evento (precisa de cliente selecionado + data marcada). */
+  get canAddToCalendar(): boolean {
+    return !!this.scheduledDate && !!this.customerName.trim();
+  }
+
+  /** Abre o Google Calendar em uma nova aba com o evento de entrega já preenchido — só clicar em Salvar. */
+  openAddToCalendar() {
+    if (!this.scheduledDate) {
+      this.notif.warning('Defina a data de entrega antes de adicionar ao calendário.');
+      return;
+    }
+
+    const start = this.scheduledDate.replace(/-/g, '');
+    const endDate = new Date(`${this.scheduledDate}T00:00:00`);
+    endDate.setDate(endDate.getDate() + 1);
+    const end = `${endDate.getFullYear()}${String(endDate.getMonth() + 1).padStart(2, '0')}${String(endDate.getDate()).padStart(2, '0')}`;
+
+    const title = `${this.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'} - ${this.customerName || 'Pedido'}`;
+
+    const itemsDescription = this.cart.length
+      ? this.cart.map(i => `${i.quantity}x ${i.productName}`).join(', ')
+      : '';
+    const detailsParts = [
+      itemsDescription ? `Itens: ${itemsDescription}` : '',
+      this.customerPhone ? `Telefone: ${this.customerPhone}` : '',
+      this.observations ? `Obs: ${this.observations}` : ''
+    ].filter(Boolean);
+
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: title,
+      dates: `${start}/${end}`,
+      details: detailsParts.join('\n')
+    });
+
+    if (this.deliveryType === 'delivery' && this.address.trim()) {
+      params.set('location', this.address.trim());
+    }
+
+    window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank');
   }
 
   // =================================================================
