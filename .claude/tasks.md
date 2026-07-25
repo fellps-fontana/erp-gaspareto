@@ -90,7 +90,7 @@ NAO FAZER: não mexer em module.guard.ts nem em company-config.ts.
 RETORNO ESPERADO: diff do arquivo de rotas.
 
 ## TASK-007 — Atualizar ConfigService para companies/{id}
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-001, TASK-002
 FLUXO: Melhoria
@@ -100,6 +100,15 @@ CRITERIO DE ACEITE: modules() reflete o doc da empresa da sessão atual; troca d
 ARQUIVOS PERMITIDOS: src/services/config/config.service.ts
 NAO FAZER: não alterar company-config.ts (DEFAULT_MODULES/ModuleConfig continuam iguais).
 RETORNO ESPERADO: diff do service.
+NOTA POS-EXECUCAO: 1 rodada de correção pelo style — a primeira versão trocou
+o listener onSnapshot (tempo real) por getDoc() one-shot, regredindo o
+comportamento documentado em stack.md ("tempo real via onSnapshot") e com
+efeito colateral real em module.guard.ts (módulo desligado em outra sessão
+só refletia após relogin). Corrigido com novo método
+`docDataObservable<T>()` em firestore-base.service.ts (irmão de
+`collectionDataObservable`, mesmo padrão onSnapshot+ngZone.run, mas pra doc
+único) — útil pra qualquer service futuro que precise ler 1 doc em tempo
+real (ex.: futura leitura direta do doc da empresa em outros pontos).
 
 ## TASK-008 — Adicionar companyId nos 8 models existentes
 STATUS: PENDENTE

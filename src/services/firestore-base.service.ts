@@ -18,4 +18,18 @@ export abstract class FirestoreBaseService {
       return () => unsubscribe();
     });
   }
+
+  protected docDataObservable<T>(docRef: any): Observable<T | undefined> {
+    return new Observable<T | undefined>((observer) => {
+      const unsubscribe = onSnapshot(
+        docRef,
+        (docSnap: any) => {
+          const data = docSnap.exists() ? ({ id: docSnap.id, ...docSnap.data() } as T) : undefined;
+          this.ngZone.run(() => observer.next(data));
+        },
+        (error: any) => this.ngZone.run(() => observer.error(error))
+      );
+      return () => unsubscribe();
+    });
+  }
 }
