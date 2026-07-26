@@ -31,7 +31,7 @@ export class ComandaService extends FirestoreBaseService {
     );
   }
 
-  async addComanda(comanda: Omit<Comanda, 'id' | 'createdAt' | 'status'>): Promise<void> {
+  async addComanda(comanda: Omit<Comanda, 'id' | 'createdAt' | 'status' | 'companyId'>): Promise<void> {
     try {
       await runTransaction(this.firestore, async (transaction: Transaction) => {
         const productsToUpdate: { ref: any; quantity: number }[] = [];

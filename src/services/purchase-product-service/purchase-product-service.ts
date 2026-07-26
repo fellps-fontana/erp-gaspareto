@@ -17,7 +17,7 @@ export class PurchaseProductService extends FirestoreBaseService {
     return this.collectionDataObservable<PurchaseProduct>(q);
   }
 
-  async addPurchaseProduct(product: Omit<PurchaseProduct, 'id' | 'createdAt'>): Promise<string> {
+  async addPurchaseProduct(product: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'>): Promise<string> {
     const ref = await addDoc(collection(this.firestore, this.COL), {
       ...product,
       createdAt: serverTimestamp()

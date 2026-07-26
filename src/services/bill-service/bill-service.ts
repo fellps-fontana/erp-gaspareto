@@ -17,7 +17,7 @@ export class BillService extends FirestoreBaseService {
     return this.collectionDataObservable<Bill>(q);
   }
 
-  async addBill(bill: Omit<Bill, 'id' | 'createdAt'>): Promise<string> {
+  async addBill(bill: Omit<Bill, 'id' | 'createdAt' | 'companyId'>): Promise<string> {
     const ref = await addDoc(collection(this.firestore, this.COL), {
       ...bill,
       createdAt: serverTimestamp()
