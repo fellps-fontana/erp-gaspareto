@@ -121,14 +121,14 @@ CRITERIO DE ACEITE: campo adicionado só na interface do documento raiz de cada 
 ARQUIVOS PERMITIDOS: src/models/product-model.ts, src/models/sell-model.ts, src/models/comanda-model.ts, src/models/order-model.ts, src/models/bill-model.ts, src/models/customer-model.ts, src/models/buy-model.ts, src/models/purchase-product-model.ts
 NAO FAZER: não renomear nenhum arquivo (a inconsistência de nome é conhecida e documentada em stack.md — não corrigir aqui).
 RETORNO ESPERADO: diff dos 8 arquivos.
-NOTA POS-EXECUCAO: build do projeto agora FALHA propositalmente (15 erros de
-tipo) em arquivos fora do escopo desta task — components/services que criam
-objetos Product/Sale/Comanda/Order/Bill/Customer/PurchaseProduct sem
-companyId ainda. Esperado: fica quebrado até TASK-010 a TASK-017 (isolamento
-nos 8 services) fecharem. Não é regressão a corrigir agora.
+NOTA POS-EXECUCAO: build do projeto ficou propositalmente quebrado (15 erros
+de tipo) até um passo de infraestrutura anterior à TASK-009 mudar a
+assinatura dos 8 métodos de escrita dos services para Omit<T,'companyId'>
+(companyId passa a ser injetado pelo service, não fornecido pelo chamador) —
+ver nota da TASK-009 abaixo. Build volta a compilar limpo desde então.
 
 ## TASK-009 — [TDD RED] Testes de isolamento companyId nos 8 services
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-002, TASK-008
 FLUXO: Implementacao
@@ -138,6 +138,34 @@ CRITERIO DE ACEITE: existe cobertura de teste pros 8 services (get + add); os te
 ARQUIVOS PERMITIDOS: arquivos *.spec.ts novos, um por service, na mesma pasta do service correspondente (ex.: src/services/product-service/product-service.spec.ts)
 NAO FAZER: não alterar nenhum arquivo de service (isso é TASK-010 a TASK-017). Se a infraestrutura de teste (mock de Firestore/emulator) não existir no projeto, resolver com o mínimo necessário e sinalizar o gap no retorno — não instalar dependência nova sem reportar.
 RETORNO ESPERADO: lista dos arquivos de teste criados + confirmação de RED (motivo da falha) por service.
+NOTA POS-EXECUCAO: rodada mais custosa da fila até agora, 3 gaps de infra
+reais encontrados e resolvidos pelo Kira antes do RED rodar de verdade:
+(1) build quebrado desde TASK-008 — Kira mudou a assinatura de escrita dos
+8 services pra Omit<T,'companyId'> (companyId passa a ser responsabilidade
+do service, não do chamador) e ajustou 7 anotações de tipo locais em 3
+componentes (bills.ts, customers.ts, product-inventory.ts) que espelhavam a
+forma antiga — zero lógica alterada, só contrato de tipo; (2) mock de
+Firestore inviável — o SDK valida internamente que o objeto é uma instância
+real (branding), e spyOn nas funções do módulo firebase/firestore falha
+porque o bundler esbuild exporta ESM como somente-leitura; usuário escolheu
+emulador real como estratégia (outras opções descartadas: refatorar pra
+injeção testável — escopo grande demais; descartar prova automatizada —
+quebra o mandato de TDD do CLAUDE.md). Kira instalou Java (Temurin 21, via
+winget, com autorização do usuário), corrigiu o firebase-tools (node_modules
+corrompido, resolvido com `npm ci` na raiz do repo), configurou
+`emulators.firestore` (porta 8080) em firebase.json, e deixou o emulador
+rodando em background pro mike conectar via `connectFirestoreEmulator`
+(helper novo: src/services/test-helpers.ts); (3) primeira versão dos testes
+de leitura era vazia/frágil — só verificava "nenhum doc retornado tem
+companyId errado", o que dava RED por coincidência de sobra de dados no
+emulador compartilhado, não por prova deliberada. Corrigido: cada teste de
+leitura agora semeia explicitamente um doc próprio E um doc de empresa
+estrangeira (via setDoc direto), e afirma as duas coisas — que o próprio
+aparece e que o estrangeiro NÃO aparece. RED final confirmado (18 FAILED, 0
+SUCCESS) de forma independente pelo Kira rodando `ng test` de novo, contra o
+emulador real, sem nenhum erro de compilação/setup. Emulador do Firestore
+segue rodando em background nesta sessão — as próximas tasks (010-018) usam
+o mesmo emulador, não precisam reiniciar.
 
 ## TASK-010 — Isolamento companyId: product-service
 STATUS: PENDENTE
