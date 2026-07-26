@@ -769,6 +769,16 @@ textarea:focus {
   outline: none;
 }
 
+.scheduled-date-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-info);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
 .btn-calendar {
   display: flex;
   align-items: center;

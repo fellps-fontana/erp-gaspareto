@@ -303,9 +303,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
         deliveryType:  this.deliveryType,
         address:       this.address.trim(),
         observations:  this.observations,
-        scheduledDate: this.scheduledDate
-          ? Timestamp.fromDate(new Date(`${this.scheduledDate}T00:00:00`))
-          : Timestamp.now(),
+        ...(this.scheduledDate
+          ? { scheduledDate: Timestamp.fromDate(new Date(`${this.scheduledDate}T00:00:00`)) }
+          : {}),
         ...(this.selectedCustomerId ? { customerId: this.selectedCustomerId } : {}),
         ...(this.addressLat != null ? { addressLat: this.addressLat } : {}),
         ...(this.addressLng != null ? { addressLng: this.addressLng } : {})
@@ -344,7 +344,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.shippingCost            = 0;
     this.deliveryType         = 'pickup';
     this.observations         = '';
-    this.scheduledDate        = this.toDateInputValue(new Date());
+    this.scheduledDate        = '';
     this.editingOrderId       = null;
   }
 

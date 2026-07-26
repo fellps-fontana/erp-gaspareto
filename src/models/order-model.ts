@@ -28,7 +28,7 @@ export interface Order {
   status: 'open' | 'pending' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'finished' | 'canceled';
 
   createdAt: Timestamp;          // Data do pedido
-  scheduledDate: Timestamp;      // Data agendada (Previsão)
+  scheduledDate?: Timestamp;     // Data agendada (Previsão) — só existe se o usuário marcar
 
   actualDeliveryDate?: Timestamp;// DATA DE ENTREGA (Preenchida no status 'delivered')
   paymentDate?: Timestamp;       // DATA DE PAGAMENTO (Preenchida quando pagar)
