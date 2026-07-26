@@ -19,7 +19,7 @@ export class SaleService extends FirestoreBaseService {
     return this.collectionDataObservable<Sale>(q);
   }
 
-  async processSale(sale: Sale, updateStock: boolean = true): Promise<void> {
+  async processSale(sale: Omit<Sale, 'id' | 'companyId'>, updateStock: boolean = true): Promise<void> {
     try {
       await runTransaction(this.firestore, async (transaction) => {
         const productSnapshots: { ref: any; quantity: number }[] = [];

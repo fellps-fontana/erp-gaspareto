@@ -70,7 +70,7 @@ export class ProductInventoryComponent implements OnInit {
   topProductsChart: any;
 
   // --- DADOS PARA CADASTRO / EDIÇÃO (CAMPOS NOVOS ADICIONADOS) ---
-  novoProduto: Product = {
+  novoProduto: Omit<Product, 'companyId'> = {
     title: '',
     sellPrice: 0,
     buyPrice: 0,
@@ -98,7 +98,7 @@ export class ProductInventoryComponent implements OnInit {
   produtoCompraEmEdicao: PurchaseProduct | null = null;
   isDeleteCompraModalOpen: boolean = false;
   produtoCompraToDelete: PurchaseProduct | null = null;
-  novoProdutoCompra: Omit<PurchaseProduct, 'id' | 'createdAt'> = {
+  novoProdutoCompra: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'> = {
     name: '',
     defaultValue: 0,
     recurring: false,
@@ -109,7 +109,7 @@ export class ProductInventoryComponent implements OnInit {
   customers: Customer[] = [];
   clienteEmEdicao: Customer | null = null;
   exibirFormularioCliente: boolean = false;
-  novoCliente: Omit<Customer, 'id'> = { name: '', phone: '', address: '' };
+  novoCliente: Omit<Customer, 'id' | 'companyId'> = { name: '', phone: '', address: '' };
   isDeleteClienteModalOpen: boolean = false;
   clienteToDelete: Customer | null = null;
 
@@ -708,7 +708,7 @@ export class ProductInventoryComponent implements OnInit {
       return;
     }
     const address = this.clienteFormattedAddress || this.novoCliente.address || '';
-    const data: Omit<Customer, 'id'> = {
+    const data: Omit<Customer, 'id' | 'companyId'> = {
       name:        this.novoCliente.name.trim(),
       phone:       this.novoCliente.phone?.trim() || '',
       address,
@@ -823,7 +823,7 @@ export class ProductInventoryComponent implements OnInit {
       this.notif.warning('Preencha nome e valor.');
       return;
     }
-    const data: Omit<PurchaseProduct, 'id' | 'createdAt'> = {
+    const data: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'> = {
       name: this.novoProdutoCompra.name.trim(),
       defaultValue: Number(this.novoProdutoCompra.defaultValue),
       recurring: this.novoProdutoCompra.recurring,

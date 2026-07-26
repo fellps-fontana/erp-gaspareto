@@ -22,7 +22,7 @@ export class CustomerService extends FirestoreBaseService {
     );
   }
 
-  addCustomer(customer: Omit<Customer, 'id'>) {
+  addCustomer(customer: Omit<Customer, 'id' | 'companyId'>) {
     return addDoc(collection(this.firestore, this.COLLECTION), customer);
   }
 

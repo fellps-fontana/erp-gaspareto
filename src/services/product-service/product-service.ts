@@ -23,9 +23,8 @@ export class ProductService extends FirestoreBaseService {
     return this.collectionDataObservable<Product>(query(this.productsCollection));
   }
 
-  addProduct(product: Product) {
-    const { id, ...productData } = product;
-    return addDoc(this.productsCollection, productData);
+  addProduct(product: Omit<Product, 'id' | 'companyId'>) {
+    return addDoc(this.productsCollection, product);
   }
 
   deleteProduct(id: string) {

@@ -43,7 +43,7 @@ export class PurchaseService {
     return this.collectionDataObservable<Purchase>(q);
   }
 
-  async addPurchase(purchase: Purchase) {
+  async addPurchase(purchase: Omit<Purchase, 'id' | 'companyId'>) {
     try {
       await runTransaction(this.firestore, async (transaction) => {
         const productDocRef = doc(this.firestore, `products/${purchase.idProduct}`);
@@ -63,10 +63,8 @@ export class PurchaseService {
         const purchaseCol = collection(this.firestore, 'purchases');
         const newPurchaseRef = doc(purchaseCol);
 
-        const { id, ...dataToSave } = purchase;
-
         transaction.set(newPurchaseRef, {
-          ...dataToSave,
+          ...purchase,
           date: serverTimestamp()
         });
       });

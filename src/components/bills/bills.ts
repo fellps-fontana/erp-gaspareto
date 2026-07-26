@@ -108,7 +108,7 @@ export class BillsComponent implements OnInit {
       this.notif.warning('Preencha nome e valor.');
       return;
     }
-    const data: Omit<Bill, 'id' | 'createdAt'> = {
+    const data: Omit<Bill, 'id' | 'createdAt' | 'companyId'> = {
       name: this.novaConta.name.trim(),
       value: Number(this.novaConta.value),
       status: 'pendente',

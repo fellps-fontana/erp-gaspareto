@@ -69,7 +69,7 @@ export class OrderService extends FirestoreBaseService {
     );
   }
 
-  addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<DocumentReference> {
+  addOrder(order: Omit<Order, 'id' | 'createdAt' | 'companyId'>): Promise<DocumentReference> {
     const newOrder = {
       ...order,
       status: 'pending',
@@ -151,7 +151,7 @@ export class OrderService extends FirestoreBaseService {
     if (!order.id) throw new Error('Pedido sem ID não pode ser finalizado.');
 
     try {
-      const saleData: Sale = {
+      const saleData: Omit<Sale, 'id' | 'companyId'> = {
         items: order.items.map(item => ({
           idProduct: item.idProduct,
           productName: item.productName,
