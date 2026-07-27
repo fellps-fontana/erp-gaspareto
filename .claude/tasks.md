@@ -435,7 +435,7 @@ NAO FAZER: não alterar order.html, order-service.ts nem a lógica de sortOrder 
 RETORNO ESPERADO: diff do componente.
 
 ## TASK-026 — Índices compostos do Firestore para queries com companyId
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-018
 FLUXO: Implementacao
