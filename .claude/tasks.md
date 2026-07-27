@@ -287,7 +287,7 @@ registrava ausência de cobertura real). Não corrigido, registrado como
 lacuna conhecida.
 
 ## TASK-019 — Atualizar mocks para aceitar companyId
-STATUS: PENDENTE
+STATUS: CONCLUIDA (não aplicável)
 AGENT: levi
 DEPENDENCIAS: TASK-008, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017
 FLUXO: Melhoria
@@ -297,6 +297,14 @@ CRITERIO DE ACEITE: app roda normalmente com environment.useMock=true após a mu
 ARQUIVOS PERMITIDOS: src/mocks/product-service-mock.ts, src/mocks/sale-service-mock.ts, src/mocks/comanda-service-mock.ts, src/mocks/order-service-mock.ts, src/mocks/bill-service-mock.ts, src/mocks/customer-service-mock.ts, src/mocks/purchase-service-mock.ts, src/mocks/purchase-product-service-mock.ts, src/mocks/config-service-mock.ts, src/mocks/core/in-memory-collection.ts, src/mocks/core/mock-database.ts
 NAO FAZER: não alterar os arquivos de seed em src/mocks/data/ nesta task, a menos que sejam estritamente necessários pra não quebrar o build (se precisar, reportar).
 RETORNO ESPERADO: diff dos mocks alterados.
+NOTA POS-EXECUCAO: task baseada numa premissa falsa. Confirmado por Kira via
+Glob/Grep antes de despachar — NÃO existe `src/mocks/`, `environment.useMock`
+nem qualquer sistema de troca de services por mock no código atual.
+`app.config.ts` sempre usa Firestore/Auth reais. Isso vem de uma descrição
+da especificação original do usuário que não bate com o código real (o
+`stack.md` gerado direto do código, antes da spec, já não mencionava mock
+nenhum — só a especificação colada pelo usuário assumia essa peça). Nada a
+fazer aqui; task fechada sem alteração de arquivo.
 
 ## TASK-020 — [TDD RED] Testes de firestore.rules
 STATUS: PENDENTE
