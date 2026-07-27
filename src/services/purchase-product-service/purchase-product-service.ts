@@ -23,10 +23,19 @@ export class PurchaseProductService extends FirestoreBaseService {
     return this.collectionDataObservable<PurchaseProduct>(q);
   }
 
-  async addPurchaseProduct(product: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'>): Promise<string> {
+  async addPurchaseProduct(
+    product: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'>
+  ): Promise<string> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível adicionar produto de compra sem uma empresa ' +
+        '(companyId) associada à sessão atual.'
+      );
+    }
     const ref = await addDoc(collection(this.firestore, this.COL), {
       ...product,
-      companyId: this.tenantService.companyId(),
+      companyId,
       createdAt: serverTimestamp()
     });
     return ref.id;

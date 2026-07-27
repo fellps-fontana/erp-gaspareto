@@ -35,6 +35,13 @@ export class ComandaService extends FirestoreBaseService {
   }
 
   async addComanda(comanda: Omit<Comanda, 'id' | 'createdAt' | 'status' | 'companyId'>): Promise<void> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível criar comanda sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     try {
       await runTransaction(this.firestore, async (transaction: Transaction) => {
         const productsToUpdate: { ref: any; quantity: number }[] = [];
@@ -62,7 +69,7 @@ export class ComandaService extends FirestoreBaseService {
           ...comanda,
           status: 'open',
           createdAt: serverTimestamp(),
-          companyId: this.tenantService.companyId()
+          companyId
         });
       });
     } catch (error) {

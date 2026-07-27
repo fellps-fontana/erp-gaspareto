@@ -13,18 +13,17 @@ import { signal } from '@angular/core';
 
 const EMULATOR_HOST = '127.0.0.1';
 const EMULATOR_PORT = 8080;
-const FIRESTORE_EMULATOR_URL = `http://${EMULATOR_HOST}:${EMULATOR_PORT}`;
 
 export interface EmulatorTestSetup {
   firestore: Firestore;
   app: FirebaseApp;
-  mockCompanyId: string;
+  mockCompanyId: string | null;
   tenantService: any;
   cleanup: () => Promise<void>;
 }
 
-export async function setupFirestoreEmulatorTest(): Promise<EmulatorTestSetup> {
-  const mockCompanyId = `company-${Date.now()}-${Math.random()}`;
+export async function setupFirestoreEmulatorTest(companyId?: string | null): Promise<EmulatorTestSetup> {
+  const mockCompanyId = companyId === null ? null : (companyId ?? `company-${Date.now()}-${Math.random()}`);
 
   // Initialize Firebase app connected to emulator
   const app = initializeApp(
@@ -37,8 +36,8 @@ export async function setupFirestoreEmulatorTest(): Promise<EmulatorTestSetup> {
   // Create tenant service mock with signal
   const tenantService = {
     companyId: signal(mockCompanyId),
-    isCompanyLoaded: () => true,
-    isAuthInitialized: () => true
+    isCompanyLoaded: () => mockCompanyId !== null,
+    isAuthInitialized: () => true,
   };
 
   return {

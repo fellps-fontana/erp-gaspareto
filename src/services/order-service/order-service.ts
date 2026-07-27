@@ -79,12 +79,21 @@ export class OrderService extends FirestoreBaseService {
     );
   }
 
-  addOrder(order: Omit<Order, 'id' | 'createdAt' | 'companyId'>): Promise<DocumentReference> {
+  async addOrder(
+    order: Omit<Order, 'id' | 'createdAt' | 'companyId'>
+  ): Promise<DocumentReference> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível criar pedido sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     const newOrder = {
       ...order,
       status: 'pending',
       createdAt: serverTimestamp(),
-      companyId: this.tenantService.companyId(),
+      companyId,
       itemsTotal: Number(order.itemsTotal),
       shippingCost: Number(order.shippingCost || 0),
       total: Number(order.itemsTotal) + Number(order.shippingCost || 0)

@@ -24,9 +24,16 @@ export class BillService extends FirestoreBaseService {
   }
 
   async addBill(bill: Omit<Bill, 'id' | 'createdAt' | 'companyId'>): Promise<string> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível adicionar conta sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     const ref = await addDoc(collection(this.firestore, this.COL), {
       ...bill,
-      companyId: this.tenantService.companyId(),
+      companyId,
       createdAt: serverTimestamp()
     });
     return ref.id;

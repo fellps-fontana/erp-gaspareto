@@ -46,6 +46,13 @@ export class PurchaseService {
   }
 
   async addPurchase(purchase: Omit<Purchase, 'id' | 'companyId'>) {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível registrar compra sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     try {
       await runTransaction(this.firestore, async (transaction) => {
         const productDocRef = doc(this.firestore, `products/${purchase.idProduct}`);
@@ -67,7 +74,7 @@ export class PurchaseService {
 
         transaction.set(newPurchaseRef, {
           ...purchase,
-          companyId: this.tenantService.companyId(),
+          companyId,
           date: serverTimestamp()
         });
       });

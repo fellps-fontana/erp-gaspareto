@@ -27,10 +27,17 @@ export class CustomerService extends FirestoreBaseService {
     );
   }
 
-  addCustomer(customer: Omit<Customer, 'id' | 'companyId'>) {
+  async addCustomer(customer: Omit<Customer, 'id' | 'companyId'>) {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível adicionar cliente sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     return addDoc(collection(this.firestore, this.COLLECTION), {
       ...customer,
-      companyId: this.tenantService.companyId()
+      companyId
     });
   }
 

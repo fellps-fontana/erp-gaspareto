@@ -34,7 +34,7 @@ describe('BillService - Multi-tenant (companyId isolation)', () => {
 
         // Seed: own company's bill
         const ownBill: Bill = {
-          companyId: setup.mockCompanyId,
+          companyId: setup.mockCompanyId as string,
           name: 'Own Bill',
           value: 100,
           status: 'pendente',
@@ -81,6 +81,41 @@ describe('BillService - Multi-tenant (companyId isolation)', () => {
         const bills = await firstValueFrom(service.getBills());
         const hasBill = bills.some((b: any) => b.companyId === setup.mockCompanyId);
         expect(hasBill).toBeTruthy('Bill must be saved with companyId');
+      });
+    });
+  });
+
+  describe('NOVA REGRA: companyId null must trigger error (CRÍTICA)', () => {
+    describe('[RED] addBill() - Guarda contra companyId nulo', () => {
+      it('[RED] should reject addBill when companyId is null', async () => {
+        const setupWithNullCompany = await setupFirestoreEmulatorTest(null);
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          providers: [
+            BillService,
+            { provide: TenantService, useValue: setupWithNullCompany.tenantService },
+            { provide: Firestore, useValue: setupWithNullCompany.firestore }
+          ]
+        });
+        const serviceWithNullCompany = TestBed.inject(BillService);
+
+        const newBill = {
+          name: 'Test Bill',
+          value: 100,
+          status: 'pendente' as const,
+          recurring: false
+        };
+
+        try {
+          await serviceWithNullCompany.addBill(newBill as any);
+          fail('Expected addBill to throw error when companyId is null');
+        } catch (error: any) {
+          expect(error.message).toMatch(/companyId|empresa|tenant|null/i,
+            'Error must mention missing companyId or company/tenant association'
+          );
+        } finally {
+          await setupWithNullCompany.cleanup();
+        }
       });
     });
   });

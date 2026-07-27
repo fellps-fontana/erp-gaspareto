@@ -34,7 +34,7 @@ describe('SaleService - Multi-tenant (companyId isolation)', () => {
 
         // Seed: own company's sale
         const ownSale: Sale = {
-          companyId: setup.mockCompanyId,
+          companyId: setup.mockCompanyId as string,
           items: [],
           total: 100,
           date: now,
@@ -91,6 +91,51 @@ describe('SaleService - Multi-tenant (companyId isolation)', () => {
         const sales = await firstValueFrom(service.getSales());
         const hasSale = sales.some((s: any) => s.companyId === setup.mockCompanyId);
         expect(hasSale).toBeTruthy('Sale must be saved with companyId');
+      });
+    });
+  });
+
+  describe('NOVA REGRA: companyId null must trigger error (CRÍTICA)', () => {
+    describe('[RED] processSale() - Guarda contra companyId nulo', () => {
+      it('[RED] should reject processSale when companyId is null', async () => {
+        const setupWithNullCompany = await setupFirestoreEmulatorTest(null);
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          providers: [
+            SaleService,
+            { provide: TenantService, useValue: setupWithNullCompany.tenantService },
+            { provide: Firestore, useValue: setupWithNullCompany.firestore }
+          ]
+        });
+        const serviceWithNullCompany = TestBed.inject(SaleService);
+
+        const now = new Date() as any;
+        const newSale: Omit<Sale, 'companyId'> = {
+          items: [
+            {
+              idProduct: 'prod-1',
+              productName: 'Test',
+              quantity: 1,
+              priceAtSale: 100,
+              priceAtCost: 50
+            }
+          ],
+          total: 100,
+          sale_type: 'pdv',
+          paymentMethod: PaymentMethod.DINHEIRO,
+          date: now
+        };
+
+        try {
+          await serviceWithNullCompany.processSale(newSale as any, false);
+          fail('Expected processSale to throw error when companyId is null');
+        } catch (error: any) {
+          expect(error.message).toMatch(/companyId|empresa|tenant|null/i,
+            'Error must mention missing companyId or company/tenant association'
+          );
+        } finally {
+          await setupWithNullCompany.cleanup();
+        }
       });
     });
   });

@@ -213,16 +213,27 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   novas. Se isso mudar (cliente-piloto com dado real) antes da task de
   `firestore.rules` ser executada, backfill é pré-requisito obrigatório —
   reavaliar com o usuário nesse momento, não assumir.
-- **Isolamento por `companyId` (seção 10) fechado até TASK-018 é só
-  client-side** — `firestore.rules` continua liberado (`allow read, write:
-  if true`) até a TASK-021 fechar. Não tratar o multi-tenant como "seguro"
-  antes disso: qualquer chamada direta ao Firestore (SDK cru, REST, DevTools)
-  ainda vê dado de qualquer empresa.
-- `TenantService.companyId()` pode ser `null` (deslogado ou auth ainda
-  inicializando) e nenhum dos 8 services trata esse caso explicitamente nas
-  escritas — hoje é risco teórico (não há caminho de chamada antes do login
-  confirmado), mas nada impede um documento `companyId: null` de ser gravado
-  se um novo caminho de chamada for introduzido sem essa trava (ver TASK-027).
+- ~~Isolamento por `companyId` (seção 10) é só client-side~~ — resolvido pela
+  TASK-021: `firestore.rules` agora exige autenticação e valida `companyId`
+  via lookup em `users/{uid}` (fase 1, sem custom claims) pras 8 coleções
+  operacionais, `companies/{id}` e `users/{uid}`.
+- ~~`TenantService.companyId()` pode ser `null` sem trava~~ — resolvido pela
+  TASK-027: os 8 métodos de escrita lançam erro explícito antes de tocar o
+  Firestore quando `companyId()` é `null`.
+- **Gap de infraestrutura de teste (descoberto na TASK-027, não resolvido)**:
+  os 17 testes de isolamento com `companyId` válido (`src/services/*/*.spec.ts`,
+  TASK-009/018) não rodam mais no Karma desde que `firestore.rules` passou a
+  exigir autenticação real (TASK-021) — `@firebase/rules-unit-testing`
+  (usado pra simular auth sem precisar de Auth Emulator) depende de
+  `process.env`, que não existe em browser, e o Karma roda esses specs
+  dentro de um Chrome real. Não afeta `test/firestore.rules.spec.ts` (roda
+  via Jest, em Node). A lógica de isolamento em si já foi provada correta
+  antes das regras travarem — isso é uma lacuna de cobertura de regressão
+  futura, não um bug funcional atual. Solução conhecida e não implementada:
+  subir também um Firebase Auth Emulator e autenticar de verdade via
+  `signInAnonymously()`/`connectAuthEmulator()` (client SDK, funciona em
+  browser) no `test-helpers.ts` — decisão do usuário se/quando investir
+  nisso.
 - 3 queries (`BillService.getBills`, `PurchaseProductService.
   getPurchaseProducts`, `SaleService.getSalesByDate`) combinam `where
   ('companyId',...)` com `orderBy`/range em outro campo — exigem índice

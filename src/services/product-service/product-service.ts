@@ -27,10 +27,17 @@ export class ProductService extends FirestoreBaseService {
     );
   }
 
-  addProduct(product: Omit<Product, 'id' | 'companyId'>) {
+  async addProduct(product: Omit<Product, 'id' | 'companyId'>) {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível adicionar produto sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     return addDoc(this.productsCollection, {
       ...product,
-      companyId: this.tenantService.companyId()
+      companyId
     });
   }
 

@@ -447,7 +447,7 @@ NAO FAZER: não alterar os services nem os testes; não fazer deploy de verdade 
 RETORNO ESPERADO: conteúdo do firestore.indexes.json + confirmação de que firebase.json referencia o arquivo.
 
 ## TASK-027 — Tratar companyId() nulo nas escritas dos 8 services
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike (RED) + levi (GREEN)
 DEPENDENCIAS: TASK-018
 FLUXO: Correcao
@@ -457,3 +457,25 @@ CRITERIO DE ACEITE: teste RED (mike) provando que addX() lança erro claro quand
 ARQUIVOS PERMITIDOS: os 8 arquivos de service (mesmos da TASK-010 a TASK-017), os 8 arquivos .spec.ts correspondentes
 NAO FAZER: não mexer em TenantService/AuthService (o sinal null é intencional enquanto desloga/inicializa — a guarda é só no ponto de escrita).
 RETORNO ESPERADO: diff dos services + confirmação RED/GREEN.
+NOTA POS-EXECUCAO: guarda implementada nos 8 services (throw explícito antes
+de qualquer chamada ao Firestore, sempre via método async — 1 rodada de
+correção do style por inconsistência async/sync em 3 dos 8 e por
+printWidth). 8/8 testes novos GREEN, confirmado 3x de forma independente.
+
+ACHADO IMPORTANTE (fora do escopo desta task, descoberto no processo):
+os 17 testes pré-existentes de isolamento com companyId válido (TASK-009/
+018) PARARAM DE RODAR no Karma depois da TASK-021 travar firestore.rules
+— não é regressão funcional (a lógica já foi provada correta antes das
+regras travarem), é uma incompatibilidade de infraestrutura de teste:
+`@firebase/rules-unit-testing` (usado pra simular autenticação sem
+precisar de um Auth Emulator de verdade) depende de `process.env`
+internamente, que não existe em ambiente de browser — e o Karma roda os
+specs de service dentro de um Chrome real (ChromeHeadless), não em Node.
+Isso NÃO afeta test/firestore.rules.spec.ts (que roda via Jest, em Node).
+Tentativa de contornar isso (por um executor, revertida pelo Kira) chegou
+a enfraquecer firestore.rules — não repetir essa abordagem. Caminho
+correto pra restaurar cobertura completa: subir também um Firebase Auth
+Emulator (emulators.auth no firebase.json) e autenticar de verdade via
+signInAnonymously()/connectAuthEmulator() no test-helpers.ts (client SDK
+normal, funciona em browser) — investimento de infra ainda não feito,
+decisão do usuário se/quando vale a pena.

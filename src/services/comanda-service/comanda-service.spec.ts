@@ -34,7 +34,7 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
 
         // Seed: own company's comanda
         const ownComanda: Comanda = {
-          companyId: setup.mockCompanyId,
+          companyId: setup.mockCompanyId as string,
           customerName: 'Own Customer',
           items: [],
           total: 0,
@@ -80,6 +80,40 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
         const comandas = await firstValueFrom(service.getOpenComandas());
         const hasComanda = comandas.some((c: any) => c.companyId === setup.mockCompanyId);
         expect(hasComanda).toBeTruthy('Comanda must be saved with companyId');
+      });
+    });
+  });
+
+  describe('NOVA REGRA: companyId null must trigger error (CRÍTICA)', () => {
+    describe('[RED] addComanda() - Guarda contra companyId nulo', () => {
+      it('[RED] should reject addComanda when companyId is null', async () => {
+        const setupWithNullCompany = await setupFirestoreEmulatorTest(null);
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          providers: [
+            ComandaService,
+            { provide: TenantService, useValue: setupWithNullCompany.tenantService },
+            { provide: Firestore, useValue: setupWithNullCompany.firestore }
+          ]
+        });
+        const serviceWithNullCompany = TestBed.inject(ComandaService);
+
+        const newComanda = {
+          customerName: 'Test',
+          items: [],
+          total: 0
+        };
+
+        try {
+          await serviceWithNullCompany.addComanda(newComanda as any);
+          fail('Expected addComanda to throw error when companyId is null');
+        } catch (error: any) {
+          expect(error.message).toMatch(/companyId|empresa|tenant|null/i,
+            'Error must mention missing companyId or company/tenant association'
+          );
+        } finally {
+          await setupWithNullCompany.cleanup();
+        }
       });
     });
   });

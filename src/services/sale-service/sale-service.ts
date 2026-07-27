@@ -25,6 +25,13 @@ export class SaleService extends FirestoreBaseService {
   }
 
   async processSale(sale: Omit<Sale, 'id' | 'companyId'>, updateStock: boolean = true): Promise<void> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível processar venda sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     try {
       await runTransaction(this.firestore, async (transaction) => {
         const productSnapshots: { ref: any; quantity: number }[] = [];
@@ -56,7 +63,7 @@ export class SaleService extends FirestoreBaseService {
 
         const newSaleRef = doc(collection(this.firestore, this.COLLECTION_NAME));
         const saleDoc: any = {
-          companyId: this.tenantService.companyId(),
+          companyId,
           items: sale.items.map(i => ({
             idProduct: i.idProduct,
             productName: i.productName,

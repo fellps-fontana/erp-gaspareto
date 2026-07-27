@@ -35,7 +35,7 @@ describe('ProductService - Multi-tenant (companyId isolation)', () => {
         // EXPECTED TO FAIL (RED): getProducts() does not filter by companyId
         // Seed: own company's product
         const ownProduct: Product = {
-          companyId: setup.mockCompanyId,
+          companyId: setup.mockCompanyId as string,
           title: 'Own Product',
           buyPrice: 10,
           sellPrice: 20,
@@ -89,7 +89,7 @@ describe('ProductService - Multi-tenant (companyId isolation)', () => {
         expect(savedDocId).toBeTruthy('Product should have been saved');
         const savedDoc = await getDoc(doc(setup.firestore, `products/${savedDocId}`));
         const savedData = savedDoc.data() as Product;
-        expect(savedData?.companyId).toBe(setup.mockCompanyId,
+        expect(savedData?.companyId).toBe(setup.mockCompanyId as string,
           'companyId must be auto-injected from TenantService'
         );
       });
@@ -108,9 +108,44 @@ describe('ProductService - Multi-tenant (companyId isolation)', () => {
         expect(docId).toBeTruthy('Product should be saved');
         const docSnap = await getDoc(doc(setup.firestore, `products/${docId}`));
         const persistedData = docSnap.data() as Product;
-        expect(persistedData?.companyId).toBe(setup.mockCompanyId,
+        expect(persistedData?.companyId).toBe(setup.mockCompanyId as string,
           'Product must be saved with companyId from TenantService'
         );
+      });
+    });
+  });
+
+  describe('NOVA REGRA: companyId null must trigger error (CRÍTICA)', () => {
+    describe('[RED] addProduct() - Guarda contra companyId nulo', () => {
+      it('[RED] should reject addProduct when companyId is null', async () => {
+        const setupWithNullCompany = await setupFirestoreEmulatorTest(null);
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          providers: [
+            ProductService,
+            { provide: TenantService, useValue: setupWithNullCompany.tenantService },
+            { provide: Firestore, useValue: setupWithNullCompany.firestore }
+          ]
+        });
+        const serviceWithNullCompany = TestBed.inject(ProductService);
+
+        const newProduct: Omit<Product, 'id' | 'companyId'> = {
+          title: `Product-${Date.now()}`,
+          buyPrice: 15,
+          sellPrice: 30,
+          stock: 75
+        };
+
+        try {
+          await serviceWithNullCompany.addProduct(newProduct as any);
+          fail('Expected addProduct to throw error when companyId is null');
+        } catch (error: any) {
+          expect(error.message).toMatch(/companyId|empresa|tenant|null/i,
+            'Error must mention missing companyId or company/tenant association'
+          );
+        } finally {
+          await setupWithNullCompany.cleanup();
+        }
       });
     });
   });

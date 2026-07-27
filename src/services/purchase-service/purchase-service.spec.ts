@@ -35,7 +35,7 @@ describe('PurchaseService - Multi-tenant (companyId isolation)', () => {
         // Seed: own company's purchase
         const ownPurchase: Purchase = {
           id: `own-${Date.now()}`,
-          companyId: setup.mockCompanyId,
+          companyId: setup.mockCompanyId as string,
           idProduct: 'prod-1',
           amount: 10,
           unityValue: 50,
@@ -94,6 +94,48 @@ describe('PurchaseService - Multi-tenant (companyId isolation)', () => {
         const purchases = await firstValueFrom(service.getPurchases());
         const hasPurchase = purchases.some((p: any) => p.companyId === setup.mockCompanyId);
         expect(hasPurchase).toBeTruthy('Purchase must be saved with companyId');
+      });
+    });
+  });
+
+  describe('NOVA REGRA: companyId null must trigger error (CRÍTICA)', () => {
+    describe('[RED] addPurchase() - Guarda contra companyId nulo', () => {
+      it('[RED] should reject addPurchase when companyId is null', async () => {
+        const setupWithNullCompany = await setupFirestoreEmulatorTest(null);
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          providers: [
+            PurchaseService,
+            { provide: TenantService, useValue: setupWithNullCompany.tenantService },
+            { provide: Firestore, useValue: setupWithNullCompany.firestore }
+          ]
+        });
+        const serviceWithNullCompany = TestBed.inject(PurchaseService);
+
+        const now = new Date() as any;
+
+        // Não precisa semear o produto: a guarda de companyId nulo dispara
+        // antes de qualquer leitura/escrita no Firestore (inclusive antes de
+        // checar se o produto existe), então addPurchase deve rejeitar sem
+        // nunca tocar na rede.
+        const newPurchase = {
+          id: `purchase-${Date.now()}`,
+          idProduct: 'prod-1',
+          amount: 10,
+          unityValue: 50,
+          date: now
+        };
+
+        try {
+          await serviceWithNullCompany.addPurchase(newPurchase as any);
+          fail('Expected addPurchase to throw error when companyId is null');
+        } catch (error: any) {
+          expect(error.message).toMatch(/companyId|empresa|tenant|null/i,
+            'Error must mention missing companyId or company/tenant association'
+          );
+        } finally {
+          await setupWithNullCompany.cleanup();
+        }
       });
     });
   });

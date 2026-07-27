@@ -32,7 +32,7 @@ describe('CustomerService - Multi-tenant (companyId isolation)', () => {
       it('[RED] should filter by companyId - own customers appear, foreign customers do not', async () => {
         // Seed: own company's customer
         const ownCustomer: Customer = {
-          companyId: setup.mockCompanyId,
+          companyId: setup.mockCompanyId as string,
           name: 'Own Customer'
         };
         await setDoc(doc(setup.firestore, `customers/own-cust-${Date.now()}`), ownCustomer);
@@ -68,6 +68,38 @@ describe('CustomerService - Multi-tenant (companyId isolation)', () => {
         const customers = await firstValueFrom(service.getCustomers());
         const hasCustomer = customers.some((c: any) => c.companyId === setup.mockCompanyId);
         expect(hasCustomer).toBeTruthy('Customer must be saved with companyId');
+      });
+    });
+  });
+
+  describe('NOVA REGRA: companyId null must trigger error (CRÍTICA)', () => {
+    describe('[RED] addCustomer() - Guarda contra companyId nulo', () => {
+      it('[RED] should reject addCustomer when companyId is null', async () => {
+        const setupWithNullCompany = await setupFirestoreEmulatorTest(null);
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          providers: [
+            CustomerService,
+            { provide: TenantService, useValue: setupWithNullCompany.tenantService },
+            { provide: Firestore, useValue: setupWithNullCompany.firestore }
+          ]
+        });
+        const serviceWithNullCompany = TestBed.inject(CustomerService);
+
+        const newCustomer = {
+          name: 'Test Customer'
+        };
+
+        try {
+          await serviceWithNullCompany.addCustomer(newCustomer as any);
+          fail('Expected addCustomer to throw error when companyId is null');
+        } catch (error: any) {
+          expect(error.message).toMatch(/companyId|empresa|tenant|null/i,
+            'Error must mention missing companyId or company/tenant association'
+          );
+        } finally {
+          await setupWithNullCompany.cleanup();
+        }
       });
     });
   });

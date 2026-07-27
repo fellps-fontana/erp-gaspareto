@@ -34,7 +34,7 @@ describe('PurchaseProductService - Multi-tenant (companyId isolation)', () => {
 
         // Seed: own company's purchase product
         const ownProduct: PurchaseProduct = {
-          companyId: setup.mockCompanyId,
+          companyId: setup.mockCompanyId as string,
           name: 'Own Product',
           defaultValue: 100,
           recurring: true,
@@ -79,6 +79,40 @@ describe('PurchaseProductService - Multi-tenant (companyId isolation)', () => {
         const products = await firstValueFrom(service.getPurchaseProducts());
         const hasProduct = products.some((p: any) => p.companyId === setup.mockCompanyId);
         expect(hasProduct).toBeTruthy('Purchase product must be saved with companyId');
+      });
+    });
+  });
+
+  describe('NOVA REGRA: companyId null must trigger error (CRÍTICA)', () => {
+    describe('[RED] addPurchaseProduct() - Guarda contra companyId nulo', () => {
+      it('[RED] should reject addPurchaseProduct when companyId is null', async () => {
+        const setupWithNullCompany = await setupFirestoreEmulatorTest(null);
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+          providers: [
+            PurchaseProductService,
+            { provide: TenantService, useValue: setupWithNullCompany.tenantService },
+            { provide: Firestore, useValue: setupWithNullCompany.firestore }
+          ]
+        });
+        const serviceWithNullCompany = TestBed.inject(PurchaseProductService);
+
+        const newProduct = {
+          name: 'Test Product',
+          defaultValue: 100,
+          recurring: false
+        };
+
+        try {
+          await serviceWithNullCompany.addPurchaseProduct(newProduct as any);
+          fail('Expected addPurchaseProduct to throw error when companyId is null');
+        } catch (error: any) {
+          expect(error.message).toMatch(/companyId|empresa|tenant|null/i,
+            'Error must mention missing companyId or company/tenant association'
+          );
+        } finally {
+          await setupWithNullCompany.cleanup();
+        }
       });
     });
   });
