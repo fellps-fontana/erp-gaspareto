@@ -399,7 +399,7 @@ confirmar o que já foi confirmado varias vezes.
 RETORNO ESPERADO: relatório GREEN/FAIL; se FAIL, relatório de bug pro Kira redespachar ao levi.
 
 ## TASK-023 — [FASE 2 / OPCIONAL] Cloud Function de custom claims
-STATUS: PENDENTE
+STATUS: BLOQUEADA (usuário optou por pular por ora — retomar quando decidir migrar de fase 1 para custom claims)
 AGENT: levi
 DEPENDENCIAS: TASK-001, TASK-005
 FLUXO: Implementacao
@@ -411,7 +411,7 @@ NAO FAZER: esta task é opcional/fase 2 — não bloqueia TASK-024 nem o fechame
 RETORNO ESPERADO: function criada + confirmação de que o claim aparece no token após signup.
 
 ## TASK-024 — Validação manual de isolamento entre duas empresas
-STATUS: PENDENTE
+STATUS: BLOQUEADA (usuário optou por pular por ora — retomar quando quiser validar na UI real, manualmente ou via browser automation)
 AGENT: mike
 DEPENDENCIAS: TASK-006, TASK-018, TASK-019, TASK-021, TASK-022
 FLUXO: Implementacao
