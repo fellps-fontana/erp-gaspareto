@@ -168,7 +168,7 @@ segue rodando em background nesta sessão — as próximas tasks (010-018) usam
 o mesmo emulador, não precisam reiniciar.
 
 ## TASK-010 — Isolamento companyId: product-service
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-009
 FLUXO: Implementacao
@@ -180,7 +180,7 @@ NAO FAZER: não alterar o arquivo .spec.ts (é leitura, não escopo de escrita).
 RETORNO ESPERADO: diff do service.
 
 ## TASK-011 — Isolamento companyId: sale-service
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-009
 FLUXO: Implementacao
@@ -192,7 +192,7 @@ NAO FAZER: não alterar o arquivo .spec.ts. Não tocar na lógica de runTransact
 RETORNO ESPERADO: diff do service.
 
 ## TASK-012 — Isolamento companyId: comanda-service
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-009
 FLUXO: Implementacao
@@ -204,7 +204,7 @@ NAO FAZER: não alterar o arquivo .spec.ts. Pode rodar em paralelo com TASK-010,
 RETORNO ESPERADO: diff do service.
 
 ## TASK-013 — Isolamento companyId: order-service
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-009
 FLUXO: Implementacao
@@ -216,7 +216,7 @@ NAO FAZER: não alterar o arquivo .spec.ts. Pode rodar em paralelo com TASK-010 
 RETORNO ESPERADO: diff do service.
 
 ## TASK-014 — Isolamento companyId: bill-service
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-009
 FLUXO: Implementacao
@@ -228,7 +228,7 @@ NAO FAZER: não alterar o arquivo .spec.ts. Pode rodar em paralelo com TASK-010 
 RETORNO ESPERADO: diff do service.
 
 ## TASK-015 — Isolamento companyId: customer-service
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-009
 FLUXO: Implementacao
@@ -240,7 +240,7 @@ NAO FAZER: não alterar o arquivo .spec.ts. Pode rodar em paralelo com TASK-010 
 RETORNO ESPERADO: diff do service.
 
 ## TASK-016 — Isolamento companyId: purchase-service
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-009
 FLUXO: Implementacao
@@ -252,7 +252,7 @@ NAO FAZER: não alterar o arquivo .spec.ts. Pode rodar em paralelo com TASK-010 
 RETORNO ESPERADO: diff do service.
 
 ## TASK-017 — Isolamento companyId: purchase-product-service
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-009
 FLUXO: Implementacao
@@ -264,7 +264,7 @@ NAO FAZER: não alterar o arquivo .spec.ts. Pode rodar em paralelo com TASK-010 
 RETORNO ESPERADO: diff do service.
 
 ## TASK-018 — [TDD GREEN] Confirmar isolamento dos 8 services
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017
 FLUXO: Implementacao
@@ -274,6 +274,17 @@ CRITERIO DE ACEITE: os 8 conjuntos de teste passam; qualquer falha remanescente 
 ARQUIVOS PERMITIDOS: nenhum (só execução)
 NAO FAZER: não alterar nenhum arquivo de teste nem de service.
 RETORNO ESPERADO: relatório GREEN/FAIL por service; se houver FAIL, relatório de bug pro Kira redespachar ao levi correspondente.
+NOTA POS-EXECUCAO: 18/18 testes de multi-tenant GREEN, confirmado de forma
+independente pelo Kira rodando `ng test` de novo. 1 correção no meio do
+caminho: purchase-service.spec.ts não semeava o produto referenciado antes
+de chamar addPurchase() — bug no teste (mike corrigiu), não no service
+(addPurchase sempre validou existência do produto, comportamento
+pré-existente da seção 2). Achado à parte, fora de escopo: app.spec.ts
+(scaffold do projeto) falha por falta de provider `_SwUpdate` — pré-
+existente, não relacionado a multi-tenant, só apareceu porque esta é a
+primeira vez que a suite de teste roda de verdade no projeto (stack.md já
+registrava ausência de cobertura real). Não corrigido, registrado como
+lacuna conhecida.
 
 ## TASK-019 — Atualizar mocks para aceitar companyId
 STATUS: PENDENTE

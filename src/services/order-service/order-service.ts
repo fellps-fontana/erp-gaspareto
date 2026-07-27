@@ -10,6 +10,7 @@ import { Order } from '../../models/order-model';
 import { SaleService } from '../sale-service/sale-service';
 import { PaymentMethod, Sale } from '../../models/sell-model';
 import { FirestoreBaseService } from '../firestore-base.service';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({
   providedIn: 'root',
@@ -17,6 +18,7 @@ import { FirestoreBaseService } from '../firestore-base.service';
 export class OrderService extends FirestoreBaseService {
   private firestore = inject(Firestore);
   private saleService = inject(SaleService);
+  private tenantService = inject(TenantService);
 
   private readonly ORDERS_COLLECTION = 'orders';
   private ordersCollection: CollectionReference;
@@ -27,7 +29,7 @@ export class OrderService extends FirestoreBaseService {
   }
 
   getOrders(): Observable<Order[]> {
-    const q = query(this.ordersCollection);
+    const q = query(this.ordersCollection, where('companyId', '==', this.tenantService.companyId()));
     return this.collectionDataObservable<Order>(q).pipe(
       map(orders => [...orders].sort((a, b) => {
         const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
@@ -39,7 +41,11 @@ export class OrderService extends FirestoreBaseService {
 
   getPendingOrders(): Observable<Order[]> {
     const activeStatuses = ['open', 'pending', 'preparing', 'ready', 'delivering', 'delivered'];
-    const q = query(this.ordersCollection, where('status', 'in', activeStatuses));
+    const q = query(
+      this.ordersCollection,
+      where('companyId', '==', this.tenantService.companyId()),
+      where('status', 'in', activeStatuses)
+    );
 
     return this.collectionDataObservable<Order>(q).pipe(
       map(orders => [...orders].sort((a, b) => {
@@ -55,7 +61,11 @@ export class OrderService extends FirestoreBaseService {
   }
 
   getOrdersByCustomer(customerId: string): Observable<Order[]> {
-    const q = query(this.ordersCollection, where('customerId', '==', customerId));
+    const q = query(
+      this.ordersCollection,
+      where('companyId', '==', this.tenantService.companyId()),
+      where('customerId', '==', customerId)
+    );
     return this.collectionDataObservable<Order>(q).pipe(
       map(orders => [...orders].sort((a, b) => {
         const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
@@ -74,6 +84,7 @@ export class OrderService extends FirestoreBaseService {
       ...order,
       status: 'pending',
       createdAt: serverTimestamp(),
+      companyId: this.tenantService.companyId(),
       itemsTotal: Number(order.itemsTotal),
       shippingCost: Number(order.shippingCost || 0),
       total: Number(order.itemsTotal) + Number(order.shippingCost || 0)

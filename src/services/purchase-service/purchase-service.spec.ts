@@ -70,6 +70,17 @@ describe('PurchaseService - Multi-tenant (companyId isolation)', () => {
     describe('[RED] addPurchase() - Escrita', () => {
       it('[RED] should auto-inject companyId when adding purchase', async () => {
         const now = new Date() as any;
+
+        // Seed: product that addPurchase() will reference
+        // addPurchase() validates that the product exists before registering the purchase
+        await setDoc(doc(setup.firestore, 'products/prod-1'), {
+          companyId: setup.mockCompanyId,
+          title: 'Test Product',
+          buyPrice: 10,
+          sellPrice: 20,
+          stock: 100
+        });
+
         const newPurchase = {
           id: `purchase-${Date.now()}`,
           idProduct: 'prod-1',

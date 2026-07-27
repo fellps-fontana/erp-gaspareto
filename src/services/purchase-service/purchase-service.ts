@@ -1,10 +1,11 @@
 import { Injectable, inject, NgZone } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, runTransaction, serverTimestamp, increment, onSnapshot, query
+  collection, doc, runTransaction, serverTimestamp, increment, onSnapshot, query, where
 } from 'firebase/firestore';
 import { Purchase } from '../../models/buy-model';
 import { Observable } from 'rxjs';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({
   providedIn: 'root',
@@ -12,6 +13,7 @@ import { Observable } from 'rxjs';
 export class PurchaseService {
   private firestore = inject(Firestore);
   private ngZone = inject(NgZone);
+  private tenantService = inject(TenantService);
 
   constructor() { }
 
@@ -39,7 +41,7 @@ export class PurchaseService {
 
   getPurchases(): Observable<Purchase[]> {
     const purchaseCol = collection(this.firestore, 'purchases');
-    const q = query(purchaseCol);
+    const q = query(purchaseCol, where('companyId', '==', this.tenantService.companyId()));
     return this.collectionDataObservable<Purchase>(q);
   }
 
@@ -65,6 +67,7 @@ export class PurchaseService {
 
         transaction.set(newPurchaseRef, {
           ...purchase,
+          companyId: this.tenantService.companyId(),
           date: serverTimestamp()
         });
       });

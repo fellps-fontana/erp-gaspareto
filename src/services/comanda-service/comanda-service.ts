@@ -8,18 +8,21 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Comanda } from '../../models/comanda-model';
 import { FirestoreBaseService } from '../firestore-base.service';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ComandaService extends FirestoreBaseService {
   private firestore = inject(Firestore);
+  private tenantService = inject(TenantService);
   private readonly COLLECTION_NAME = 'comandas';
 
   getOpenComandas(): Observable<Comanda[]> {
     const q = query(
       collection(this.firestore, this.COLLECTION_NAME),
-      where('status', '==', 'open')
+      where('status', '==', 'open'),
+      where('companyId', '==', this.tenantService.companyId())
     );
 
     return this.collectionDataObservable<Comanda>(q).pipe(
@@ -58,7 +61,8 @@ export class ComandaService extends FirestoreBaseService {
         transaction.set(newComandaRef, {
           ...comanda,
           status: 'open',
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          companyId: this.tenantService.companyId()
         });
       });
     } catch (error) {

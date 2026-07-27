@@ -1,17 +1,19 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, addDoc, doc, updateDoc, deleteDoc, query, increment, UpdateData
+  collection, addDoc, doc, updateDoc, deleteDoc, query, increment, UpdateData, where
 } from 'firebase/firestore';
 import { Product } from '../../models/product-model';
 import { Observable } from 'rxjs';
 import { FirestoreBaseService } from '../firestore-base.service';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ProductService extends FirestoreBaseService {
   private firestore = inject(Firestore);
+  private tenantService = inject(TenantService);
   private productsCollection;
 
   constructor() {
@@ -20,11 +22,16 @@ export class ProductService extends FirestoreBaseService {
   }
 
   getProducts(): Observable<Product[]> {
-    return this.collectionDataObservable<Product>(query(this.productsCollection));
+    return this.collectionDataObservable<Product>(
+      query(this.productsCollection, where('companyId', '==', this.tenantService.companyId()))
+    );
   }
 
   addProduct(product: Omit<Product, 'id' | 'companyId'>) {
-    return addDoc(this.productsCollection, product);
+    return addDoc(this.productsCollection, {
+      ...product,
+      companyId: this.tenantService.companyId()
+    });
   }
 
   deleteProduct(id: string) {

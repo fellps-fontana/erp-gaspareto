@@ -1,25 +1,32 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy
+  collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, where
 } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { Bill } from '../../models/bill-model';
 import { FirestoreBaseService } from '../firestore-base.service';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({ providedIn: 'root' })
 export class BillService extends FirestoreBaseService {
   private firestore = inject(Firestore);
+  private tenantService = inject(TenantService);
   private readonly COL = 'bills';
 
   getBills(): Observable<Bill[]> {
-    const q = query(collection(this.firestore, this.COL), orderBy('createdAt', 'desc'));
+    const q = query(
+      collection(this.firestore, this.COL),
+      where('companyId', '==', this.tenantService.companyId()),
+      orderBy('createdAt', 'desc')
+    );
     return this.collectionDataObservable<Bill>(q);
   }
 
   async addBill(bill: Omit<Bill, 'id' | 'createdAt' | 'companyId'>): Promise<string> {
     const ref = await addDoc(collection(this.firestore, this.COL), {
       ...bill,
+      companyId: this.tenantService.companyId(),
       createdAt: serverTimestamp()
     });
     return ref.id;
