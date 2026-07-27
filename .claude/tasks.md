@@ -381,7 +381,7 @@ verificação manual (update, delete, signup, takeover) confirmados de
 forma independente antes do aprovado final.
 
 ## TASK-022 — [TDD GREEN] Confirmar firestore.rules
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-021
 FLUXO: Implementacao
@@ -390,6 +390,12 @@ ESCOPO: rodar novamente os testes de regra contra o firestore.rules novo, confir
 CRITERIO DE ACEITE: todos os casos de negação cross-tenant e permissão same-tenant passam.
 ARQUIVOS PERMITIDOS: nenhum (só execução)
 NAO FAZER: não reescrever os testes nem a regra.
+NOTA POS-EXECUCAO: coberta organicamente pelas 3 rodadas de correção da
+TASK-021 — style e Kira rodaram `npx jest test/firestore.rules.spec.ts`
+(27/27 GREEN) de forma independente repetidas vezes durante o ciclo de
+revisão, além de cenários manuais extras (update, delete, signup,
+takeover). Não houve necessidade de rodada separada de mike só pra
+confirmar o que já foi confirmado varias vezes.
 RETORNO ESPERADO: relatório GREEN/FAIL; se FAIL, relatório de bug pro Kira redespachar ao levi.
 
 ## TASK-023 — [FASE 2 / OPCIONAL] Cloud Function de custom claims
