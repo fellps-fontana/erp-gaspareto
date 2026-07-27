@@ -341,7 +341,7 @@ companyId (fase 1), nao request.auth.token.companyId, senao passa no teste
 mas quebra pra usuario real.
 
 ## TASK-021 — firestore.rules novo
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-018, TASK-020
 FLUXO: Implementacao
@@ -357,6 +357,28 @@ continua `allow read, write: if true`, ou seja, qualquer chamada direta ao
 Firestore (SDK cru, REST, DevTools) ainda lê/escreve dado de qualquer
 empresa. TASK-021 é o gate real de segurança do multi-tenant, não uma
 formalidade — priorizar.
+NOTA POS-EXECUCAO: a task mais pesada da fila em ciclo de revisão — 3
+rodadas de correção, cada uma achando um buraco real e diferente, todos
+confirmados por execução real contra o emulador (não leitura estática):
+(1) `allow update, delete` combinados permitiam trocar `companyId` de um
+doc próprio num update, "doando"/vazando o documento pra outro tenant —
+corrigido separando update/delete e travando `companyId` como imutável em
+update; (2) o `create` de `companies/{id}` dependia de `get()` em
+`users/{uid}`, que não enxerga writes pendentes da MESMA transaction —
+quebrava o cadastro de empresa nova (a transaction real do
+AuthService.signup cria os dois docs juntos) — corrigido permitindo
+auto-cadastro quando `companyId == request.auth.uid`, sem depender do
+lookup; (3) o fix do ponto 2 abriu um buraco pior em `users/{uid}`: o
+`create` só validava que o uid do path batia com o autenticado, não o
+CONTEÚDO — um atacante podia se autodeclarar owner de qualquer
+`companyId` alheio, sequestrando o tenant inteiro (leitura+escrita
+completas). Corrigido travando o `create` no único padrão real do
+self-signup (`companyId == uid`, `role == 'owner'`). Também houve uma
+interrupção de infraestrutura no meio (emulador caiu/ficou órfão servindo
+regra desatualizada 2x) — resolvida pelo Kira, sem relação com a
+qualidade do código produzido. 27/27 testes GREEN + 3 rounds de
+verificação manual (update, delete, signup, takeover) confirmados de
+forma independente antes do aprovado final.
 
 ## TASK-022 — [TDD GREEN] Confirmar firestore.rules
 STATUS: PENDENTE
