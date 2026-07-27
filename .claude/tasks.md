@@ -423,7 +423,7 @@ NAO FAZER: não corrigir bug encontrado sozinho — reportar ao Kira pra redespa
 RETORNO ESPERADO: relatório de validação (passou/falhou por cenário testado).
 
 ## TASK-025 — Aba Pedidos: filtro "Todos" não exclui finalizados/cancelados
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: vazio
 FLUXO: Correcao
