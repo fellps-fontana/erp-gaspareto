@@ -309,6 +309,13 @@ CRITERIO DE ACEITE: testes rodam e falham (RED) porque a regra atual ainda liber
 ARQUIVOS PERMITIDOS: firestore.rules.spec.ts (novo, raiz ou pasta de teste dedicada — mike decide o caminho e reporta), package.json (só se precisar adicionar @firebase/rules-unit-testing como devDependency)
 NAO FAZER: se @firebase/rules-unit-testing não estiver disponível/instalável no ambiente, não forçar — reportar o gap ao Kira em vez de decidir sozinho instalar dependência nova sem aviso (gap já sinalizado em regra-de-negocio.md seção 12).
 RETORNO ESPERADO: arquivo de teste criado + confirmação de RED, ou relatório do gap de tooling se não for viável rodar agora.
+NOTA PRE-EXECUCAO: infra do emulador já está pronta desde a TASK-009 — Java
+instalado, firebase-tools funcionando, firestore.json com emulators.firestore
+configurado (porta 8080), emulador já roda em background nesta sessão (não
+precisa reiniciar). O gap de tooling original (falta de infra) não deve mais
+se repetir; se @firebase/rules-unit-testing precisar ser instalado, é
+esperado que instale sem problema — só confirmar antes de instalar mesmo
+assim, por via das dúvidas.
 
 ## TASK-021 — firestore.rules novo
 STATUS: PENDENTE
@@ -321,6 +328,12 @@ CRITERIO DE ACEITE: testes da TASK-020 ficam GREEN; nomes de coleção na regra 
 ARQUIVOS PERMITIDOS: firestore.rules
 NAO FAZER: não alterar firestore.rules.spec.ts. Publicar/deployar a regra só depois de TASK-018 confirmado GREEN (services já gravam companyId em toda escrita) — regra publicada antes disso bloqueia o app em produção.
 RETORNO ESPERADO: conteúdo final de firestore.rules.
+NOTA IMPORTANTE (achado do style na revisão da TASK-010/018): até esta task
+fechar, o isolamento por companyId é só client-side — firestore.rules
+continua `allow read, write: if true`, ou seja, qualquer chamada direta ao
+Firestore (SDK cru, REST, DevTools) ainda lê/escreve dado de qualquer
+empresa. TASK-021 é o gate real de segurança do multi-tenant, não uma
+formalidade — priorizar.
 
 ## TASK-022 — [TDD GREEN] Confirmar firestore.rules
 STATUS: PENDENTE
@@ -369,3 +382,27 @@ CRITERIO DE ACEITE: com filtro "Todos" e ordenação "Mais antigo" selecionados,
 ARQUIVOS PERMITIDOS: src/components/order/order.ts
 NAO FAZER: não alterar order.html, order-service.ts nem a lógica de sortOrder (recent/oldest) — ela já existe e já está correta, o gap é só na fonte de dados do filtro "Todos".
 RETORNO ESPERADO: diff do componente.
+
+## TASK-026 — Índices compostos do Firestore para queries com companyId
+STATUS: PENDENTE
+AGENT: levi
+DEPENDENCIAS: TASK-018
+FLUXO: Implementacao
+CONTEXTO A LER: achado do style na revisão da TASK-010/018 (registrado no commit db784ca); src/services/bill-service/bill-service.ts (getBills: where(companyId) + orderBy(createdAt)); src/services/purchase-product-service/purchase-product-service.ts (getPurchaseProducts: mesmo padrão); src/services/sale-service/sale-service.ts (getSalesByDate: where(companyId) + where(date>=) + where(date<=) + orderBy(date))
+ESCOPO: criar firestore.indexes.json (não existe no repo hoje) com os índices compostos exigidos pelas 3 queries acima — igualdade em companyId combinada com orderBy/range em outro campo. O Firestore Emulator não cobra índice (por isso os testes da TASK-009/018 passaram), mas o Firestore de produção real vai rejeitar essas queries com FAILED_PRECONDITION no primeiro uso após o deploy, sem o índice.
+CRITERIO DE ACEITE: firestore.indexes.json cobre os 3 casos (bills: companyId ASC + createdAt DESC; purchaseProducts: companyId ASC + createdAt DESC; sales: companyId ASC + date ASC/DESC conforme o range usado); firebase.json referencia o arquivo (campo "firestore.indexes"); se possível, validar localmente que o formato é aceito pelo `firebase deploy --only firestore:indexes --dry-run` ou equivalente (sem precisar deployar de verdade).
+ARQUIVOS PERMITIDOS: firestore.indexes.json (novo), firebase.json (só para referenciar o novo arquivo, campo firestore.indexes)
+NAO FAZER: não alterar os services nem os testes; não fazer deploy de verdade pro Firebase (isso é decisão do usuário, fora do escopo de um agent).
+RETORNO ESPERADO: conteúdo do firestore.indexes.json + confirmação de que firebase.json referencia o arquivo.
+
+## TASK-027 — Tratar companyId() nulo nas escritas dos 8 services
+STATUS: PENDENTE
+AGENT: mike (RED) + levi (GREEN)
+DEPENDENCIAS: TASK-018
+FLUXO: Correcao
+CONTEXTO A LER: achado do style na revisão da TASK-010/018 (commit db784ca) — TenantService.companyId é signal<string|null>, nenhum dos 8 services trata explicitamente o caso null no momento da chamada; regra-de-negocio.md seção 10
+ESCOPO: hoje é um risco teórico (não há caminho de chamada desses services antes do login confirmado), mas sem trava explícita um dev pode introduzir esse buraco sem erro de compilação no futuro (companyId: string obrigatório no model, mas addDoc/transaction.set aceitam null de boa porque as coleções não são tipadas com generics). Adicionar uma guarda mínima nos 8 métodos de escrita (addX/processSale) que lança erro explícito se tenantService.companyId() for null, em vez de gravar companyId: null silenciosamente.
+CRITERIO DE ACEITE: teste RED (mike) provando que addX() lança erro claro quando companyId() é null; levi implementa a guarda nos 8 services; mike confirma GREEN. Nenhum documento com companyId: null pode mais ser gravado por nenhum dos 8 services.
+ARQUIVOS PERMITIDOS: os 8 arquivos de service (mesmos da TASK-010 a TASK-017), os 8 arquivos .spec.ts correspondentes
+NAO FAZER: não mexer em TenantService/AuthService (o sinal null é intencional enquanto desloga/inicializa — a guarda é só no ponto de escrita).
+RETORNO ESPERADO: diff dos services + confirmação RED/GREEN.

@@ -213,3 +213,19 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   novas. Se isso mudar (cliente-piloto com dado real) antes da task de
   `firestore.rules` ser executada, backfill é pré-requisito obrigatório —
   reavaliar com o usuário nesse momento, não assumir.
+- **Isolamento por `companyId` (seção 10) fechado até TASK-018 é só
+  client-side** — `firestore.rules` continua liberado (`allow read, write:
+  if true`) até a TASK-021 fechar. Não tratar o multi-tenant como "seguro"
+  antes disso: qualquer chamada direta ao Firestore (SDK cru, REST, DevTools)
+  ainda vê dado de qualquer empresa.
+- `TenantService.companyId()` pode ser `null` (deslogado ou auth ainda
+  inicializando) e nenhum dos 8 services trata esse caso explicitamente nas
+  escritas — hoje é risco teórico (não há caminho de chamada antes do login
+  confirmado), mas nada impede um documento `companyId: null` de ser gravado
+  se um novo caminho de chamada for introduzido sem essa trava (ver TASK-027).
+- 3 queries (`BillService.getBills`, `PurchaseProductService.
+  getPurchaseProducts`, `SaleService.getSalesByDate`) combinam `where
+  ('companyId',...)` com `orderBy`/range em outro campo — exigem índice
+  composto no Firestore de produção real (o emulador não cobra isso). Sem
+  `firestore.indexes.json` (ver TASK-026), essas telas quebram no primeiro
+  uso após o deploy.
