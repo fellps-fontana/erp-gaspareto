@@ -66,9 +66,21 @@ transações (`runTransaction`) para operações que envolvem estoque.
 
 ## Ferramentas / qualidade
 
-- **Testes:** Karma + Jasmine (setup padrão do Angular CLI). ⚠️ Não foi encontrado
-  nenhum arquivo `*.spec.ts` além do `app.spec.ts` gerado pelo scaffold — cobertura
-  de teste real parece inexistente hoje.
+- **Testes:** dois runners, propósitos diferentes.
+  - **Karma + Jasmine** (`npm test` / `ng test`, setup padrão do Angular CLI):
+    testes de componentes/services Angular, incluindo os 8 services de dados
+    (`src/services/*/*.spec.ts`), que rodam contra um Firestore Emulator real
+    (ver abaixo), não contra Firestore de produção nem mock.
+  - **Jest + ts-jest** (`npm run test:rules`, devDependency adicionada junto
+    com `@firebase/rules-unit-testing`): só para `test/firestore.rules.spec.ts`
+    — testa as regras de segurança do Firestore isoladamente, também contra o
+    emulador. Runner separado porque `@firebase/rules-unit-testing` roda em
+    Node (não em browser/Karma) e é o padrão oficial da Firebase para esse
+    tipo de teste.
+  - **Firestore Emulator:** `firebase.json` tem `emulators.firestore` (porta
+    8080, `firebase emulators:start --only firestore`) — pré-requisito: Java
+    (JRE/JDK 11+) instalado. Sem o emulador rodando, nenhum dos dois runners
+    consegue testar código que toca Firestore de verdade.
 - **Lint/format:** Prettier configurado no `package.json` (printWidth 100,
   singleQuote, parser `angular` para `.html`). Não há ESLint configurado.
 - **Estilo de código:** `.editorconfig` — indent 2 espaços, aspas simples em `.ts`,

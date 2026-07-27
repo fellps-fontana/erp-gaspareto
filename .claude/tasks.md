@@ -307,7 +307,7 @@ nenhum — só a especificação colada pelo usuário assumia essa peça). Nada 
 fazer aqui; task fechada sem alteração de arquivo.
 
 ## TASK-020 — [TDD RED] Testes de firestore.rules
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-001, TASK-008
 FLUXO: Implementacao
@@ -324,6 +324,21 @@ precisa reiniciar). O gap de tooling original (falta de infra) não deve mais
 se repetir; se @firebase/rules-unit-testing precisar ser instalado, é
 esperado que instale sem problema — só confirmar antes de instalar mesmo
 assim, por via das dúvidas.
+NOTA POS-EXECUCAO: instalado @firebase/rules-unit-testing + jest/ts-jest/
+@types/jest como devDependencies (--legacy-peer-deps) — novo runner de
+teste SO para firestore.rules (roda via `npx jest test/firestore.rules.
+spec.ts`, separado do `ng test`/Karma usado pelos services). Arquivo:
+test/firestore.rules.spec.ts, 27 casos, 15 RED / 12 GREEN (same-tenant ja
+passa hoje, esperado). 1 correcao de design no meio do caminho: a primeira
+versao autenticava simulando CUSTOM CLAIMS no token (request.auth.token.
+companyId) — isso so funciona se a Cloud Function da TASK-023 existir, e
+ela e opcional/fase 2, NAO implementada. AuthService (TASK-002) so cria o
+doc users/{uid}, nao seta claim nenhum. Corrigido: testes agora semeiam
+users/{uid} de verdade (via withSecurityRulesDisabled) e autenticam so com
+uid/email (token real de login sem claims) — a regra da TASK-021 PRECISA
+usar get(/databases/$(database)/documents/users/$(request.auth.uid)).data.
+companyId (fase 1), nao request.auth.token.companyId, senao passa no teste
+mas quebra pra usuario real.
 
 ## TASK-021 — firestore.rules novo
 STATUS: PENDENTE
