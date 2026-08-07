@@ -1,12 +1,18 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, isDevMode } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
-import { provideFirestore, getFirestore } from '@angular/fire/firestore';
+import { provideFirestore, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
 
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
 import { environment } from '../enviroments/enviroments';
-import { getAuth, provideAuth } from '@angular/fire/auth';
+import { getAuth, provideAuth, connectAuthEmulator } from '@angular/fire/auth';
+
+// Conecta nos emuladores locais SOMENTE em dev mode + flag explicita
+// (environment.useEmulator) -- nunca em build de producao, mesmo que a
+// flag fique true por engano (isDevMode() e falso num build --configuration
+// production real, independente do conteudo deste arquivo de environment).
+const useEmulator = isDevMode() && environment.useEmulator;
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -26,7 +32,19 @@ export const appConfig: ApplicationConfig = {
       messagingSenderId: "387862323319",
       measurementId: "G-X1MN9G6SEQ"
     })),
-    provideAuth(() => getAuth()),
-    provideFirestore(() => getFirestore())
+    provideAuth(() => {
+      const auth = getAuth();
+      if (useEmulator) {
+        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+      }
+      return auth;
+    }),
+    provideFirestore(() => {
+      const firestore = getFirestore();
+      if (useEmulator) {
+        connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+      }
+      return firestore;
+    })
   ]
 };

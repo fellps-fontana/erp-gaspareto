@@ -12,7 +12,7 @@ import { authGuard } from '../guards/auth.guard';
 import { moduleGuard } from '../guards/module.guard';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent },
+  { path: '', component: HomeComponent, canActivate: [authGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
   { path: 'pdv', component: PdvComponent, canActivate: [authGuard, moduleGuard], data: { module: 'pdv' } },

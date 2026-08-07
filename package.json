@@ -7,7 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "test:rules": "jest test/firestore.rules.spec.ts"
+    "test:rules": "jest test/firestore.rules.spec.ts",
+    "seed:demo": "node scripts/seed-demo.mjs"
   },
   "prettier": {
     "printWidth": 100,
