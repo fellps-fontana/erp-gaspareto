@@ -24,10 +24,15 @@ export const appConfig: ApplicationConfig = {
       registrationStrategy: 'registerWhenStable:30000'
     }),
     provideFirebaseApp(() => initializeApp({
-      projectId: "projetosfelipe-9e458",
+      // Em modo emulador, o project ID precisa bater com o que o emulador
+      // e o script de seed usam ("demo-test") -- o emulador segrega dados
+      // por project ID mesmo respondendo no mesmo host:port, entao usar o
+      // project ID real aqui faria o app nao encontrar nenhuma conta
+      // criada via seed/emulador.
+      projectId: useEmulator ? "demo-test" : "projetosfelipe-9e458",
       appId: "1:387862323319:web:ac0159f2fad009d2062672",
       storageBucket: "projetosfelipe-9e458.firebasestorage.app",
-      apiKey: "AIzaSyAKeaJqPLIZrAmXQuokvaw4PAEY0q0GDYM",
+      apiKey: useEmulator ? "demo-key" : "AIzaSyAKeaJqPLIZrAmXQuokvaw4PAEY0q0GDYM",
       authDomain: "projetosfelipe-9e458.firebaseapp.com",
       messagingSenderId: "387862323319",
       measurementId: "G-X1MN9G6SEQ"
