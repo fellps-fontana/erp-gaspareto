@@ -113,8 +113,17 @@ async function main() {
     customerIds.push({ id: ref.id, ...c });
   }
 
+  // Helper: data no passado (dias atras, com hora variavel) -- pra parecer
+  // historico de verdade, nao tudo criado "agora".
+  const daysAgo = (days, hour = 12) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    d.setHours(hour, Math.floor(Math.random() * 60), 0, 0);
+    return Timestamp.fromDate(d);
+  };
+
   console.log('Semeando vendas (PDV)...');
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 14; i++) {
     const p = productIds[i % productIds.length];
     const qty = 1 + (i % 3);
     await addDoc(collection(firestore, 'sales'), {
@@ -123,7 +132,7 @@ async function main() {
         priceAtSale: p.sellPrice, priceAtCost: p.buyPrice,
       }],
       total: p.sellPrice * qty,
-      date: Timestamp.now(),
+      date: daysAgo(i % 20, 9 + (i % 10)),
       paymentMethod: i % 2 === 0 ? 'dinheiro' : 'pix',
       sale_type: 'pdv',
       status: 'completed',
@@ -131,33 +140,59 @@ async function main() {
     });
   }
 
-  console.log('Semeando pedidos...');
-  const orderStatuses = ['pending', 'preparing', 'delivering', 'delivered', 'finished'];
-  for (let i = 0; i < 5; i++) {
-    const c = customerIds[i % customerIds.length];
-    const p = productIds[(i + 2) % productIds.length];
-    const qty = 1 + (i % 2);
-    const itemsTotal = p.sellPrice * qty;
-    await addDoc(collection(firestore, 'orders'), {
-      customerName: c.name,
-      customerPhone: c.phone,
-      customerId: c.id,
-      items: [{
-        idProduct: p.id, productName: p.title, quantity: qty,
-        priceAtSale: p.sellPrice, priceAtCost: p.buyPrice,
-      }],
-      itemsTotal,
-      shippingCost: 5,
-      total: itemsTotal + 5,
-      deliveryType: 'delivery',
-      address: c.address,
-      addressLat: c.lat,
-      addressLng: c.lng,
-      status: orderStatuses[i],
-      createdAt: Timestamp.now(),
-      scheduledDate: Timestamp.now(),
-      companyId,
-    });
+  // Pedidos: 4 por cliente (20 no total), espalhados nas ultimas semanas.
+  // So usa status que a UI de fato sabe avancar (order.ts getNextActionLabel
+  // so trata pending/delivering/delivered -- "preparing"/"ready" existem no
+  // tipo mas ficam sem nenhuma acao disponivel, parecem travados na demo).
+  console.log('Semeando pedidos (historico por cliente)...');
+  // pesos: maioria finalizado/entregue (historico real), alguns em andamento,
+  // 1 cancelado pra mostrar o fluxo completo.
+  const orderStatusCycle = ['finished', 'finished', 'delivered', 'finished', 'delivering', 'pending', 'canceled'];
+  let orderCount = 0;
+  for (const c of customerIds) {
+    const ordersForCustomer = 3 + (orderCount % 2); // 3 ou 4 pedidos por cliente
+    for (let j = 0; j < ordersForCustomer; j++) {
+      const status = orderStatusCycle[orderCount % orderStatusCycle.length];
+      const p1 = productIds[orderCount % productIds.length];
+      const p2 = productIds[(orderCount + 3) % productIds.length];
+      const qty1 = 1 + (orderCount % 3);
+      const qty2 = 1 + ((orderCount + 1) % 2);
+      const itemsTotal = p1.sellPrice * qty1 + p2.sellPrice * qty2;
+      const shippingCost = 5 + (orderCount % 3) * 2;
+      const created = daysAgo(3 + orderCount * 3, 11 + (orderCount % 8));
+
+      const orderData = {
+        customerName: c.name,
+        customerPhone: c.phone,
+        customerId: c.id,
+        items: [
+          { idProduct: p1.id, productName: p1.title, quantity: qty1, priceAtSale: p1.sellPrice, priceAtCost: p1.buyPrice },
+          { idProduct: p2.id, productName: p2.title, quantity: qty2, priceAtSale: p2.sellPrice, priceAtCost: p2.buyPrice },
+        ],
+        itemsTotal,
+        shippingCost,
+        total: itemsTotal + shippingCost,
+        deliveryType: 'delivery',
+        address: c.address,
+        addressLat: c.lat,
+        addressLng: c.lng,
+        status,
+        createdAt: created,
+        scheduledDate: created,
+        companyId,
+      };
+
+      if (status === 'delivered' || status === 'finished') {
+        orderData.actualDeliveryDate = daysAgo(Math.max(0, 3 + orderCount * 3 - 1));
+      }
+      if (status === 'finished') {
+        orderData.paymentDate = daysAgo(Math.max(0, 3 + orderCount * 3 - 1));
+        orderData.closingDate = daysAgo(Math.max(0, 3 + orderCount * 3 - 1));
+      }
+
+      await addDoc(collection(firestore, 'orders'), orderData);
+      orderCount++;
+    }
   }
 
   console.log('Semeando comanda aberta...');
