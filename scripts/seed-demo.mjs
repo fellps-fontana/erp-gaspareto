@@ -69,11 +69,43 @@ async function main() {
     productIds.push({ id: ref.id, ...p });
   }
 
-  console.log('Semeando clientes...');
+  console.log('Semeando clientes (Chapeco/SC)...');
   const customers = [
-    { name: 'Joao da Silva', phone: '11987654321', address: 'Rua das Flores, 123 - Centro' },
-    { name: 'Maria Oliveira', phone: '11976543210', address: 'Av. Brasil, 456 - Jardim America' },
-    { name: 'Pedro Souza', phone: '11965432109', address: 'Rua XV de Novembro, 789 - Vila Nova' },
+    {
+      name: 'Joao da Silva', phone: '49999871234',
+      address: 'Rua Marechal Deodoro, 1500 - Centro, Chapeco - SC',
+      cep: '89802-210', rua: 'Rua Marechal Deodoro', numero: '1500',
+      bairro: 'Centro', cidade: 'Chapeco', uf: 'SC',
+      lat: -27.0964, lng: -52.6183,
+    },
+    {
+      name: 'Maria Oliveira', phone: '49998762345',
+      address: 'Rua Uruguai, 2340 - Efapi, Chapeco - SC',
+      cep: '89809-310', rua: 'Rua Uruguai', numero: '2340',
+      bairro: 'Efapi', cidade: 'Chapeco', uf: 'SC',
+      lat: -27.0850, lng: -52.6690,
+    },
+    {
+      name: 'Pedro Souza', phone: '49997653456',
+      address: 'Av. Fernando Machado, 890 - Palmital, Chapeco - SC',
+      cep: '89805-000', rua: 'Av. Fernando Machado', numero: '890',
+      bairro: 'Palmital', cidade: 'Chapeco', uf: 'SC',
+      lat: -27.0800, lng: -52.6100,
+    },
+    {
+      name: 'Ana Beatriz Costa', phone: '49996544567',
+      address: 'Rua Getulio Vargas, 445 - Passo dos Fortes, Chapeco - SC',
+      cep: '89805-400', rua: 'Rua Getulio Vargas', numero: '445',
+      bairro: 'Passo dos Fortes', cidade: 'Chapeco', uf: 'SC',
+      lat: -27.1050, lng: -52.6250,
+    },
+    {
+      name: 'Carlos Eduardo Bett', phone: '49995435678',
+      address: 'Rua Fernando Simas, 210 - Presidente Medici, Chapeco - SC',
+      cep: '89802-450', rua: 'Rua Fernando Simas', numero: '210',
+      bairro: 'Presidente Medici', cidade: 'Chapeco', uf: 'SC',
+      lat: -27.0920, lng: -52.6350,
+    },
   ];
   const customerIds = [];
   for (const c of customers) {
@@ -119,6 +151,8 @@ async function main() {
       total: itemsTotal + 5,
       deliveryType: 'delivery',
       address: c.address,
+      addressLat: c.lat,
+      addressLng: c.lng,
       status: orderStatuses[i],
       createdAt: Timestamp.now(),
       scheduledDate: Timestamp.now(),
