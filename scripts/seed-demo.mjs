@@ -140,14 +140,17 @@ async function main() {
     });
   }
 
-  // Pedidos: 4 por cliente (20 no total), espalhados nas ultimas semanas.
-  // So usa status que a UI de fato sabe avancar (order.ts getNextActionLabel
-  // so trata pending/delivering/delivered -- "preparing"/"ready" existem no
-  // tipo mas ficam sem nenhuma acao disponivel, parecem travados na demo).
+  // Pedidos: 3-4 por cliente, espalhados nas ultimas semanas.
+  // So usa status que o CODIGO REAL efetivamente grava em algum momento:
+  // addOrder() sempre cria com 'pending'; markAsDelivered() grava 'delivered';
+  // finalizeOrder() grava 'finished'; cancelOrder() grava 'canceled'.
+  // 'delivering'/'preparing'/'ready'/'open' existem no tipo mas nenhum
+  // metodo do OrderService realmente os grava -- nao aparecem num sistema
+  // usado de verdade, entao nao entram na demo.
   console.log('Semeando pedidos (historico por cliente)...');
-  // pesos: maioria finalizado/entregue (historico real), alguns em andamento,
-  // 1 cancelado pra mostrar o fluxo completo.
-  const orderStatusCycle = ['finished', 'finished', 'delivered', 'finished', 'delivering', 'pending', 'canceled'];
+  // pesos: maioria finalizado/entregue (historico real), um pendente
+  // (em aberto agora) e um cancelado, pra mostrar o fluxo completo.
+  const orderStatusCycle = ['finished', 'finished', 'delivered', 'finished', 'pending', 'canceled'];
   let orderCount = 0;
   for (const c of customerIds) {
     const ordersForCustomer = 3 + (orderCount % 2); // 3 ou 4 pedidos por cliente
