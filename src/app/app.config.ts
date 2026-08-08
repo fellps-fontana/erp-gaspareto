@@ -14,6 +14,13 @@ import { getAuth, provideAuth, connectAuthEmulator } from '@angular/fire/auth';
 // production real, independente do conteudo deste arquivo de environment).
 const useEmulator = isDevMode() && environment.useEmulator;
 
+// Usa o mesmo host que serviu a pagina (window.location.hostname) em vez de
+// fixar '127.0.0.1' -- assim funciona tanto acessando via localhost na
+// mesma maquina quanto via IP da rede local de outro PC/celular, contanto
+// que o `ng serve --host 0.0.0.0` e os emuladores (firebase.json ->
+// emulators.*.host: "0.0.0.0") estejam expostos na rede.
+const emulatorHost = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1';
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -40,14 +47,14 @@ export const appConfig: ApplicationConfig = {
     provideAuth(() => {
       const auth = getAuth();
       if (useEmulator) {
-        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+        connectAuthEmulator(auth, `http://${emulatorHost}:9099`, { disableWarnings: true });
       }
       return auth;
     }),
     provideFirestore(() => {
       const firestore = getFirestore();
       if (useEmulator) {
-        connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+        connectFirestoreEmulator(firestore, emulatorHost, 8080);
       }
       return firestore;
     })
