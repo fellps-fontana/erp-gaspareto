@@ -9,8 +9,27 @@
 // o id de outro documento (ex.: idProduct, customerId) e são reforçados só
 // pela lógica das transações no código-cliente, não pelo Firestore.
 
+Table companies {
+  id            string    [pk, note: 'doc id gerado pelo Firestore']
+  name          string
+  document      string    [null]
+  plan          string    [note: 'trial | basic | pro']
+  status        string    [note: 'active | suspended | canceled']
+  modules       json      [note: 'ModuleConfig: pdv, pedidos, gestao, rotas, contas, clientes, compras (booleans) — substitui o doc único config/company']
+  createdAt     timestamp
+}
+
+Table users {
+  uid           string    [pk, note: 'id = uid do Firebase Auth']
+  email         string
+  companyId     string    [ref: > companies.id]
+  role          string    [note: 'owner | admin | employee']
+  createdAt     timestamp
+}
+
 Table products {
   id            string    [pk, note: 'doc id gerado pelo Firestore']
+  companyId     string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   title         string
   buyPrice      number    [note: 'sobrescrito pela última compra registrada (ver regra-de-negocio.md)']
   sellPrice     number
@@ -21,6 +40,7 @@ Table products {
 
 Table customers {
   id            string    [pk]
+  companyId     string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   name          string
   phone         string    [null]
   address       string    [null, note: 'endereço formatado livre, fallback']
@@ -37,6 +57,7 @@ Table customers {
 
 Table sales {
   id             string    [pk]
+  companyId      string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   total          number
   date           timestamp
   items          json      [note: 'array de SaleItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
@@ -48,6 +69,7 @@ Table sales {
 
 Table orders {
   id                    string    [pk]
+  companyId             string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   customerName          string
   customerPhone         string    [null]
   customerId            string    [null, ref: > customers.id]
@@ -70,6 +92,7 @@ Table orders {
 
 Table comandas {
   id            string    [pk]
+  companyId     string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   customerName  string
   items         json      [note: 'array de ComandaItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
   total         number
@@ -79,6 +102,7 @@ Table comandas {
 
 Table purchases {
   id            string    [pk]
+  companyId     string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   date          timestamp
   idProduct     string    [ref: > products.id]
   unityValue    number
@@ -87,6 +111,7 @@ Table purchases {
 
 Table purchaseProducts {
   id                string    [pk]
+  companyId         string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   name              string
   defaultValue      number
   recurring         boolean
@@ -96,6 +121,7 @@ Table purchaseProducts {
 
 Table bills {
   id                  string    [pk]
+  companyId           string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   name                string
   value               number
   dueDate             timestamp [null]
@@ -109,15 +135,18 @@ Table bills {
 }
 
 Table config {
-  id       string  [pk, note: "único doc usado: id = 'company'"]
-  modules  json    [note: 'ModuleConfig: pdv, pedidos, gestao, rotas, contas, clientes, compras (booleans)']
+  id       string  [pk, note: "único doc usado: id = 'company' — LEGADO"]
+  modules  json    [note: 'ModuleConfig — substituído por companies.modules (ver regra-de-negocio.md seção 11); manter documentado até confirmar remoção do doc config/company em produção']
 }
 
 // Observações:
 // - items dentro de sales/orders/comandas são arrays embutidos no próprio
 //   documento (subcoleção não é usada) — cada item referencia products.id
 //   via idProduct, mas sem enforcement do banco.
-// - Não existe tabela/coleção "users" — não há autenticação implementada
-//   hoje (ver stack.md). Se autenticação for adicionada, este schema precisa
-//   de uma tabela users e provavelmente um campo createdBy/ownerId nas
-//   coleções operacionais.
+// - company_id é campo simples (não FK real do Firestore) — a integridade é
+//   reforçada só por firestore.rules e pelo código-cliente (TenantService),
+//   nunca pelo banco em si. Ver regra-de-negocio.md seção 10 para o motivo de
+//   ser campo e não subcoleção companies/{id}/products/...
+// - purchaseProducts na coleção real do Firestore é "purchase-products"
+//   (kebab-case) — nome da tabela aqui mantido em camelCase por já estar
+//   assim no arquivo original; não é inconsistência nova desta rodada.

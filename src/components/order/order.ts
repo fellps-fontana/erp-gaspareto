@@ -118,7 +118,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.isLoadingOrders = true;
     this.products$ = this.productService.getProducts();
 
-    this.orders$ = this.orderService.getPendingOrders().pipe(
+    this.orders$ = this.orderService.getOrders().pipe(
       catchError(err => {
         console.error('OrdersComponent: Erro ao carregar pedidos', err);
         this.notif.error('Erro ao carregar pedidos. Verifique a conexão.');

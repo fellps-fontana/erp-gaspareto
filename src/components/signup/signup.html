@@ -1,0 +1,65 @@
+<div class="signup-container">
+  <div class="signup-card">
+    <header class="signup-header">
+      <h1>🏢 Cadastrar empresa</h1>
+      <p>Crie sua conta para começar a usar o sistema</p>
+    </header>
+
+    <form (ngSubmit)="submit()" #signupForm="ngForm" novalidate>
+      <div class="form-group">
+        <label for="companyName">Nome da empresa</label>
+        <input
+          id="companyName"
+          type="text"
+          name="companyName"
+          [(ngModel)]="companyName"
+          required
+          autocomplete="organization"
+          [disabled]="loading()"
+          placeholder="Minha Empresa Ltda"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input
+          id="email"
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          required
+          autocomplete="email"
+          [disabled]="loading()"
+          placeholder="voce@empresa.com"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Senha</label>
+        <input
+          id="password"
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          required
+          minlength="6"
+          autocomplete="new-password"
+          [disabled]="loading()"
+          placeholder="••••••••"
+        />
+      </div>
+
+      <p class="error-banner" *ngIf="errorMessage()">{{ errorMessage() }}</p>
+
+      <button type="submit" class="btn btn-primary btn-block" [disabled]="loading()">
+        <span *ngIf="loading()" class="spinner" aria-hidden="true"></span>
+        {{ loading() ? 'Cadastrando...' : 'Cadastrar empresa' }}
+      </button>
+    </form>
+
+    <p class="login-hint">
+      Já tem uma conta?
+      <a routerLink="/login">Entrar</a>
+    </p>
+  </div>
+</div>

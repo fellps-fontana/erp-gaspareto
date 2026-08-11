@@ -174,7 +174,7 @@ export class CustomersComponent implements OnInit, OnDestroy {
     const address = this.formattedAddress;
     this.isProcessing = true;
     try {
-      const data: Omit<Customer, 'id'> = {
+      const data: Omit<Customer, 'id' | 'companyId'> = {
         name:        this.form.name.trim(),
         phone:       this.form.phone?.trim() ?? '',
         address:     address || '',

@@ -6,20 +6,32 @@ import {
 import { Observable } from 'rxjs';
 import { Sale } from '../../models/sell-model';
 import { FirestoreBaseService } from '../firestore-base.service';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class SaleService extends FirestoreBaseService {
   private firestore = inject(Firestore);
+  private tenantService = inject(TenantService);
   private readonly COLLECTION_NAME = 'sales';
 
   getSales(): Observable<Sale[]> {
-    const q = query(collection(this.firestore, this.COLLECTION_NAME));
+    const q = query(
+      collection(this.firestore, this.COLLECTION_NAME),
+      where('companyId', '==', this.tenantService.companyId())
+    );
     return this.collectionDataObservable<Sale>(q);
   }
 
-  async processSale(sale: Sale, updateStock: boolean = true): Promise<void> {
+  async processSale(sale: Omit<Sale, 'id' | 'companyId'>, updateStock: boolean = true): Promise<void> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível processar venda sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     try {
       await runTransaction(this.firestore, async (transaction) => {
         const productSnapshots: { ref: any; quantity: number }[] = [];
@@ -51,6 +63,7 @@ export class SaleService extends FirestoreBaseService {
 
         const newSaleRef = doc(collection(this.firestore, this.COLLECTION_NAME));
         const saleDoc: any = {
+          companyId,
           items: sale.items.map(i => ({
             idProduct: i.idProduct,
             productName: i.productName,
@@ -77,6 +90,7 @@ export class SaleService extends FirestoreBaseService {
     const salesCollection = collection(this.firestore, this.COLLECTION_NAME);
     const salesQuery = query(
       salesCollection,
+      where('companyId', '==', this.tenantService.companyId()),
       where('date', '>=', startDate),
       where('date', '<=', endDate),
       orderBy('date', 'desc')

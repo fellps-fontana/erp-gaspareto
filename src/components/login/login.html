@@ -1,0 +1,50 @@
+<div class="login-container">
+  <div class="login-card">
+    <header class="login-header">
+      <h1>🔐 Entrar</h1>
+      <p>Acesse sua conta para continuar</p>
+    </header>
+
+    <form (ngSubmit)="submit()" #loginForm="ngForm" novalidate>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input
+          id="email"
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          required
+          autocomplete="email"
+          [disabled]="loading()"
+          placeholder="voce@empresa.com"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Senha</label>
+        <input
+          id="password"
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          required
+          autocomplete="current-password"
+          [disabled]="loading()"
+          placeholder="••••••••"
+        />
+      </div>
+
+      <p class="error-banner" *ngIf="errorMessage()">{{ errorMessage() }}</p>
+
+      <button type="submit" class="btn btn-primary btn-block" [disabled]="loading()">
+        <span *ngIf="loading()" class="spinner" aria-hidden="true"></span>
+        {{ loading() ? 'Entrando...' : 'Entrar' }}
+      </button>
+    </form>
+
+    <p class="signup-hint">
+      Ainda não tem conta?
+      <a routerLink="/signup">Cadastre sua empresa</a>
+    </p>
+  </div>
+</div>
