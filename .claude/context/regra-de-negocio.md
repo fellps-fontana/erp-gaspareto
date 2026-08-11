@@ -66,6 +66,21 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
 
 ## 5. Pedidos (`orders`) — [CRÍTICA]
 
+- **Numeração sequencial por empresa** (`orderNumber`): gerada em
+  `OrderService.addOrder` via `runTransaction` sobre `counters/{companyId}`
+  (lê `nextOrderNumber`, usa no pedido novo, grava `nextOrderNumber + 1`) —
+  atômico mesmo com dois pedidos criados ao mesmo tempo. Começa em `#1` por
+  empresa (multi-tenant não compartilha sequência). Só existe em Pedidos —
+  PDV e Comandas não têm numeração própria. É controle humano/exibição
+  (`#1`, `#2`...), nunca usado como chave/id do documento.
+- Na prática, hoje só 4 status são de fato atribuídos pela UI: `pending`
+  ("Pendente"), `delivered` ("Entregue"), `finished` ("Concluído") e
+  `canceled` ("Cancelado"). `open`, `preparing`, `ready`, `delivering` estão
+  definidos no tipo mas não são setados em nenhum lugar do código atual.
+- A tela de Pedidos (`order.ts`) **sempre exclui** pedidos `finished`/
+  `canceled` de qualquer filtro (inclusive o filtro "Ativos"/padrão) — esses
+  status só ficam visíveis na aba Histórico Geral (seção 5.1), não mais em
+  Pedidos.
 - Ciclo de status: `open → pending → preparing → ready → delivering →
   delivered → finished` (ou `canceled` a qualquer momento antes de `finished`).
 - `deliveryType`: `'pickup'` (retirada, sem endereço obrigatório) ou
@@ -85,6 +100,19 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
 - Datas do ciclo de vida: `createdAt`, `scheduledDate` (previsão),
   `actualDeliveryDate` (preenchida em `delivered`), `paymentDate` e
   `closingDate` (preenchidas em `finished`).
+
+## 5.1 Histórico Geral (Gestão > aba Histórico)
+
+- View agregada, sem coleção própria — junta em tempo real (`combineLatest`)
+  `sales` (só `sale_type: 'pdv'`, pra não duplicar com `orders`), `orders` e
+  `comandas` (via `ComandaService.getAllComandas()`, sem filtro de status) num
+  único feed ordenado por data.
+- Filtros combináveis: origem (PDV/Pedido/Comanda), cliente, produto e busca
+  livre (por id do documento ou por `orderNumber`).
+- **Limitação conhecida**: vendas de PDV e Comandas não têm `customerId`
+  vinculado (só `orders` tem cliente cadastrado) — ao filtrar por cliente,
+  itens de PDV/Comanda simplesmente não aparecem, mesmo que sejam do mesmo
+  cliente na prática (comanda guarda só `customerName` livre, sem `id`).
 
 ## 6. Rotas de entrega
 

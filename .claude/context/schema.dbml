@@ -70,6 +70,7 @@ Table sales {
 Table orders {
   id                    string    [pk]
   companyId             string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
+  orderNumber           number    [note: 'sequencial por empresa (#1, #2, ...), gerado via counters/{companyId} em transação — só controle humano, não usar como id']
   customerName          string
   customerPhone         string    [null]
   customerId            string    [null, ref: > customers.id]
@@ -137,6 +138,11 @@ Table bills {
 Table config {
   id       string  [pk, note: "único doc usado: id = 'company' — LEGADO"]
   modules  json    [note: 'ModuleConfig — substituído por companies.modules (ver regra-de-negocio.md seção 11); manter documentado até confirmar remoção do doc config/company em produção']
+}
+
+Table counters {
+  id               string  [pk, note: 'doc id = companyId — um contador por empresa']
+  nextOrderNumber  number  [note: 'próximo orderNumber a emitir (começa em 1 se doc não existe); lido e incrementado via runTransaction em OrderService.addOrder, garante sequência atômica mesmo com escritas concorrentes']
 }
 
 // Observações:

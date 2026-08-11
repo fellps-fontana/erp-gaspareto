@@ -102,3 +102,23 @@ transações (`runTransaction`) para operações que envolvem estoque.
   `environments`) — mantido assim por já estar em uso nos imports
   (`app.config.ts` importa de `'../enviroments/enviroments'`). Não corrigir
   sem avaliar impacto em todos os imports.
+- **Dois ambientes reais, dois projetos Firebase separados:**
+  - **Produção**: branch `main`, projeto `projetosfelipe-9e458`, config em
+    `enviroments.ts` (`useEmulator: true` só em dev local — build de prod usa
+    Firebase real). Onde o cliente Gasparetto roda hoje.
+  - **Homologação/staging**: branch `homologacao`, projeto Firebase próprio
+    `hologaerp` (alias `hml` no `.firebaserc`), config em
+    `enviroments.staging.ts` (`useEmulator: false`, Firestore/Auth reais do
+    `hologaerp`, isolado de produção). Usado pra validar multi-tenant e
+    features novas antes de ir pra produção — TASK-024 (isolamento entre
+    empresas) validada manualmente aqui.
+  - `angular.json` tem configuration `staging` (`fileReplacements` troca
+    `enviroments.ts` por `enviroments.staging.ts`). Scripts: `npm run
+    start:staging`, `npm run build:staging`, `npm run deploy:rules:staging`
+    (`firestore.rules` + `firestore.indexes.json` pro projeto `hml`), `npm
+    run deploy:hosting:staging` (build + deploy Hosting pro `hml`).
+- **CI/CD:** GitHub Actions. `.github/workflows/firebase-hosting-merge.yml`
+  builda/deploya produção em push pra `main`; `.github/workflows/
+  firebase-hosting-homolog.yml` builda com `--configuration staging` e
+  deploya em push pra `homologacao`, usando o secret
+  `FIREBASE_SERVICE_ACCOUNT_HOLOGAERP`.
