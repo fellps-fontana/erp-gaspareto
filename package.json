@@ -4,11 +4,17 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "start:staging": "ng serve --configuration staging",
     "build": "ng build",
+    "build:staging": "ng build --configuration staging",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "test:rules": "jest test/firestore.rules.spec.ts",
-    "seed:demo": "node scripts/seed-demo.mjs"
+    "test:rules:only": "jest test/firestore.rules.spec.ts",
+    "test:rules": "firebase emulators:exec --only firestore,auth \"npm run test:rules:only\"",
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "deploy:rules:staging": "firebase deploy --only firestore:rules,firestore:indexes --project hml",
+    "deploy:hosting:staging": "npm run build:staging && firebase deploy --only hosting --project hml",
+    "reinstall": "rimraf node_modules package-lock.json && npm install"
   },
   "prettier": {
     "printWidth": 100,
@@ -30,6 +36,7 @@
     "@angular/fire": "^20.0.1",
     "@angular/forms": "^20.3.0",
     "@angular/platform-browser": "^20.3.0",
+    "@angular/platform-browser-dynamic": "^20.3.0",
     "@angular/router": "^20.3.0",
     "@angular/service-worker": "^20.3.0",
     "bootstrap": "^5.3.8",
@@ -44,7 +51,7 @@
     "@angular/build": "^20.3.13",
     "@angular/cli": "^20.3.13",
     "@angular/compiler-cli": "^20.3.0",
-    "@firebase/rules-unit-testing": "^5.0.1",
+    "@firebase/rules-unit-testing": "^4.0.1",
     "@types/jasmine": "~5.1.0",
     "@types/jest": "^30.0.0",
     "jasmine-core": "~5.9.0",
@@ -54,6 +61,7 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "rimraf": "^6.0.1",
     "semver": "^7.8.3",
     "ts-jest": "^29.4.12",
     "typescript": "~5.9.2"
