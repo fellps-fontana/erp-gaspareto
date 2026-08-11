@@ -274,16 +274,7 @@
   cursor: default;
 }
 
-/* CEP row */
-.cep-input-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.cep-input-row input { flex: 1; }
-
-.cep-loading {
+.geocode-loading {
   font-size: 0.8rem;
   color: var(--text-secondary);
   white-space: nowrap;
