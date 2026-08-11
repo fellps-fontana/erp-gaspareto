@@ -10,7 +10,7 @@
       </button>
       <h1>Pedidos & Encomendas</h1>
       <div class="filters">
-        <button [class.active]="filterStatus === 'all'"       (click)="filterStatus = 'all'">Todos</button>
+        <button [class.active]="filterStatus === 'all'"       (click)="filterStatus = 'all'">Ativos</button>
         <button [class.active]="filterStatus === 'pending'"   (click)="filterStatus = 'pending'">Pendente</button>
         <button [class.active]="filterStatus === 'delivered'" (click)="filterStatus = 'delivered'">Entregues</button>
       </div>

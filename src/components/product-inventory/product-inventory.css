@@ -1329,6 +1329,43 @@ input[type="color"] {
   color: var(--text-inverse);
 }
 
+/* Histórico Geral: badge de origem (PDV/Pedido/Comanda) — classes próprias
+   pra não colidir com as de status de pedido acima (ex.: "open" existe tanto
+   em pedido quanto em comanda, com significados diferentes). */
+.status-badge.pdv {
+  background: var(--color-info);
+  color: var(--text-inverse);
+}
+
+.status-badge.pedido {
+  background: var(--color-primary);
+}
+
+.status-badge.comanda {
+  background: var(--color-secondary);
+}
+
+/* Histórico Geral: status de comanda e de venda PDV, com prefixo pra não
+   colidir com os status de pedido (.open, .canceled etc. acima). */
+.status-badge.comanda-open {
+  background: var(--color-warning);
+}
+
+.status-badge.comanda-closed {
+  background: var(--color-success);
+  color: var(--text-inverse);
+}
+
+.status-badge.pdv-completed {
+  background: var(--color-success);
+  color: var(--text-inverse);
+}
+
+.status-badge.pdv-canceled {
+  background: var(--color-danger);
+  color: var(--text-inverse);
+}
+
 /* ==========================================================
    ABA COMPRAS
    ========================================================== */

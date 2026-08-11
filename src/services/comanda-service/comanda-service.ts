@@ -34,6 +34,26 @@ export class ComandaService extends FirestoreBaseService {
     );
   }
 
+  /**
+   * Todas as comandas da empresa (abertas e fechadas), usado no histórico
+   * geral. Diferente de getOpenComandas(), que só traz status 'open' pro
+   * fluxo operacional do PDV.
+   */
+  getAllComandas(): Observable<Comanda[]> {
+    const q = query(
+      collection(this.firestore, this.COLLECTION_NAME),
+      where('companyId', '==', this.tenantService.companyId())
+    );
+
+    return this.collectionDataObservable<Comanda>(q).pipe(
+      map(comandas => [...comandas].sort((a, b) => {
+        const dateA = (a.createdAt as any)?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
+        const dateB = (b.createdAt as any)?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+        return dateB - dateA;
+      }))
+    );
+  }
+
   async addComanda(comanda: Omit<Comanda, 'id' | 'createdAt' | 'status' | 'companyId'>): Promise<void> {
     const companyId = this.tenantService.companyId();
     if (!companyId) {

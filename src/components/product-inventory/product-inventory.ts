@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Chart, registerables } from 'chart.js';
-import { Observable, of } from 'rxjs';
+import { Observable, of, combineLatest } from 'rxjs';
 
 Chart.register(...registerables);
 
@@ -22,6 +22,21 @@ import { PurchaseProductService } from '../../services/purchase-product-service/
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { ConfigService } from '../../services/config/config.service';
 import { OrderService } from '../../services/order-service/order-service';
+import { ComandaService } from '../../services/comanda-service/comanda-service';
+
+// --- HISTÓRICO GERAL: item unificado das 3 origens (pdv/pedido/comanda) ---
+// Não é uma coleção do Firestore, é só uma forma comum de exibir sales,
+// orders e comandas juntos na mesma lista/filtro.
+export interface HistoricoItem {
+  id: string;
+  origem: 'pdv' | 'pedido' | 'comanda';
+  data: Date | null;
+  clienteNome: string;
+  clienteId?: string;
+  status: string;
+  total: number;
+  itens: { idProduct: string; productName: string; quantity: number }[];
+}
 
 @Component({
   selector: 'app-estoque',
@@ -34,7 +49,7 @@ export class ProductInventoryComponent implements OnInit {
   readonly config = inject(ConfigService);
 
   // Controle das Abas
-  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' = 'relatorio';
+  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' = 'relatorio';
   reportTab: 'vendas' | 'contas' | 'balanco' = 'vendas';
 
   // Controle de Visualização do Formulário
@@ -118,6 +133,14 @@ export class ProductInventoryComponent implements OnInit {
   clienteHistorico: Customer | null = null;
   pedidosCliente$: Observable<Order[]> = of([]);
 
+  // --- HISTÓRICO GERAL (aba própria em Gestão) ---
+  historicoItems: HistoricoItem[] = [];
+  historicoCarregando = true;
+  filtroHistoricoOrigem: 'todos' | 'pdv' | 'pedido' | 'comanda' = 'todos';
+  filtroHistoricoClienteId: string = '';
+  filtroHistoricoProdutoId: string = '';
+  filtroHistoricoBusca: string = '';
+
   // campos de endereço por CEP
   clienteCep = '';
   clienteRua = '';
@@ -149,6 +172,7 @@ export class ProductInventoryComponent implements OnInit {
     private billService: BillService,
     private purchaseProductService: PurchaseProductService,
     private orderService: OrderService,
+    private comandaService: ComandaService,
     private notif: NotificationService
   ) { }
 
@@ -189,6 +213,117 @@ export class ProductInventoryComponent implements OnInit {
     this.purchaseProductService.getPurchaseProducts().subscribe(data => {
       this.purchaseProducts = data;
     });
+
+    // 7. Carrega e combina Histórico Geral (PDV + Pedidos + Comandas)
+    combineLatest([
+      this.saleService.getSales(),
+      this.orderService.getOrders(),
+      this.comandaService.getAllComandas()
+    ]).subscribe(([vendas, pedidos, comandas]) => {
+      this.historicoItems = this.montarHistorico(vendas, pedidos, comandas);
+      this.historicoCarregando = false;
+    });
+  }
+
+  // ==========================================================
+  // ABA 5: HISTÓRICO GERAL
+  // ==========================================================
+
+  private montarHistorico(vendas: any[], pedidos: Order[], comandas: any[]): HistoricoItem[] {
+    // PDV: só vendas de balcão (sale_type 'pdv'). Vendas com sale_type
+    // 'order' não entram aqui pra não duplicar — o mesmo evento de negócio
+    // já aparece como o Pedido correspondente (mais rico: nome do cliente,
+    // endereço, ciclo de status), então a origem "pedido" cobre esse caso.
+    const itensPdv: HistoricoItem[] = vendas
+      .filter(v => v.sale_type === 'pdv')
+      .map(v => ({
+        id: v.id!,
+        origem: 'pdv' as const,
+        data: this.dataDoPedido(v.date),
+        clienteNome: 'Balcão (sem cliente)',
+        clienteId: undefined,
+        status: v.status || 'completed',
+        total: v.total || 0,
+        itens: (v.items || []).map((i: any) => ({
+          idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
+        }))
+      }));
+
+    const itensPedido: HistoricoItem[] = pedidos.map(p => ({
+      id: p.id!,
+      origem: 'pedido' as const,
+      data: this.dataDoPedido(p.createdAt),
+      clienteNome: p.customerName || 'Sem nome',
+      clienteId: p.customerId,
+      status: p.status,
+      total: p.total || 0,
+      itens: (p.items || []).map(i => ({
+        idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
+      }))
+    }));
+
+    // Comandas guardam o nome do cliente como texto livre, não vinculado a
+    // um Customer.id — por isso não entram no filtro por cliente (mesma
+    // limitação que já existe hoje pras vendas de PDV no Relatório).
+    const itensComanda: HistoricoItem[] = comandas.map(c => ({
+      id: c.id!,
+      origem: 'comanda' as const,
+      data: this.dataDoPedido(c.createdAt),
+      clienteNome: c.customerName || 'Sem nome',
+      clienteId: undefined,
+      status: c.status,
+      total: c.total || 0,
+      itens: (c.items || []).map((i: any) => ({
+        idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
+      }))
+    }));
+
+    return [...itensPdv, ...itensPedido, ...itensComanda].sort((a, b) => {
+      const ta = a.data ? a.data.getTime() : 0;
+      const tb = b.data ? b.data.getTime() : 0;
+      return tb - ta;
+    });
+  }
+
+  get historicoFiltrado(): HistoricoItem[] {
+    const busca = this.filtroHistoricoBusca.trim().toLowerCase();
+    return this.historicoItems.filter(item => {
+      if (this.filtroHistoricoOrigem !== 'todos' && item.origem !== this.filtroHistoricoOrigem) return false;
+      if (this.filtroHistoricoClienteId && item.clienteId !== this.filtroHistoricoClienteId) return false;
+      if (this.filtroHistoricoProdutoId && !item.itens.some(i => i.idProduct === this.filtroHistoricoProdutoId)) return false;
+      if (busca && !item.id.toLowerCase().includes(busca)) return false;
+      return true;
+    });
+  }
+
+  limparFiltrosHistorico() {
+    this.filtroHistoricoOrigem = 'todos';
+    this.filtroHistoricoClienteId = '';
+    this.filtroHistoricoProdutoId = '';
+    this.filtroHistoricoBusca = '';
+  }
+
+  origemLabel(origem: HistoricoItem['origem']): string {
+    return { pdv: 'PDV', pedido: 'Pedido', comanda: 'Comanda' }[origem];
+  }
+
+  statusLabelHistorico(item: HistoricoItem): string {
+    if (item.origem === 'pedido') return this.traduzirStatusPedido(item.status);
+    if (item.origem === 'comanda') return item.status === 'open' ? 'Aberta' : 'Fechada';
+    return item.status === 'canceled' ? 'Cancelada' : 'Concluída';
+  }
+
+  // Classe CSS do badge de status — com prefixo por origem pra "open" de
+  // comanda não pegar a mesma cor de "open" de pedido (mesmo texto, coisas
+  // diferentes). Pedido usa a classe crua porque já tem 8 status próprios
+  // e nenhum colide com os de comanda/pdv.
+  statusClassHistorico(item: HistoricoItem): string {
+    if (item.origem === 'pedido') return item.status;
+    return `${item.origem}-${item.status}`;
+  }
+
+  trackByHistorico(index: number, item: HistoricoItem): string {
+    return item.id || index.toString();
   }
 
   // ==========================================================

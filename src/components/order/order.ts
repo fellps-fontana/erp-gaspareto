@@ -140,13 +140,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
         this.isLoadingOrders = false;
         if (!orders) return [];
 
-        let result = orders;
+        // Pedidos finalizados/cancelados não aparecem mais nesta tela (nem
+        // no filtro "Todos") — a tela de Pedidos é só operacional agora.
+        // Esse histórico vive na aba Histórico Geral (Gestão), que já cobre
+        // os 3 status por lá (Pedido, PDV, Comanda) sem duplicar aqui.
+        let result = orders.filter(o => !['finished', 'canceled'].includes(o.status));
+
         if (this._filterStatus === 'pending') {
-          result = orders.filter(o =>
+          result = result.filter(o =>
             ['open', 'pending', 'preparing', 'ready', 'delivering'].includes(o.status)
           );
         } else if (this._filterStatus === 'delivered') {
-          result = orders.filter(o => ['delivered', 'finished'].includes(o.status));
+          result = result.filter(o => o.status === 'delivered');
         }
 
         if (this._sortOrder === 'oldest') {

@@ -19,6 +19,9 @@
       <button *ngIf="config.modules().compras" [class.active]="activeTab === 'compras'" (click)="activeTab = 'compras'">
         🛒 Compras
       </button>
+      <button [class.active]="activeTab === 'historico'" (click)="activeTab = 'historico'">
+        🧾 Histórico
+      </button>
     </nav>
 
     <button class="btn-voltar" [routerLink]="['/']">⬅ Voltar ao PDV</button>
@@ -579,6 +582,83 @@
             </button>
             <button class="btn-acao edit" (click)="abrirEdicaoCompra(p)" title="Editar">✏️</button>
             <button class="btn-acao delete" (click)="openDeleteCompraModal(p)" title="Excluir">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===================== ABA HISTÓRICO GERAL ===================== -->
+    <section *ngIf="activeTab === 'historico'" class="painel-relatorio">
+
+      <div class="header-section">
+        <h1>Histórico Geral</h1>
+        <p>Todos os lançamentos — PDV, Pedidos e Comandas — num só lugar.</p>
+      </div>
+
+      <!-- FILTROS -->
+      <div class="filtros-dashboard card-base">
+        <div class="filter-row main-filters">
+          <div class="source-selection">
+            <select [(ngModel)]="filtroHistoricoOrigem">
+              <option value="todos">Todas as Origens</option>
+              <option value="pdv">PDV</option>
+              <option value="pedido">Pedidos</option>
+              <option value="comanda">Comandas</option>
+            </select>
+          </div>
+
+          <div class="client-selection">
+            <select [(ngModel)]="filtroHistoricoClienteId">
+              <option value="">Todos os Clientes</option>
+              <option *ngFor="let c of customers" [value]="c.id">{{ c.name }}</option>
+            </select>
+            <small class="filter-warning" *ngIf="filtroHistoricoClienteId">
+              ⚠️ Vendas PDV e Comandas não têm cliente cadastrado vinculado e não aparecem neste filtro.
+            </small>
+          </div>
+
+          <div class="product-selection">
+            <select [(ngModel)]="filtroHistoricoProdutoId">
+              <option value="">Todos os Produtos</option>
+              <option *ngFor="let p of products" [value]="p.id">{{ p.title }}</option>
+            </select>
+          </div>
+
+          <div class="custom-dates">
+            <input type="text" [(ngModel)]="filtroHistoricoBusca" placeholder="Buscar por ID do lançamento...">
+          </div>
+
+          <div class="filter-actions">
+            <button class="btn-dashboard-action secondary" (click)="limparFiltrosHistorico()">
+              LIMPAR
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LISTA -->
+      <div class="compra-produtos-lista">
+        <div class="clientes-vazio" *ngIf="historicoCarregando">Carregando histórico...</div>
+        <div class="clientes-vazio" *ngIf="!historicoCarregando && historicoFiltrado.length === 0">
+          Nenhum lançamento encontrado com esses filtros.
+        </div>
+
+        <div class="compra-card" *ngFor="let item of historicoFiltrado; trackBy: trackByHistorico">
+          <div class="compra-info">
+            <div class="pedido-historico-header">
+              <span class="status-badge" [ngClass]="item.origem">{{ origemLabel(item.origem) }}</span>
+              <span class="pedido-historico-data">{{ item.data | date:'dd/MM/yyyy HH:mm' }}</span>
+              <span class="status-badge" [ngClass]="statusClassHistorico(item)">{{ statusLabelHistorico(item) }}</span>
+            </div>
+            <span class="compra-nome">{{ item.clienteNome }}</span>
+            <ul class="pedido-historico-itens">
+              <li *ngFor="let i of item.itens">{{ i.quantity }}x {{ i.productName }}</li>
+            </ul>
+          </div>
+
+          <div class="compra-meta">
+            <span class="meta-badge valor-badge">R$ {{ item.total | number:'1.2-2' }}</span>
           </div>
         </div>
       </div>
