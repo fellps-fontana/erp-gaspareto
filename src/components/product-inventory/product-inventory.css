@@ -1247,9 +1247,17 @@ input[type="color"] {
 
 .pedido-historico-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.header-left-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .pedido-historico-data {
@@ -1366,6 +1374,12 @@ input[type="color"] {
   color: var(--text-inverse);
 }
 
+.order-number {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
 /* ==========================================================
    ABA COMPRAS
    ========================================================== */
@@ -1406,6 +1420,18 @@ input[type="color"] {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.header-right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.historico-valor {
+  align-self: flex-end;
+  margin-top: 0.4rem;
 }
 
 .valor-badge {

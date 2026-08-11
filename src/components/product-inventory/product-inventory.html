@@ -613,9 +613,6 @@
               <option value="">Todos os Clientes</option>
               <option *ngFor="let c of customers" [value]="c.id">{{ c.name }}</option>
             </select>
-            <small class="filter-warning" *ngIf="filtroHistoricoClienteId">
-              ⚠️ Vendas PDV e Comandas não têm cliente cadastrado vinculado e não aparecem neste filtro.
-            </small>
           </div>
 
           <div class="product-selection">
@@ -626,7 +623,7 @@
           </div>
 
           <div class="custom-dates">
-            <input type="text" [(ngModel)]="filtroHistoricoBusca" placeholder="Buscar por ID do lançamento...">
+            <input type="text" [(ngModel)]="filtroHistoricoBusca" placeholder="Buscar por nº do pedido (#12) ou ID...">
           </div>
 
           <div class="filter-actions">
@@ -647,18 +644,20 @@
         <div class="compra-card" *ngFor="let item of historicoFiltrado; trackBy: trackByHistorico">
           <div class="compra-info">
             <div class="pedido-historico-header">
-              <span class="status-badge" [ngClass]="item.origem">{{ origemLabel(item.origem) }}</span>
-              <span class="pedido-historico-data">{{ item.data | date:'dd/MM/yyyy HH:mm' }}</span>
-              <span class="status-badge" [ngClass]="statusClassHistorico(item)">{{ statusLabelHistorico(item) }}</span>
+              <div class="header-left-group">
+                <span class="order-number" *ngIf="item.numero">#{{ item.numero }}</span>
+                <span class="status-badge" [ngClass]="item.origem">{{ origemLabel(item.origem) }}</span>
+              </div>
+              <div class="header-right-group">
+                <span class="status-badge" [ngClass]="statusClassHistorico(item)">{{ statusLabelHistorico(item) }}</span>
+                <span class="pedido-historico-data">{{ item.data | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
             </div>
             <span class="compra-nome">{{ item.clienteNome }}</span>
             <ul class="pedido-historico-itens">
               <li *ngFor="let i of item.itens">{{ i.quantity }}x {{ i.productName }}</li>
             </ul>
-          </div>
-
-          <div class="compra-meta">
-            <span class="meta-badge valor-badge">R$ {{ item.total | number:'1.2-2' }}</span>
+            <span class="meta-badge valor-badge historico-valor">R$ {{ item.total | number:'1.2-2' }}</span>
           </div>
         </div>
       </div>
