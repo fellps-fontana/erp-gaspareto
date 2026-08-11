@@ -5,6 +5,7 @@ import { Subscription } from 'rxjs';
 import { Order } from '../../models/order-model';
 import { OrderService } from '../../services/order-service/order-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
+import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
 
 interface OrderWithCoords extends Order {
   _lat: number;
@@ -24,6 +25,7 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
   private orderService = inject(OrderService);
   private notif = inject(NotificationService);
   private router = inject(Router);
+  private geocodingService = inject(GeocodingService);
 
   orders: Order[] = [];
   selectedIds = new Set<string>();
@@ -97,7 +99,7 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
         if (order.addressLat != null && order.addressLng != null) {
           withCoords.push({ ...order, _lat: order.addressLat, _lng: order.addressLng } as OrderWithCoords);
         } else {
-          const coords = await this.geocode(order.address!);
+          const coords = await this.geocodingService.geocode(order.address!);
           if (coords) {
             withCoords.push({ ...order, _lat: coords.lat, _lng: coords.lng } as OrderWithCoords);
           } else {
@@ -152,23 +154,6 @@ export class DeliveryRouteComponent implements OnInit, OnDestroy {
       this.isGeneratingRoute = false;
       this.loadingTooLong = false;
     }
-  }
-
-  // ── Geocodificação via Nominatim (OpenStreetMap, gratuito) ──────────
-  private async geocode(address: string): Promise<{ lat: number; lng: number } | null> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=br`;
-      const res  = await fetch(url, { signal: controller.signal, headers: { 'Accept-Language': 'pt-BR' } });
-      const data = await res.json();
-      if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    } catch {
-      // timeout ou erro de rede — ignora, retorna null
-    } finally {
-      clearTimeout(timer);
-    }
-    return null;
   }
 
   // ── Geolocalização do dispositivo ───────────────────────────────────

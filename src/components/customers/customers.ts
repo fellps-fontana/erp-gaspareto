@@ -8,23 +8,26 @@ import { Order } from '../../models/order-model';
 import { CustomerService } from '../../services/customer-service/customer-service';
 import { OrderService } from '../../services/order-service/order-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
+import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
+import { MapPickerComponent } from '../map-picker/map-picker';
 
 interface CustomerForm {
   name: string;
   phone: string;
-  cep: string;
   rua: string;
   numero: string;
   complemento: string;
   bairro: string;
   cidade: string;
   uf: string;
+  lat?: number;
+  lng?: number;
 }
 
 @Component({
   selector: 'app-customers',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MapPickerComponent],
   templateUrl: './customers.html',
   styleUrls: ['./customers.css']
 })
@@ -33,18 +36,22 @@ export class CustomersComponent implements OnInit, OnDestroy {
   private orderService = inject(OrderService);
   private notif = inject(NotificationService);
   private router = inject(Router);
+  private geocodingService = inject(GeocodingService);
 
   customers: Customer[] = [];
   searchTerm = '';
   isFormOpen = false;
   isDeleteModalOpen = false;
   isProcessing = false;
-  cepLoading = false;
-  cepError = '';
+  geocodeLoading = false;
+  geocodeError = '';
 
   form: CustomerForm = this.emptyForm();
   editingId: string | null = null;
   customerToDelete: Customer | null = null;
+
+  /** CEP não é mais digitado — vem do resultado da geocodificação reversa, best-effort. */
+  private resolvedCep = '';
 
   isHistoryModalOpen = false;
   selectedCustomerForHistory: Customer | null = null;
@@ -93,7 +100,8 @@ export class CustomersComponent implements OnInit, OnDestroy {
   openAdd() {
     this.form = this.emptyForm();
     this.editingId = null;
-    this.cepError = '';
+    this.resolvedCep = '';
+    this.geocodeError = '';
     this.isFormOpen = true;
   }
 
@@ -101,15 +109,17 @@ export class CustomersComponent implements OnInit, OnDestroy {
     this.form = this.emptyForm();
     this.form.name        = c.name;
     this.form.phone       = c.phone       ?? '';
-    this.form.cep         = c.cep         ?? '';
     this.form.rua         = c.rua         ?? c.address ?? '';
     this.form.numero      = c.numero      ?? '';
     this.form.complemento = c.complemento ?? '';
     this.form.bairro      = c.bairro      ?? '';
     this.form.cidade      = c.cidade      ?? '';
     this.form.uf          = c.uf          ?? '';
+    this.form.lat         = c.lat;
+    this.form.lng         = c.lng;
     this.editingId = c.id!;
-    this.cepError  = '';
+    this.resolvedCep = c.cep ?? '';
+    this.geocodeError = '';
     this.isFormOpen = true;
   }
 
@@ -118,52 +128,31 @@ export class CustomersComponent implements OnInit, OnDestroy {
     this.editingId = null;
   }
 
-  onCepInput() {
-    const digits = this.form.cep.replace(/\D/g, '');
-    if (digits.length > 8) {
-      this.form.cep = this.form.cep.slice(0, 9);
-      return;
-    }
-    this.form.cep = digits.length > 5
-      ? `${digits.slice(0, 5)}-${digits.slice(5)}`
-      : digits;
-
-    this.cepError = '';
-    if (digits.length === 8) {
-      this.fetchCep(digits);
-    } else {
-      this.clearAddressFields();
-    }
-  }
-
-  private async fetchCep(cep: string) {
-    this.cepLoading = true;
-    this.clearAddressFields();
+  async onMapPositionChange({ lat, lng }: { lat: number; lng: number }) {
+    this.form.lat = lat;
+    this.form.lng = lng;
+    this.geocodeLoading = true;
+    this.geocodeError = '';
     try {
-      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-      const data = await res.json();
-      if (data.erro) {
-        this.cepError = 'CEP não encontrado.';
-        return;
+      const result = await this.geocodingService.reverseGeocode(lat, lng);
+      if (result) {
+        this.form.rua    = result.rua    ?? '';
+        this.form.bairro = result.bairro ?? '';
+        this.form.cidade = result.cidade ?? '';
+        this.form.uf     = result.uf     ?? '';
+        this.resolvedCep = result.cep    ?? '';
+      } else {
+        this.form.rua    = '';
+        this.form.bairro = '';
+        this.form.cidade = '';
+        this.form.uf     = '';
+        this.resolvedCep = '';
+        this.geocodeError = 'Não foi possível identificar o endereço desta posição. '
+          + 'Você pode salvar assim mesmo — a localização será usada para calcular a rota de entrega.';
       }
-      this.form.rua    = data.logradouro || '';
-      this.form.bairro = data.bairro     || '';
-      this.form.cidade = data.localidade || '';
-      this.form.uf     = data.uf         || '';
-    } catch {
-      this.cepError = 'Erro ao buscar CEP. Tente novamente.';
     } finally {
-      this.cepLoading = false;
+      this.geocodeLoading = false;
     }
-  }
-
-  private clearAddressFields() {
-    this.form.rua    = '';
-    this.form.bairro = '';
-    this.form.cidade = '';
-    this.form.uf     = '';
-    this.form.numero = '';
-    this.form.complemento = '';
   }
 
   async save() {
@@ -178,13 +167,15 @@ export class CustomersComponent implements OnInit, OnDestroy {
         name:        this.form.name.trim(),
         phone:       this.form.phone?.trim() ?? '',
         address:     address || '',
-        cep:         this.form.cep,
+        cep:         this.resolvedCep,
         rua:         this.form.rua,
         numero:      this.form.numero,
         complemento: this.form.complemento,
         bairro:      this.form.bairro,
         cidade:      this.form.cidade,
         uf:          this.form.uf,
+        ...(this.form.lat != null ? { lat: this.form.lat } : {}),
+        ...(this.form.lng != null ? { lng: this.form.lng } : {}),
       };
       if (this.editingId) {
         await this.customerService.updateCustomer(this.editingId, data);
@@ -266,6 +257,6 @@ export class CustomersComponent implements OnInit, OnDestroy {
   }
 
   private emptyForm(): CustomerForm {
-    return { name: '', phone: '', cep: '', rua: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '' };
+    return { name: '', phone: '', rua: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '' };
   }
 }
