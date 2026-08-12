@@ -15,19 +15,6 @@ export interface ReverseGeocodeResult {
   address: string;
 }
 
-interface NominatimReverseResponse {
-  address?: {
-    road?: string;
-    suburb?: string;
-    neighbourhood?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    postcode?: string;
-    'ISO3166-2-lvl4'?: string;
-  };
-}
-
 interface GoogleAddressComponent {
   long_name: string;
   short_name: string;
@@ -102,9 +89,11 @@ export class GeocodingService {
   }
 
   private extractAddressComponent(components: GoogleAddressComponent[], types: string[], useShortName: boolean = false): string | undefined {
-    const component = components.find(c => c.types.some(t => types.includes(t)));
-    if (!component) return undefined;
-    return useShortName ? component.short_name : component.long_name;
+    for (const type of types) {
+      const match = components.find(c => c.types.includes(type));
+      if (match) return useShortName ? match.short_name : match.long_name;
+    }
+    return undefined;
   }
 
   private formatAddress(rua?: string, bairro?: string, cidade?: string, uf?: string): string {
