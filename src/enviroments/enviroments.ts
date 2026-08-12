@@ -1,6 +1,7 @@
 export const environment = {
   production: false,
   useEmulator: true,
+  googleMapsApiKey: "AIzaSyBRa0bcYQxGsRCRR88YeNsiMn9KRxFYcQg",
   firebase: {
       apiKey: "AIzaSyAKeaJqPLIZrAmXQuokvaw4PAEY0q0GDYM",
       authDomain: "projetosfelipe-9e458.firebaseapp.com",

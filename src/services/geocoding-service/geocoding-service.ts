@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { environment } from '../../enviroments/enviroments';
 
 export interface GeocodeResult {
   lat: number;
@@ -27,6 +28,20 @@ interface NominatimReverseResponse {
   };
 }
 
+interface GoogleAddressComponent {
+  long_name: string;
+  short_name: string;
+  types: string[];
+}
+
+interface GoogleGeocodeResponse {
+  status: string;
+  results: Array<{
+    address_components: GoogleAddressComponent[];
+    formatted_address: string;
+  }>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class GeocodingService {
   geocode(address: string): Promise<GeocodeResult | null> {
@@ -52,18 +67,22 @@ export class GeocodingService {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=pt-BR&zoom=18`;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${environment.googleMapsApiKey}&language=pt-BR&region=BR`;
       const res = await fetch(url, { signal: controller.signal });
-      const data: NominatimReverseResponse = await res.json();
+      const data: GoogleGeocodeResponse = await res.json();
 
-      if (!data.address) return null;
+      if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+        return null;
+      }
 
-      const addr = data.address;
-      const rua = addr.road;
-      const bairro = addr.suburb ?? addr.neighbourhood;
-      const cidade = addr.city ?? addr.town ?? addr.village;
-      const uf = addr['ISO3166-2-lvl4'] ? addr['ISO3166-2-lvl4'].split('-')[1] : undefined;
-      const cep = addr.postcode;
+      const result = data.results[0];
+      const components = result.address_components;
+
+      const rua = this.extractAddressComponent(components, ['route']);
+      const bairro = this.extractAddressComponent(components, ['sublocality_level_1', 'sublocality', 'neighborhood']);
+      const cidade = this.extractAddressComponent(components, ['locality', 'administrative_area_level_2']);
+      const uf = this.extractAddressComponent(components, ['administrative_area_level_1'], true);
+      const cep = this.extractAddressComponent(components, ['postal_code']);
 
       const addressStr = this.formatAddress(rua, bairro, cidade, uf);
 
@@ -80,6 +99,12 @@ export class GeocodingService {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  private extractAddressComponent(components: GoogleAddressComponent[], types: string[], useShortName: boolean = false): string | undefined {
+    const component = components.find(c => c.types.some(t => types.includes(t)));
+    if (!component) return undefined;
+    return useShortName ? component.short_name : component.long_name;
   }
 
   private formatAddress(rua?: string, bairro?: string, cidade?: string, uf?: string): string {
