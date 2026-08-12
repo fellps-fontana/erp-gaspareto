@@ -8,6 +8,7 @@ export interface GeocodeResult {
 
 export interface ReverseGeocodeResult {
   rua?: string;
+  numero?: string;
   bairro?: string;
   cidade?: string;
   uf?: string;
@@ -66,6 +67,7 @@ export class GeocodingService {
       const components = result.address_components;
 
       const rua = this.extractAddressComponent(components, ['route']);
+      const numero = this.extractAddressComponent(components, ['street_number']);
       const bairro = this.extractAddressComponent(components, ['sublocality_level_1', 'sublocality', 'neighborhood']);
       const cidade = this.extractAddressComponent(components, ['locality', 'administrative_area_level_2']);
       const uf = this.extractAddressComponent(components, ['administrative_area_level_1'], true);
@@ -75,6 +77,7 @@ export class GeocodingService {
 
       return {
         rua,
+        numero,
         bairro,
         cidade,
         uf,
