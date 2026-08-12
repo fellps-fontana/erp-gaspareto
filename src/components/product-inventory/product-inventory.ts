@@ -23,6 +23,8 @@ import { NotificationService } from '../../services/notification-service/notific
 import { ConfigService } from '../../services/config/config.service';
 import { OrderService } from '../../services/order-service/order-service';
 import { ComandaService } from '../../services/comanda-service/comanda-service';
+import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
+import { MapPickerComponent } from '../map-picker/map-picker';
 
 // --- HISTÓRICO GERAL: item unificado das 3 origens (pdv/pedido/comanda) ---
 // Não é uma coleção do Firestore, é só uma forma comum de exibir sales,
@@ -42,12 +44,13 @@ export interface HistoricoItem {
 @Component({
   selector: 'app-estoque',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, MapPickerComponent],
   templateUrl: './product-inventory.html',
   styleUrls: ['./product-inventory.css', './product-inventory-mobile.css']
 })
 export class ProductInventoryComponent implements OnInit {
   readonly config = inject(ConfigService);
+  private geocodingService = inject(GeocodingService);
 
   // Controle das Abas
   activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' = 'relatorio';
@@ -142,16 +145,19 @@ export class ProductInventoryComponent implements OnInit {
   filtroHistoricoProdutoId: string = '';
   filtroHistoricoBusca: string = '';
 
-  // campos de endereço por CEP
-  clienteCep = '';
+  // campos de endereço resolvidos via mini-mapa (lat/lng -> geocodificação reversa)
   clienteRua = '';
   clienteBairro = '';
   clienteCidade = '';
   clienteUf = '';
   clienteNumero = '';
   clienteComplemento = '';
-  clienteCepLoading = false;
-  clienteCepError = '';
+  clienteLat?: number;
+  clienteLng?: number;
+  geocodeLoading = false;
+  geocodeError = '';
+  /** CEP não é mais digitado — vem do resultado da geocodificação reversa, best-effort. */
+  private resolvedCep = '';
 
   get clienteFormattedAddress(): string {
     if (!this.clienteRua || !this.clienteNumero.trim() || !this.clienteBairro || !this.clienteCidade) return '';
@@ -775,21 +781,32 @@ export class ProductInventoryComponent implements OnInit {
   abrirNovoCliente() {
     this.clienteEmEdicao = null;
     this.novoCliente = { name: '', phone: '', address: '' };
-    this.limparCamposCep();
+    this.clienteRua = '';
+    this.clienteBairro = '';
+    this.clienteCidade = '';
+    this.clienteUf = '';
+    this.clienteNumero = '';
+    this.clienteComplemento = '';
+    this.clienteLat = undefined;
+    this.clienteLng = undefined;
+    this.resolvedCep = '';
+    this.geocodeError = '';
     this.exibirFormularioCliente = true;
   }
 
   abrirEdicaoCliente(c: Customer) {
     this.clienteEmEdicao = c;
     this.novoCliente     = { name: c.name, phone: c.phone || '', address: c.address || '' };
-    this.clienteCep          = c.cep         ?? '';
     this.clienteRua          = c.rua         ?? c.address ?? '';
     this.clienteNumero       = c.numero      ?? '';
     this.clienteComplemento  = c.complemento ?? '';
     this.clienteBairro       = c.bairro      ?? '';
     this.clienteCidade       = c.cidade      ?? '';
     this.clienteUf           = c.uf          ?? '';
-    this.clienteCepError     = '';
+    this.clienteLat          = c.lat;
+    this.clienteLng          = c.lng;
+    this.resolvedCep         = c.cep ?? '';
+    this.geocodeError        = '';
     this.exibirFormularioCliente = true;
   }
 
@@ -798,48 +815,30 @@ export class ProductInventoryComponent implements OnInit {
     this.clienteEmEdicao = null;
   }
 
-  private limparCamposCep() {
-    this.clienteCep = '';
-    this.clienteRua = '';
-    this.clienteBairro = '';
-    this.clienteCidade = '';
-    this.clienteUf = '';
-    this.clienteNumero = '';
-    this.clienteComplemento = '';
-    this.clienteCepError = '';
-  }
-
-  onClienteCepInput() {
-    const digits = this.clienteCep.replace(/\D/g, '');
-    if (digits.length > 8) { this.clienteCep = this.clienteCep.slice(0, 9); return; }
-    this.clienteCep = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
-    this.clienteCepError = '';
-    if (digits.length === 8) {
-      this.buscarCep(digits);
-    } else {
-      this.clienteRua = '';
-      this.clienteBairro = '';
-      this.clienteCidade = '';
-      this.clienteUf = '';
-      this.clienteNumero = '';
-      this.clienteComplemento = '';
-    }
-  }
-
-  private async buscarCep(cep: string) {
-    this.clienteCepLoading = true;
+  async onClientePositionChange({ lat, lng }: { lat: number; lng: number }) {
+    this.clienteLat = lat;
+    this.clienteLng = lng;
+    this.geocodeLoading = true;
+    this.geocodeError = '';
     try {
-      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-      const data = await res.json();
-      if (data.erro) { this.clienteCepError = 'CEP não encontrado.'; return; }
-      this.clienteRua    = data.logradouro || '';
-      this.clienteBairro = data.bairro     || '';
-      this.clienteCidade = data.localidade || '';
-      this.clienteUf     = data.uf         || '';
-    } catch {
-      this.clienteCepError = 'Erro ao buscar CEP.';
+      const result = await this.geocodingService.reverseGeocode(lat, lng);
+      if (result) {
+        this.clienteRua    = result.rua    ?? '';
+        this.clienteBairro = result.bairro ?? '';
+        this.clienteCidade = result.cidade ?? '';
+        this.clienteUf     = result.uf     ?? '';
+        this.resolvedCep   = result.cep    ?? '';
+      } else {
+        this.clienteRua    = '';
+        this.clienteBairro = '';
+        this.clienteCidade = '';
+        this.clienteUf     = '';
+        this.resolvedCep   = '';
+        this.geocodeError = 'Não foi possível identificar o endereço desta posição. '
+          + 'Você pode salvar assim mesmo — a localização será usada para calcular a rota de entrega.';
+      }
     } finally {
-      this.clienteCepLoading = false;
+      this.geocodeLoading = false;
     }
   }
 
@@ -853,13 +852,15 @@ export class ProductInventoryComponent implements OnInit {
       name:        this.novoCliente.name.trim(),
       phone:       this.novoCliente.phone?.trim() || '',
       address,
-      cep:         this.clienteCep,
+      cep:         this.resolvedCep,
       rua:         this.clienteRua,
       numero:      this.clienteNumero,
       complemento: this.clienteComplemento,
       bairro:      this.clienteBairro,
       cidade:      this.clienteCidade,
       uf:          this.clienteUf,
+      ...(this.clienteLat != null ? { lat: this.clienteLat } : {}),
+      ...(this.clienteLng != null ? { lng: this.clienteLng } : {})
     };
     try {
       if (this.clienteEmEdicao?.id) {
