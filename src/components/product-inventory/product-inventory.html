@@ -170,7 +170,7 @@
             <small class="kpi-meta">total em aberto</small>
           </div>
           <div class="card kpi-info">
-            <span class="kpi-label">A Pagar (Recebido)</span>
+            <span class="kpi-label">Recebido</span>
             <strong class="kpi-value" style="color: var(--color-info);">R$ {{ totalContasRecebidas | number:'1.2-2' }}</strong>
             <small class="kpi-meta">chegou, aguardando pag.</small>
           </div>
@@ -186,7 +186,7 @@
           <div class="status-filter-inline">
             <button [class.active]="filtroContasStatus === 'todos'" (click)="filtroContasStatus = 'todos'">Todas</button>
             <button [class.active]="filtroContasStatus === 'pendente'" (click)="filtroContasStatus = 'pendente'">Pendente</button>
-            <button [class.active]="filtroContasStatus === 'recebido'" (click)="filtroContasStatus = 'recebido'">A Pagar</button>
+            <button [class.active]="filtroContasStatus === 'recebido'" (click)="filtroContasStatus = 'recebido'">Recebido</button>
             <button [class.active]="filtroContasStatus === 'pago'" (click)="filtroContasStatus = 'pago'">Pago</button>
           </div>
           <a [routerLink]="['/contas']" class="btn-link-contas">Gerenciar Contas →</a>

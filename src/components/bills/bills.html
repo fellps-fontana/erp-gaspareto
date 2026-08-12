@@ -66,7 +66,7 @@
       <small class="kpi-meta">{{ countByStatus('pendente') }} conta(s)</small>
     </div>
     <div class="card kpi-recebido">
-      <span class="kpi-label">A Pagar</span>
+      <span class="kpi-label">Recebido</span>
       <strong class="kpi-value">R$ {{ totalRecebido | number:'1.2-2' }}</strong>
       <small class="kpi-meta">{{ countByStatus('recebido') }} conta(s)</small>
     </div>
@@ -81,7 +81,7 @@
   <div class="status-filter" *ngIf="!exibirFormulario">
     <button [class.active]="filtroStatus === 'todos'" (click)="filtroStatus = 'todos'">Todas</button>
     <button [class.active]="filtroStatus === 'pendente'" (click)="filtroStatus = 'pendente'">Pendente</button>
-    <button [class.active]="filtroStatus === 'recebido'" (click)="filtroStatus = 'recebido'">A Pagar</button>
+    <button [class.active]="filtroStatus === 'recebido'" (click)="filtroStatus = 'recebido'">Recebido</button>
     <button [class.active]="filtroStatus === 'pago'" (click)="filtroStatus = 'pago'">Pago</button>
   </div>
 

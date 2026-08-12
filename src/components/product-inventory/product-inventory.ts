@@ -29,6 +29,7 @@ import { ComandaService } from '../../services/comanda-service/comanda-service';
 // orders e comandas juntos na mesma lista/filtro.
 export interface HistoricoItem {
   id: string;
+  numero?: number; // só existe pra origem 'pedido' — número sequencial por empresa
   origem: 'pdv' | 'pedido' | 'comanda';
   data: Date | null;
   clienteNome: string;
@@ -251,6 +252,7 @@ export class ProductInventoryComponent implements OnInit {
 
     const itensPedido: HistoricoItem[] = pedidos.map(p => ({
       id: p.id!,
+      numero: p.orderNumber,
       origem: 'pedido' as const,
       data: this.dataDoPedido(p.createdAt),
       clienteNome: p.customerName || 'Sem nome',
@@ -291,7 +293,11 @@ export class ProductInventoryComponent implements OnInit {
       if (this.filtroHistoricoOrigem !== 'todos' && item.origem !== this.filtroHistoricoOrigem) return false;
       if (this.filtroHistoricoClienteId && item.clienteId !== this.filtroHistoricoClienteId) return false;
       if (this.filtroHistoricoProdutoId && !item.itens.some(i => i.idProduct === this.filtroHistoricoProdutoId)) return false;
-      if (busca && !item.id.toLowerCase().includes(busca)) return false;
+      if (busca) {
+        const bateId = item.id.toLowerCase().includes(busca);
+        const bateNumero = item.numero !== undefined && item.numero.toString() === busca.replace('#', '');
+        if (!bateId && !bateNumero) return false;
+      }
       return true;
     });
   }
@@ -379,7 +385,7 @@ export class ProductInventoryComponent implements OnInit {
 
   billStatusLabel(status: Bill['status']): string {
     const labels: Record<Bill['status'], string> = {
-      pendente: 'Pendente', recebido: 'A Pagar', pago: 'Pago'
+      pendente: 'Pendente', recebido: 'Recebido', pago: 'Pago'
     };
     return labels[status];
   }

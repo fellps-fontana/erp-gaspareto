@@ -156,7 +156,7 @@ export class BillsComponent implements OnInit {
   statusLabel(status: Bill['status']): string {
     const labels: Record<Bill['status'], string> = {
       pendente: 'Pendente',
-      recebido: 'A Pagar',
+      recebido: 'Recebido',
       pago: 'Pago'
     };
     return labels[status];
