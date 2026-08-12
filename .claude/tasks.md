@@ -479,3 +479,63 @@ Emulator (emulators.auth no firebase.json) e autenticar de verdade via
 signInAnonymously()/connectAuthEmulator() no test-helpers.ts (client SDK
 normal, funciona em browser) — investimento de infra ainda não feito,
 decisão do usuário se/quando vale a pena.
+
+## TASK-028 — Corrigir rótulo de exibição do status 'recebido' em Contas
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: vazio
+FLUXO: Correcao
+CONTEXTO A LER: regra-de-negocio.md seção 7 (Contas a pagar/receber — item sobre 'recebido'/"A Pagar"); src/components/product-inventory/product-inventory.ts:388 (billStatusLabel: pendente/recebido/pago); src/components/bills/bills.ts:159 (mesmo mapeamento duplicado)
+ESCOPO: trocar o texto exibido pro status 'recebido' de conta — hoje aparece como "A Pagar" nas duas telas (bills e aba Contas de Gestão), o que confunde porque a página inteira já se chama "Contas a Pagar" independente do status. Usar um rótulo que reflita o que 'recebido' significa no fluxo (ex.: "Recebido"), sem alterar o valor salvo no Firestore nem a lógica de transição (avancarStatusBill).
+CRITERIO DE ACEITE: nenhuma tela mostra mais "A Pagar" como rótulo do status 'recebido' especificamente (o título geral da página "Contas a Pagar" pode continuar); o valor 'recebido' salvo no banco não muda; filtros, KPIs e a lógica de avancarStatusBill que comparam a string 'recebido' continuam funcionando sem alteração.
+ARQUIVOS PERMITIDOS: src/components/bills/bills.ts, src/components/bills/bills.html, src/components/product-inventory/product-inventory.ts, src/components/product-inventory/product-inventory.html
+NAO FAZER: não renomear o valor do enum/status em bill-model.ts nem migrar dado existente — só o texto de exibição.
+RETORNO ESPERADO: diff dos arquivos tocados + rótulo novo escolhido.
+HISTORICO: hanzo trocou o rótulo de 'recebido' de "A Pagar" para "Recebido"
+em 4 pontos (bills.ts:statusLabel, bills.html KPI + botão de filtro,
+product-inventory.ts:billStatusLabel, product-inventory.html KPI + botão
+de filtro). Nenhum valor salvo no Firestore mudou; avancarStatusBill,
+filtros e getters de total continuam comparando a string 'recebido' sem
+alteração. `git grep "A Pagar"` confirmou que só restou o <h1> de título
+da página "Contas a Pagar" em bills.html (nome da tela, fora do escopo).
+`ng build --configuration production` passou sem erro. Revisado inline
+pelo Kira (mudança puramente textual, sem gate do style) — aprovado sem
+rodada de correção.
+CORREÇÃO POS-EXECUÇÃO: o worktree usado (starry-napping-spark) foi criado
+a partir de origin/main, 43 commits atrás de homologacao (faltava o merge
+inteiro do multi-tenant). O diff original do hanzo foi feito contra essa
+base desatualizada. Kira reaplicou a mesma mudança diretamente sobre o
+conteúdo real e atual dos 4 arquivos no checkout principal (copiado antes
+de editar, devolvido depois) — confirmado sem nenhuma ocorrência de
+"A Pagar" restante nos 4 arquivos reais. A regra-de-negocio.md também
+tinha sido corrompida por engano nesse processo (sobrescrita por uma
+versão stale de 160 linhas) e foi restaurada a partir do commit 9545645 +
+reaplicação das duas decisões (buyPrice e recorrência). Ver relatório
+completo dado ao usuário no chat desta sessão.
+
+## TASK-029 — Modelar geração automática da próxima ocorrência de conta recorrente
+STATUS: CONCLUIDA
+AGENT: killua
+DEPENDENCIAS: vazio
+FLUXO: Implementacao
+CONTEXTO A LER: regra-de-negocio.md seção 7 (bills — recurring/recurrencePeriod) e seção 8 (purchaseProducts — recPeriodMap semanal/mensal vs weekly/monthly, gerarBillDeProdutoCompra); stack.md (confirmar se o projeto já usa Firebase Functions ou só client SDK)
+ESCOPO: modelar como a próxima ocorrência de uma bill/purchaseProduct recorrente (recurring=true) passa a ser gerada automaticamente — comparar abordagem client-side (checagem ao carregar a tela de Contas: se passou recurrencePeriod desde a última ocorrência, gera a próxima) contra Cloud Function agendada, e propor a mais adequada à stack atual.
+CRITERIO DE ACEITE: entrega comparação das duas abordagens com tradeoffs; esqueleto/contrato de onde a lógica entra (service/método, assinatura, sem lógica real); lista explícita de pontos que precisam decisão do usuário antes de implementar (ex.: o que fazer se o app ficar semanas sem ser aberto — gerar todas as ocorrências atrasadas ou só a mais recente).
+ARQUIVOS PERMITIDOS: nenhum — task somente leitura, retorna modelagem em texto (killua não escreve código de implementação).
+NAO FAZER: não implementar código; não decidir sozinho o comportamento pra app fechado por muito tempo — reportar como ponto em aberto pro Kira levar ao usuário.
+RETORNO ESPERADO: modelagem/proposta de arquitetura + tradeoffs + pontos em aberto pra decisão do usuário antes de seguir pro ciclo TDD (regra crítica).
+HISTORICO: killua checou a stack real (sem functions/, sem firebase-functions
+no package.json, firebase.json só com hosting+firestore) antes de comparar.
+Recomendou client-side (BillRecurrenceService.checkAndGenerateDueOccurrences)
+sobre Cloud Function agendada, justificado pela ausência de infra de
+Functions hoje (TASK-023 de custom claims já fica em fase 2/opcional pelo
+mesmo motivo). Entregou esqueleto de contrato (BillRecurrenceService com
+checkAndGenerateDueOccurrences/calcularProximaDataVencimento, campo novo
+Bill.recurrenceGroupId, contrato de Cloud Function pra fase 2) e 9 pontos
+em aberto pra decisão do usuário (escopo, catch-up, limite de geração,
+status inicial, cálculo de dueDate, ponto de gatilho, aceite da fraqueza
+multi-tenant do client-side, bill sem dueDate, confirmação de que
+calcularProximaDataVencimento entra no ciclo TDD por ser regra crítica).
+Nenhum código escrito — task só de modelagem, como definido no escopo.
+Implementação fica bloqueada até o usuário responder os pontos em aberto;
+vai virar TASK-030+ quando destravar.

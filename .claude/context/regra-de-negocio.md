@@ -33,8 +33,9 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
 - **Compra de produto (entrada de estoque)** (`PurchaseService.addPurchase`):
   incrementa `stock` e **sobrescreve `buyPrice`** do produto com o valor
   unitário da nova compra — ou seja, o preço de custo do produto é sempre o
-  da última compra registrada, não uma média ponderada. ⚠️ Confirmar se esse
-  é o comportamento desejado (FIFO/média não é usado).
+  da última compra registrada, não uma média ponderada. Confirmado com o
+  usuário (2026-08-11): comportamento é intencional, mantém-se como está —
+  não usar FIFO/média ponderada.
 - Estorno de compra (`deletePurchase`) é negado se o estoque atual for menor
   que a quantidade da compra a estornar (não deixa estoque negativo).
 
@@ -128,17 +129,23 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
 - `status`: `'pendente' → 'recebido' → 'pago'` (avanço sequencial, uma etapa
   por vez — `avancarStatusBill` no componente de estoque só avança para o
   próximo estado, nunca pula etapa nem regride).
-  - ⚠️ Os rótulos de UI usam `'recebido'` como "A Pagar" (ver
-    `billStatusLabel` em `product-inventory.ts`) — nome do status no banco
-    (`recebido`) não bate com o rótulo mostrado ao usuário (`A Pagar`).
-    Confirmar com o usuário se isso é intencional ou débito técnico de
-    nomenclatura.
+  - Confirmado com o usuário (2026-08-11): o rótulo de UI do status
+    `'recebido'` mostrava "A Pagar" (`billStatusLabel`/`statusLabel` em
+    `product-inventory.ts`/`bills.ts`), confundindo com o título geral da
+    tela "Contas a Pagar". Corrigido só o texto de exibição pra "Recebido"
+    (TASK-028) — o valor `'recebido'` salvo no banco não mudou.
 - `receivedAt` é preenchido ao entrar em `'recebido'`, `paidAt` ao entrar em
   `'pago'`.
 - `recurring` + `recurrencePeriod` (`'semanal' | 'mensal'`) marca contas
-  recorrentes — ⚠️ não foi encontrada, no código revisado, nenhuma rotina que
-  gere automaticamente a próxima ocorrência de uma conta recorrente; parece
-  ser só um campo informativo hoje.
+  recorrentes. Decisão confirmada com o usuário (2026-08-11) sobre geração
+  automática da próxima ocorrência (TASK-029/030): abordagem client-side
+  (checagem ao carregar a tela de Contas, sem Cloud Function — o projeto
+  não tem infra de Functions hoje); escopo só para bills vinculadas a
+  `purchaseProductId` (conta recorrente manual sem produto não entra);
+  catch-up gera só a ocorrência mais recente (não recria as intermediárias
+  perdidas se o app ficar muito tempo sem abrir); próxima data de
+  vencimento é âncora (última data conhecida) + período, nunca "hoje +
+  período" — preserva o dia do calendário mesmo com atraso na checagem.
 - Uma conta pode nascer vinculada a uma compra (`purchaseProductId`), gerada
   automaticamente ao cadastrar um "produto de compra" recorrente
   (`gerarBillDeProdutoCompra`) ou ao confirmar uma entrada de estoque com a
