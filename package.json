@@ -42,7 +42,7 @@
     "bootstrap": "^5.3.8",
     "chart.js": "^4.5.1",
     "firebase": "^11.10.0",
-    "firebase-tools": "^14.27.0",
+    "firebase-tools": "^15.26.0",
     "leaflet": "^1.9.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

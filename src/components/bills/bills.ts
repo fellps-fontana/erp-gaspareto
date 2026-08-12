@@ -8,6 +8,8 @@ import { PurchaseProduct } from '../../models/purchase-product-model';
 import { BillService } from '../../services/bill-service/bill-service';
 import { PurchaseProductService } from '../../services/purchase-product-service/purchase-product-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
+import { BillRecurrenceService } from '../../services/bill-recurrence-service/bill-recurrence-service';
+import { TenantService } from '../../services/tenant-service/tenant-service';
 
 @Component({
   selector: 'app-bills',
@@ -36,16 +38,30 @@ export class BillsComponent implements OnInit {
   constructor(
     private billService: BillService,
     private purchaseProductService: PurchaseProductService,
-    private notif: NotificationService
+    private notif: NotificationService,
+    private billRecurrenceService: BillRecurrenceService,
+    private tenantService: TenantService
   ) {}
 
   ngOnInit() {
+    this.checkAndGenerateRecurringBills();
     this.billService.getBills().subscribe(data => {
       this.bills = data;
     });
     this.purchaseProductService.getPurchaseProducts().subscribe(data => {
       this.purchaseProducts = data;
     });
+  }
+
+  private async checkAndGenerateRecurringBills() {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) return;
+
+    try {
+      await this.billRecurrenceService.checkAndGenerateDueOccurrences(companyId);
+    } catch (error) {
+      console.error('Erro ao gerar ocorrências de bills recorrentes:', error);
+    }
   }
 
   onPurchaseProductChange(productId: string) {
