@@ -90,22 +90,22 @@
 
         <div class="form-divider">Endereço</div>
 
-        <!-- CEP -->
+        <!-- Mini-mapa: captura lat/lng por clique/arraste, geocodifica reverso p/ preview -->
         <div class="form-field">
-          <label>CEP</label>
-          <div class="cep-input-row">
-            <input type="text" [(ngModel)]="form.cep" (input)="onCepInput()"
-              placeholder="00000-000" maxlength="9" inputmode="numeric">
-            <span class="cep-loading" *ngIf="cepLoading">buscando...</span>
-          </div>
-          <small class="field-error" *ngIf="cepError">{{ cepError }}</small>
+          <app-map-picker
+            [lat]="form.lat"
+            [lng]="form.lng"
+            (positionChange)="onMapPositionChange($event)">
+          </app-map-picker>
+          <small class="geocode-loading" *ngIf="geocodeLoading">Identificando endereço...</small>
+          <small class="field-error" *ngIf="geocodeError">{{ geocodeError }}</small>
         </div>
 
         <!-- Rua + Número + Complemento -->
-        <ng-container *ngIf="form.rua">
+        <ng-container *ngIf="form.lat != null && form.lng != null">
           <div class="form-field">
             <label>Rua</label>
-            <input type="text" [(ngModel)]="form.rua" readonly class="input-readonly">
+            <input type="text" [(ngModel)]="form.rua" readonly class="input-readonly" placeholder="Não identificada">
           </div>
 
           <div class="form-row">
@@ -121,12 +121,12 @@
 
           <div class="form-field">
             <label>Bairro</label>
-            <input type="text" [(ngModel)]="form.bairro" readonly class="input-readonly">
+            <input type="text" [(ngModel)]="form.bairro" readonly class="input-readonly" placeholder="Não identificado">
           </div>
 
           <div class="form-field">
             <label>Cidade</label>
-            <input type="text" [value]="form.cidade + (form.uf ? ' - ' + form.uf : '')" readonly class="input-readonly">
+            <input type="text" [value]="form.cidade + (form.uf ? ' - ' + form.uf : '')" readonly class="input-readonly" placeholder="Não identificada">
           </div>
 
           <div class="address-preview" *ngIf="addressReady">
