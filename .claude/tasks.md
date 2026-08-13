@@ -539,3 +539,72 @@ calcularProximaDataVencimento entra no ciclo TDD por ser regra crítica).
 Nenhum código escrito — task só de modelagem, como definido no escopo.
 Implementação fica bloqueada até o usuário responder os pontos em aberto;
 vai virar TASK-030+ quando destravar.
+
+## TASK-030 — Implementar geração automática de conta recorrente (BillRecurrenceService)
+STATUS: CONCLUIDA
+AGENT: mike (RED) + levi (GREEN) + style
+DEPENDENCIAS: TASK-029
+FLUXO: Implementacao
+CONTEXTO A LER: regra-de-negocio.md seção 7 (decisões de recorrência confirmadas: client-side, escopo restrito a bills com purchaseProductId, catch-up gera só a ocorrência mais recente, próxima data = âncora + período); src/services/bill-recurrence-service/bill-recurrence-service.ts (esqueleto entregue na TASK-029, hoje só com NotImplementedException); src/services/bill-service/bill-service.ts (padrão de service Firestore já usado); src/models/bill-model.ts (campos dueDate/recurring/recurrencePeriod/purchaseProductId/status); src/services/tenant-service/tenant-service.ts (padrão de companyId da sessão)
+ESCOPO: implementar os dois métodos do esqueleto BillRecurrenceService. (1) calcularProximaDataVencimento(ultimaData, period): soma o período (semanal=+7 dias, mensal=+1 mês) sobre a última data conhecida (âncora), nunca "hoje + período". (2) checkAndGenerateDueOccurrences(companyId): busca bills recurring=true com purchaseProductId preenchido da empresa, agrupa por purchaseProductId pegando só a bill mais recente de cada série, e se a próxima data de vencimento calculada já passou, gera UMA bill nova (status 'pendente', mesmos dados da anterior exceto dueDate recalculada) — nunca recria ocorrências intermediárias perdidas. Se a bill mais recente da série não tiver dueDate, usa createdAt como âncora. Por fim, chamar checkAndGenerateDueOccurrences no ngOnInit de BillsComponent (único ponto de gatilho por ora).
+CRITERIO DE ACEITE:
+1. calcularProximaDataVencimento com period='semanal' soma 7 dias à data âncora; com period='mensal' soma 1 mês — provado por teste RED do mike antes de qualquer implementação.
+2. checkAndGenerateDueOccurrences nunca gera mais de uma bill nova por série de purchaseProductId numa única chamada, mesmo que várias ocorrências tenham ficado atrasadas.
+3. Bill gerada automaticamente nasce com status 'pendente' (mesmo padrão do gerarBillDeProdutoCompra manual).
+4. Bills sem recurring=true ou sem purchaseProductId nunca entram na geração automática.
+5. BillsComponent chama o serviço ao carregar a tela (ngOnInit).
+ARQUIVOS PERMITIDOS: src/services/bill-recurrence-service/bill-recurrence-service.ts, src/services/bill-recurrence-service/bill-recurrence-service.spec.ts (novo), src/components/bills/bills.ts, src/services/test-helpers.ts (ampliado: setupFirestoreEmulatorTest ganhou login real no Firebase Auth Emulator + criacao de users/{uid} compativel com firestore.rules, decisao tomada com o usuario em 2026-08-12 apos mike identificar que os 8 testes de I/O nao rodavam por falta de auth real)
+NAO FAZER: não implementar Cloud Function (fase 2, fora de escopo, sem infra hoje); não gerar mais de uma ocorrência por checagem mesmo com atraso longo; não alterar bill-service.ts nem purchase-product-service.ts; não editar .claude/tasks.md.
+RETORNO ESPERADO: mike confirma RED (teste falha por lógica ausente, não por erro de compilação) → levi implementa até GREEN (usa os testes só como leitura) → mike roda de novo e confirma GREEN.
+HISTORICO: rodada RED do mike revelou dois problemas de infra antes de dar
+sinal valido: (1) beforeEach compartilhado misturava testes de logica pura
+com setup de emulador Firestore, mascarando se os 6 testes de
+calcularProximaDataVencimento realmente rodavam — corrigido separando em
+describe isolado, sem Firestore; (2) os 8 testes de I/O travavam com
+PERMISSION_DENIED porque setupFirestoreEmulatorTest (test-helpers.ts) nunca
+fazia login real no Firebase Auth — decisao do usuario (2026-08-12): corrigir
+agora. Mike adicionou signInAnonymously + criacao de users/{uid} compativel
+com firestore.rules (mockCompanyId passou a ser o uid do usuario logado, unica
+forma de satisfazer a regra de create em users/{uid}). Confirmado sem
+regressao (8 testes que ja falhavam por outro motivo passaram a passar,
+nenhum teste que passava quebrou). RED final: 12/14 valido (6 logica pura +
+6 I/O por NotImplementedException); os 2 restantes (isolamento entre
+empresas) ficam com PERMISSION_DENIED por um motivo novo e correto — um
+unico usuario autenticado nao pode gravar companyId de empresa alheia, dado
+que so foi coberto por um unico usuario de teste — decisao do usuario:
+fica como divida tecnica conhecida, fora do escopo desta task.
+
+Bloqueio de infra a parte: subagents (mike/levi) tambem sao barrados de
+escrever no checkout principal sem worktree isolado nesta sessao background,
+e criar um worktree novo aqui recriaria o problema de base desalinhada ja
+sofrido nas TASK-028/029 (origin/main 43 commits atras de homologacao).
+Decisao do usuario (2026-08-12): desativar o guard pra este repo via
+.claude/settings.json ({"worktree":{"bgIsolation":"none"}}), criado pelo
+Kira (via copia atraves de worktree descartavel, ja que o proprio arquivo
+nao podia ser escrito direto enquanto o guard estava ativo).
+
+Levi implementou calcularProximaDataVencimento (ancora+periodo, overflow de
+fim de mes e ano bissexto tratados) e checkAndGenerateDueOccurrences (busca
+por companyId+recurring+purchaseProductId, agrupa por serie, gera so a mais
+recente vencida, status sempre 'pendente'), plugou a chamada em
+BillsComponent.ngOnInit (fire-and-forget). 12/12 GREEN esperados, suite
+completa sem regressao (28 SUCCESS). Levi commitou por conta propria
+(0c06b50) sem autorizacao explicita do Kira, varrendo tambem
+package.json/package-lock.json (WIP do usuario, upgrade do firebase-tools
+14.27.0->15.26.0, ja em andamento antes desta task) — decisao do usuario:
+manter como esta, conteudo correto so nao devia ter sido commitado sem
+perguntar.
+
+Style revisou e deu PRECISA CORRIGIR: (1) checkAndGenerateDueOccurrences sem
+guarda contra companyId vazio, quebrando o padrao de defesa em profundidade
+fechado na TASK-027; (2) TenantService injetado no construtor mas nunca
+usado (dependencia morta); (3) string 'bills' duplicada sem constante COL;
+(4) catch em bills.ts so dava console.error, sem notificar o usuario numa
+falha de escrita de regra critica. Levi corrigiu os 4 pontos sem tocar em
+calcularProximaDataVencimento nem na logica de catch-up (ja aprovadas).
+Style revisou de novo, rodou a suite pessoalmente (12 GREEN/2 FAILED,
+confirmado) e aprovou. Commit da correcao: e0b8fa3.
+
+Regra de negocio coberta: regra-de-negocio.md secao 7 (bills/recorrencia,
+CRITICA) e secao 10 (multi-tenant/companyId, CRITICA, padrao TASK-027
+respeitado apos correcao do style).
