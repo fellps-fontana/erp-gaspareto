@@ -11,6 +11,7 @@
     </button>
   </div>
   <small class="map-picker-search-error" *ngIf="searchError">{{ searchError }}</small>
+  <small class="map-picker-search-error" *ngIf="mapLoadError">{{ mapLoadError }}</small>
 
   <div #mapContainer class="map-picker-canvas"></div>
 

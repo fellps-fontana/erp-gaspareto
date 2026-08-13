@@ -828,6 +828,9 @@ export class ProductInventoryComponent implements OnInit {
         this.clienteCidade = result.cidade ?? '';
         this.clienteUf     = result.uf     ?? '';
         this.resolvedCep   = result.cep    ?? '';
+        if (result.numero) {
+          this.clienteNumero = result.numero;
+        }
       } else {
         this.clienteRua    = '';
         this.clienteBairro = '';
