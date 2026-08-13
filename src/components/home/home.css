@@ -106,6 +106,59 @@
   letter-spacing: 4px;
 }
 
+/* Painel de aniversariantes do dia */
+.birthday-panel {
+  width: 100%;
+  max-width: 640px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-home-card);
+  padding: var(--sp-md);
+  box-sizing: border-box;
+  color: var(--text-primary);
+  margin-bottom: 30px;
+  transition:
+    background-color var(--theme-transition-duration) var(--theme-transition-ease),
+    border-color var(--theme-transition-duration) var(--theme-transition-ease);
+}
+
+.birthday-panel__title {
+  margin: 0 0 var(--sp-sm);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.birthday-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.birthday-panel__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm) var(--sp-md);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.birthday-panel__name {
+  font-weight: 600;
+}
+
+.birthday-panel__phone {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
 /* Grid dos Botões */
 .grid-menu {
   display: flex;

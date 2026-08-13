@@ -128,7 +128,7 @@ export class ProductInventoryComponent implements OnInit {
   customers: Customer[] = [];
   clienteEmEdicao: Customer | null = null;
   exibirFormularioCliente: boolean = false;
-  novoCliente: Omit<Customer, 'id' | 'companyId'> = { name: '', phone: '', address: '' };
+  novoCliente: Omit<Customer, 'id' | 'companyId'> = { name: '', phone: '', address: '', dataAniversario: '' };
   isDeleteClienteModalOpen: boolean = false;
   clienteToDelete: Customer | null = null;
 
@@ -780,7 +780,7 @@ export class ProductInventoryComponent implements OnInit {
 
   abrirNovoCliente() {
     this.clienteEmEdicao = null;
-    this.novoCliente = { name: '', phone: '', address: '' };
+    this.novoCliente = { name: '', phone: '', address: '', dataAniversario: '' };
     this.clienteRua = '';
     this.clienteBairro = '';
     this.clienteCidade = '';
@@ -796,7 +796,12 @@ export class ProductInventoryComponent implements OnInit {
 
   abrirEdicaoCliente(c: Customer) {
     this.clienteEmEdicao = c;
-    this.novoCliente     = { name: c.name, phone: c.phone || '', address: c.address || '' };
+    this.novoCliente     = {
+      name: c.name,
+      phone: c.phone || '',
+      address: c.address || '',
+      dataAniversario: c.dataAniversario || ''
+    };
     this.clienteRua          = c.rua         ?? c.address ?? '';
     this.clienteNumero       = c.numero      ?? '';
     this.clienteComplemento  = c.complemento ?? '';
@@ -855,6 +860,7 @@ export class ProductInventoryComponent implements OnInit {
       name:        this.novoCliente.name.trim(),
       phone:       this.novoCliente.phone?.trim() || '',
       address,
+      dataAniversario: this.novoCliente.dataAniversario || '',
       cep:         this.resolvedCep,
       rua:         this.clienteRua,
       numero:      this.clienteNumero,

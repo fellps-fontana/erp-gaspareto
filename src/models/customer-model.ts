@@ -13,4 +13,5 @@ export interface Customer {
   uf?: string;
   lat?: number;
   lng?: number;
+  dataAniversario?: string; // 'YYYY-MM-DD', date-only sem hora/timezone
 }
