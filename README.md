@@ -54,6 +54,36 @@ ng e2e
 
 Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
 
+## Ambientes (staging/homolog)
+
+O projeto tem dois ambientes Firebase configurados em `.firebaserc`:
+
+- `default` (`projetosfelipe-9e458`) — usado por `ng serve`/`ng build` sem
+  flag de configuração, aponta pro Firestore local (`useEmulator: true` em
+  `src/enviroments/enviroments.ts`).
+- `hml` (`hologaerp`) — homologação/staging, banco real na nuvem
+  (`src/enviroments/enviroments.staging.ts`).
+
+Rodar localmente contra o banco de homologação (sem deploy):
+
+```bash
+npm run start:staging
+```
+
+Buildar e publicar o app no Firebase Hosting de homolog
+(`https://hologaerp.web.app`):
+
+```bash
+npm run deploy:hosting:staging
+```
+
+Publicar `firestore.rules`/`firestore.indexes.json` em homolog (separado
+do deploy de hosting — só necessário quando essas regras mudam):
+
+```bash
+npm run deploy:rules:staging
+```
+
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
