@@ -61,6 +61,7 @@ export class BillsComponent implements OnInit {
       await this.billRecurrenceService.checkAndGenerateDueOccurrences(companyId);
     } catch (error) {
       console.error('Erro ao gerar ocorrências de bills recorrentes:', error);
+      this.notif.warning('Não foi possível verificar contas recorrentes automaticamente.');
     }
   }
 

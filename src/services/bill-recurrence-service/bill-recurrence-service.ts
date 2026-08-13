@@ -4,7 +4,6 @@ import {
   collection, getDocs, query, where, addDoc, Timestamp
 } from 'firebase/firestore';
 import { Bill } from '../../models/bill-model';
-import { TenantService } from '../tenant-service/tenant-service';
 
 export interface RecurrenceCheckResult {
   generated: Bill[];
@@ -12,21 +11,15 @@ export interface RecurrenceCheckResult {
 
 @Injectable({ providedIn: 'root' })
 export class BillRecurrenceService {
+  private readonly COL = 'bills';
+
   constructor(
-    @Optional() private firestore?: Firestore,
-    @Optional() private tenantService?: TenantService
+    @Optional() private firestore?: Firestore
   ) {
     // Se não tiver injeção (testes de lógica pura), tentar via inject
     if (!this.firestore) {
       try {
         this.firestore = inject(Firestore);
-      } catch {
-        // Falha esperada em testes sem injection context
-      }
-    }
-    if (!this.tenantService) {
-      try {
-        this.tenantService = inject(TenantService);
       } catch {
         // Falha esperada em testes sem injection context
       }
@@ -39,9 +32,15 @@ export class BillRecurrenceService {
    * (catch-up: não recria as ocorrências intermediárias perdidas).
    */
   async checkAndGenerateDueOccurrences(companyId: string): Promise<RecurrenceCheckResult> {
+    if (!companyId) {
+      throw new Error(
+        'Não é possível verificar ocorrências de bills recorrentes sem ' +
+        'uma empresa (companyId) associada à sessão atual.'
+      );
+    }
 
     const q = query(
-      collection(this.firestore!, 'bills'),
+      collection(this.firestore!, this.COL),
       where('companyId', '==', companyId),
       where('recurring', '==', true)
     );
@@ -87,7 +86,7 @@ export class BillRecurrenceService {
           createdAt: Timestamp.now()
         };
 
-        const ref = await addDoc(collection(this.firestore!, 'bills'), newBill);
+        const ref = await addDoc(collection(this.firestore!, this.COL), newBill);
         generated.push({
           ...newBill,
           id: ref.id
