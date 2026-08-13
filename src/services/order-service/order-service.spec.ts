@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Order } from '../../models/order-model';
 import { Firestore } from '@angular/fire/firestore';
 import { setDoc, doc } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
 describe('OrderService - Multi-tenant (companyId isolation)', () => {
@@ -30,48 +30,55 @@ describe('OrderService - Multi-tenant (companyId isolation)', () => {
   describe('Regra: Isolamento de tenant por companyId (CRÍTICA)', () => {
     describe('[RED] getOrders() - Leitura', () => {
       it('[RED] should filter by companyId - own orders appear, foreign orders do not', async () => {
-        const now = new Date() as any;
+        const secondSetup = await setupSecondUserContext();
+        try {
+          const now = new Date() as any;
 
-        // Seed: own company's order
-        const ownOrder: Order = {
-          companyId: setup.mockCompanyId as string,
-          customerName: 'Own',
-          items: [],
-          itemsTotal: 100,
-          shippingCost: 10,
-          total: 110,
-          status: 'open',
-          deliveryType: 'delivery',
-          scheduledDate: now,
-          createdAt: now
-        };
-        await setDoc(doc(setup.firestore, `orders/own-order-${Date.now()}`), ownOrder);
+          // Seed: own company's order
+          const ownOrder: Order = {
+            companyId: setup.mockCompanyId as string,
+            customerName: 'Own',
+            items: [],
+            itemsTotal: 100,
+            shippingCost: 10,
+            total: 110,
+            orderNumber: 1,
+            status: 'open',
+            deliveryType: 'delivery',
+            scheduledDate: now,
+            createdAt: now
+          };
+          await setDoc(doc(setup.firestore, `orders/own-order-${Date.now()}`), ownOrder);
 
-        // Seed: foreign company's order (should NOT appear)
-        const foreignOrder: Order = {
-          companyId: 'foreign-company-xyz',
-          customerName: 'Foreign',
-          items: [],
-          itemsTotal: 50,
-          shippingCost: 5,
-          total: 55,
-          status: 'open',
-          deliveryType: 'delivery',
-          scheduledDate: now,
-          createdAt: now
-        };
-        await setDoc(doc(setup.firestore, `orders/foreign-order-${Date.now()}`), foreignOrder);
+          // Seed: foreign company's order (written by second user, should NOT appear to first user)
+          const foreignOrder: Order = {
+            companyId: secondSetup.mockCompanyId as string,
+            customerName: 'Foreign',
+            items: [],
+            itemsTotal: 50,
+            shippingCost: 5,
+            total: 55,
+            orderNumber: 1,
+            status: 'open',
+            deliveryType: 'delivery',
+            scheduledDate: now,
+            createdAt: now
+          };
+          await setDoc(doc(secondSetup.firestore, `orders/foreign-order-${Date.now()}`), foreignOrder);
 
-        // Call service
-        const orders = await firstValueFrom(service.getOrders());
+          // Call service (as first user)
+          const orders = await firstValueFrom(service.getOrders());
 
-        // ASSERTION: own order must appear
-        const ownAppears = orders.some((o: any) => o.companyId === setup.mockCompanyId && o.customerName === 'Own');
-        expect(ownAppears).toBeTruthy('Own company order must appear');
+          // ASSERTION: own order must appear
+          const ownAppears = orders.some((o: any) => o.companyId === setup.mockCompanyId && o.customerName === 'Own');
+          expect(ownAppears).toBeTruthy('Own company order must appear');
 
-        // ASSERTION: foreign order must NOT appear
-        const foreignAppears = orders.some((o: any) => o.companyId === 'foreign-company-xyz');
-        expect(foreignAppears).toBeFalsy('Foreign company order must NOT appear');
+          // ASSERTION: foreign order must NOT appear
+          const foreignAppears = orders.some((o: any) => o.companyId === secondSetup.mockCompanyId);
+          expect(foreignAppears).toBeFalsy('Foreign company order must NOT appear');
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 

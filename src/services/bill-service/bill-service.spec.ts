@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Bill } from '../../models/bill-model';
 import { Firestore } from '@angular/fire/firestore';
 import { setDoc, doc } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
 describe('BillService - Multi-tenant (companyId isolation)', () => {
@@ -30,40 +30,45 @@ describe('BillService - Multi-tenant (companyId isolation)', () => {
   describe('Regra: Isolamento de tenant por companyId (CRÍTICA)', () => {
     describe('[RED] getBills() - Leitura', () => {
       it('[RED] should filter by companyId - own bills appear, foreign bills do not', async () => {
-        const now = new Date() as any;
+        const secondSetup = await setupSecondUserContext();
+        try {
+          const now = new Date() as any;
 
-        // Seed: own company's bill
-        const ownBill: Bill = {
-          companyId: setup.mockCompanyId as string,
-          name: 'Own Bill',
-          value: 100,
-          status: 'pendente',
-          recurring: false,
-          createdAt: now
-        };
-        await setDoc(doc(setup.firestore, `bills/own-bill-${Date.now()}`), ownBill);
+          // Seed: own company's bill
+          const ownBill: Bill = {
+            companyId: setup.mockCompanyId as string,
+            name: 'Own Bill',
+            value: 100,
+            status: 'pendente',
+            recurring: false,
+            createdAt: now
+          };
+          await setDoc(doc(setup.firestore, `bills/own-bill-${Date.now()}`), ownBill);
 
-        // Seed: foreign company's bill (should NOT appear)
-        const foreignBill: Bill = {
-          companyId: 'foreign-company-xyz',
-          name: 'Foreign Bill',
-          value: 50,
-          status: 'pendente',
-          recurring: false,
-          createdAt: now
-        };
-        await setDoc(doc(setup.firestore, `bills/foreign-bill-${Date.now()}`), foreignBill);
+          // Seed: foreign company's bill (written by second user, should NOT appear to first user)
+          const foreignBill: Bill = {
+            companyId: secondSetup.mockCompanyId as string,
+            name: 'Foreign Bill',
+            value: 50,
+            status: 'pendente',
+            recurring: false,
+            createdAt: now
+          };
+          await setDoc(doc(secondSetup.firestore, `bills/foreign-bill-${Date.now()}`), foreignBill);
 
-        // Call service
-        const bills = await firstValueFrom(service.getBills());
+          // Call service (as first user)
+          const bills = await firstValueFrom(service.getBills());
 
-        // ASSERTION: own bill must appear
-        const ownAppears = bills.some((b: any) => b.companyId === setup.mockCompanyId && b.name === 'Own Bill');
-        expect(ownAppears).toBeTruthy('Own company bill must appear');
+          // ASSERTION: own bill must appear
+          const ownAppears = bills.some((b: any) => b.companyId === setup.mockCompanyId && b.name === 'Own Bill');
+          expect(ownAppears).toBeTruthy('Own company bill must appear');
 
-        // ASSERTION: foreign bill must NOT appear
-        const foreignAppears = bills.some((b: any) => b.companyId === 'foreign-company-xyz');
-        expect(foreignAppears).toBeFalsy('Foreign company bill must NOT appear');
+          // ASSERTION: foreign bill must NOT appear
+          const foreignAppears = bills.some((b: any) => b.companyId === secondSetup.mockCompanyId);
+          expect(foreignAppears).toBeFalsy('Foreign company bill must NOT appear');
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 

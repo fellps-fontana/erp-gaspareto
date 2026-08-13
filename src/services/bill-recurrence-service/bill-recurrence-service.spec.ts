@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Bill } from '../../models/bill-model';
 import { Firestore } from '@angular/fire/firestore';
 import { setDoc, doc, Timestamp } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 
 // Describe isolado: logica pura, SEM emulador Firestore, SEM TestBed com
 // providers de infra. BillRecurrenceService nao tem dependencias injetadas
@@ -222,63 +222,76 @@ describe('BillRecurrenceService - checkAndGenerateDueOccurrences (REGRA CRITICA,
 
     describe('tenant isolation (CRITICA)', () => {
       it('[RED] should only generate for specified companyId', async () => {
-        const now = Timestamp.now();
-        const yesterday = Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+        const secondSetup = await setupSecondUserContext();
+        try {
+          const now = Timestamp.now();
+          const yesterday = Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
-        const ownBill: Bill = {
-          companyId: setup.mockCompanyId as string,
-          name: 'Own Bill',
-          value: 100,
-          dueDate: yesterday,
-          status: 'pendente',
-          recurring: true,
-          recurrencePeriod: 'semanal',
-          createdAt: now,
-          purchaseProductId: 'pp-own-123'
-        };
-        await setDoc(doc(setup.firestore, 'bills/own-' + Date.now()), ownBill);
+          const ownBill: Bill = {
+            companyId: setup.mockCompanyId as string,
+            name: 'Own Bill',
+            value: 100,
+            dueDate: yesterday,
+            status: 'pendente',
+            recurring: true,
+            recurrencePeriod: 'semanal',
+            createdAt: now,
+            purchaseProductId: 'pp-own-123'
+          };
+          await setDoc(doc(setup.firestore, 'bills/own-' + Date.now()), ownBill);
 
-        const foreignBill: Bill = {
-          companyId: 'foreign-company-xyz',
-          name: 'Foreign Bill',
-          value: 50,
-          dueDate: yesterday,
-          status: 'pendente',
-          recurring: true,
-          recurrencePeriod: 'semanal',
-          createdAt: now,
-          purchaseProductId: 'pp-foreign-123'
-        };
-        await setDoc(doc(setup.firestore, 'bills/foreign-' + Date.now()), foreignBill);
+          const foreignBill: Bill = {
+            companyId: secondSetup.mockCompanyId as string,
+            name: 'Foreign Bill',
+            value: 50,
+            dueDate: yesterday,
+            status: 'pendente',
+            recurring: true,
+            recurrencePeriod: 'semanal',
+            createdAt: now,
+            purchaseProductId: 'pp-foreign-123'
+          };
+          await setDoc(doc(secondSetup.firestore, 'bills/foreign-' + Date.now()), foreignBill);
 
-        const result = await service.checkAndGenerateDueOccurrences(setup.mockCompanyId as string);
+          const result = await service.checkAndGenerateDueOccurrences(setup.mockCompanyId as string);
 
-        expect(result.generated.some(b => b.purchaseProductId === 'pp-own-123')).toBeTruthy();
-        expect(result.generated.some(b => b.purchaseProductId === 'pp-foreign-123')).toBeFalsy();
+          expect(result.generated.some(b => b.purchaseProductId === 'pp-own-123')).toBeTruthy();
+          expect(result.generated.some(b => b.purchaseProductId === 'pp-foreign-123')).toBeFalsy();
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
 
       it('[RED] should not leak foreign bills in result', async () => {
-        const now = Timestamp.now();
-        const yesterday = Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+        const secondSetup = await setupSecondUserContext();
+        try {
+          const now = Timestamp.now();
+          const yesterday = Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
-        const foreignBill: Bill = {
-          companyId: 'another-foreign-company',
-          name: 'Another Foreign Bill',
-          value: 999,
-          dueDate: yesterday,
-          status: 'pendente',
-          recurring: true,
-          recurrencePeriod: 'mensal',
-          createdAt: now,
-          purchaseProductId: 'pp-another-foreign'
-        };
-        await setDoc(doc(setup.firestore, 'bills/another-' + Date.now()), foreignBill);
+          const foreignBill: Bill = {
+            companyId: secondSetup.mockCompanyId as string,
+            name: 'Another Foreign Bill',
+            value: 999,
+            dueDate: yesterday,
+            status: 'pendente',
+            recurring: true,
+            recurrencePeriod: 'mensal',
+            createdAt: now,
+            purchaseProductId: 'pp-another-foreign'
+          };
+          await setDoc(doc(secondSetup.firestore, 'bills/another-' + Date.now()), foreignBill);
 
-        const result = await service.checkAndGenerateDueOccurrences(setup.mockCompanyId as string);
+          const result = await service.checkAndGenerateDueOccurrences(setup.mockCompanyId as string);
 
-        result.generated.forEach(bill => {
-          expect(bill.companyId).toBe(setup.mockCompanyId as string);
-        });
+          result.generated.forEach(bill => {
+            expect(bill.companyId).toBe(setup.mockCompanyId as string);
+          });
+          expect(result.generated.some(b => b.companyId === secondSetup.mockCompanyId)).toBeFalsy(
+            'No foreign bills from second user should appear in result'
+          );
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 

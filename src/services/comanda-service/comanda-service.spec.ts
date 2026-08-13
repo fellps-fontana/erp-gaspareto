@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Comanda } from '../../models/comanda-model';
 import { Firestore } from '@angular/fire/firestore';
 import { setDoc, doc } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
 describe('ComandaService - Multi-tenant (companyId isolation)', () => {
@@ -30,40 +30,45 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
   describe('Regra: Isolamento de tenant por companyId (CRÍTICA)', () => {
     describe('[RED] getOpenComandas() - Leitura', () => {
       it('[RED] should filter by companyId - own comandas appear, foreign comandas do not', async () => {
-        const now = new Date() as any;
+        const secondSetup = await setupSecondUserContext();
+        try {
+          const now = new Date() as any;
 
-        // Seed: own company's comanda
-        const ownComanda: Comanda = {
-          companyId: setup.mockCompanyId as string,
-          customerName: 'Own Customer',
-          items: [],
-          total: 0,
-          status: 'open',
-          createdAt: now
-        };
-        await setDoc(doc(setup.firestore, `comandas/own-comanda-${Date.now()}`), ownComanda);
+          // Seed: own company's comanda
+          const ownComanda: Comanda = {
+            companyId: setup.mockCompanyId as string,
+            customerName: 'Own Customer',
+            items: [],
+            total: 0,
+            status: 'open',
+            createdAt: now
+          };
+          await setDoc(doc(setup.firestore, `comandas/own-comanda-${Date.now()}`), ownComanda);
 
-        // Seed: foreign company's comanda (should NOT appear)
-        const foreignComanda: Comanda = {
-          companyId: 'foreign-company-xyz',
-          customerName: 'Foreign Customer',
-          items: [],
-          total: 0,
-          status: 'open',
-          createdAt: now
-        };
-        await setDoc(doc(setup.firestore, `comandas/foreign-comanda-${Date.now()}`), foreignComanda);
+          // Seed: foreign company's comanda (written by second user, should NOT appear to first user)
+          const foreignComanda: Comanda = {
+            companyId: secondSetup.mockCompanyId as string,
+            customerName: 'Foreign Customer',
+            items: [],
+            total: 0,
+            status: 'open',
+            createdAt: now
+          };
+          await setDoc(doc(secondSetup.firestore, `comandas/foreign-comanda-${Date.now()}`), foreignComanda);
 
-        // Call service
-        const comandas = await firstValueFrom(service.getOpenComandas());
+          // Call service (as first user)
+          const comandas = await firstValueFrom(service.getOpenComandas());
 
-        // ASSERTION: own comanda must appear
-        const ownAppears = comandas.some((c: any) => c.companyId === setup.mockCompanyId && c.customerName === 'Own Customer');
-        expect(ownAppears).toBeTruthy('Own company comanda must appear');
+          // ASSERTION: own comanda must appear
+          const ownAppears = comandas.some((c: any) => c.companyId === setup.mockCompanyId && c.customerName === 'Own Customer');
+          expect(ownAppears).toBeTruthy('Own company comanda must appear');
 
-        // ASSERTION: foreign comanda must NOT appear
-        const foreignAppears = comandas.some((c: any) => c.companyId === 'foreign-company-xyz');
-        expect(foreignAppears).toBeFalsy('Foreign company comanda must NOT appear');
+          // ASSERTION: foreign comanda must NOT appear
+          const foreignAppears = comandas.some((c: any) => c.companyId === secondSetup.mockCompanyId);
+          expect(foreignAppears).toBeFalsy('Foreign company comanda must NOT appear');
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 

@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Sale, PaymentMethod } from '../../models/sell-model';
 import { Firestore } from '@angular/fire/firestore';
 import { setDoc, doc } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
 describe('SaleService - Multi-tenant (companyId isolation)', () => {
@@ -30,40 +30,45 @@ describe('SaleService - Multi-tenant (companyId isolation)', () => {
   describe('Regra: Isolamento de tenant por companyId (CRÍTICA)', () => {
     describe('[RED] getSales() - Leitura', () => {
       it('[RED] should filter by companyId - own sales appear, foreign sales do not', async () => {
-        const now = new Date() as any;
+        const secondSetup = await setupSecondUserContext();
+        try {
+          const now = new Date() as any;
 
-        // Seed: own company's sale
-        const ownSale: Sale = {
-          companyId: setup.mockCompanyId as string,
-          items: [],
-          total: 100,
-          date: now,
-          paymentMethod: PaymentMethod.DINHEIRO,
-          sale_type: 'pdv'
-        };
-        await setDoc(doc(setup.firestore, `sales/own-sale-${Date.now()}`), ownSale);
+          // Seed: own company's sale
+          const ownSale: Sale = {
+            companyId: setup.mockCompanyId as string,
+            items: [],
+            total: 100,
+            date: now,
+            paymentMethod: PaymentMethod.DINHEIRO,
+            sale_type: 'pdv'
+          };
+          await setDoc(doc(setup.firestore, `sales/own-sale-${Date.now()}`), ownSale);
 
-        // Seed: foreign company's sale (should NOT appear)
-        const foreignSale: Sale = {
-          companyId: 'foreign-company-xyz',
-          items: [],
-          total: 50,
-          date: now,
-          paymentMethod: PaymentMethod.PIX,
-          sale_type: 'pdv'
-        };
-        await setDoc(doc(setup.firestore, `sales/foreign-sale-${Date.now()}`), foreignSale);
+          // Seed: foreign company's sale (written by second user, should NOT appear to first user)
+          const foreignSale: Sale = {
+            companyId: secondSetup.mockCompanyId as string,
+            items: [],
+            total: 50,
+            date: now,
+            paymentMethod: PaymentMethod.PIX,
+            sale_type: 'pdv'
+          };
+          await setDoc(doc(secondSetup.firestore, `sales/foreign-sale-${Date.now()}`), foreignSale);
 
-        // Call service
-        const sales = await firstValueFrom(service.getSales());
+          // Call service (as first user)
+          const sales = await firstValueFrom(service.getSales());
 
-        // ASSERTION: own sale must appear
-        const ownAppears = sales.some((s: any) => s.companyId === setup.mockCompanyId && s.total === 100);
-        expect(ownAppears).toBeTruthy('Own company sale must appear');
+          // ASSERTION: own sale must appear
+          const ownAppears = sales.some((s: any) => s.companyId === setup.mockCompanyId && s.total === 100);
+          expect(ownAppears).toBeTruthy('Own company sale must appear');
 
-        // ASSERTION: foreign sale must NOT appear
-        const foreignAppears = sales.some((s: any) => s.companyId === 'foreign-company-xyz');
-        expect(foreignAppears).toBeFalsy('Foreign company sale must NOT appear');
+          // ASSERTION: foreign sale must NOT appear
+          const foreignAppears = sales.some((s: any) => s.companyId === secondSetup.mockCompanyId);
+          expect(foreignAppears).toBeFalsy('Foreign company sale must NOT appear');
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 
