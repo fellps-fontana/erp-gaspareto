@@ -301,7 +301,7 @@ export class ProductInventoryComponent implements OnInit {
       if (this.filtroHistoricoProdutoId && !item.itens.some(i => i.idProduct === this.filtroHistoricoProdutoId)) return false;
       if (busca) {
         const bateId = item.id.toLowerCase().includes(busca);
-        const bateNumero = item.numero !== undefined && item.numero.toString() === busca.replace('#', '');
+        const bateNumero = item.numero !== undefined && item.numero.toString().includes(busca.replace('#', ''));
         if (!bateId && !bateNumero) return false;
       }
       return true;
