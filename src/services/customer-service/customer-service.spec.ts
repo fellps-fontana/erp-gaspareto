@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Customer } from '../../models/customer-model';
 import { Firestore } from '@angular/fire/firestore';
 import { setDoc, doc } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
 describe('CustomerService - Multi-tenant (companyId isolation)', () => {
@@ -30,30 +30,35 @@ describe('CustomerService - Multi-tenant (companyId isolation)', () => {
   describe('Regra: Isolamento de tenant por companyId (CRÍTICA)', () => {
     describe('[RED] getCustomers() - Leitura', () => {
       it('[RED] should filter by companyId - own customers appear, foreign customers do not', async () => {
-        // Seed: own company's customer
-        const ownCustomer: Customer = {
-          companyId: setup.mockCompanyId as string,
-          name: 'Own Customer'
-        };
-        await setDoc(doc(setup.firestore, `customers/own-cust-${Date.now()}`), ownCustomer);
+        const secondSetup = await setupSecondUserContext();
+        try {
+          // Seed: own company's customer
+          const ownCustomer: Customer = {
+            companyId: setup.mockCompanyId as string,
+            name: 'Own Customer'
+          };
+          await setDoc(doc(setup.firestore, `customers/own-cust-${Date.now()}`), ownCustomer);
 
-        // Seed: foreign company's customer (should NOT appear)
-        const foreignCustomer: Customer = {
-          companyId: 'foreign-company-xyz',
-          name: 'Foreign Customer'
-        };
-        await setDoc(doc(setup.firestore, `customers/foreign-cust-${Date.now()}`), foreignCustomer);
+          // Seed: foreign company's customer (written by second user, should NOT appear to first user)
+          const foreignCustomer: Customer = {
+            companyId: secondSetup.mockCompanyId as string,
+            name: 'Foreign Customer'
+          };
+          await setDoc(doc(secondSetup.firestore, `customers/foreign-cust-${Date.now()}`), foreignCustomer);
 
-        // Call service
-        const customers = await firstValueFrom(service.getCustomers());
+          // Call service (as first user)
+          const customers = await firstValueFrom(service.getCustomers());
 
-        // ASSERTION: own customer must appear
-        const ownAppears = customers.some((c: any) => c.companyId === setup.mockCompanyId && c.name === 'Own Customer');
-        expect(ownAppears).toBeTruthy('Own company customer must appear');
+          // ASSERTION: own customer must appear
+          const ownAppears = customers.some((c: any) => c.companyId === setup.mockCompanyId && c.name === 'Own Customer');
+          expect(ownAppears).toBeTruthy('Own company customer must appear');
 
-        // ASSERTION: foreign customer must NOT appear
-        const foreignAppears = customers.some((c: any) => c.companyId === 'foreign-company-xyz');
-        expect(foreignAppears).toBeFalsy('Foreign company customer must NOT appear');
+          // ASSERTION: foreign customer must NOT appear
+          const foreignAppears = customers.some((c: any) => c.companyId === secondSetup.mockCompanyId);
+          expect(foreignAppears).toBeFalsy('Foreign company customer must NOT appear');
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 

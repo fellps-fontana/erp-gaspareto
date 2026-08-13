@@ -18,16 +18,46 @@
         [class.module-item--saving]="saving() === mod.key"
       >
         <div class="module-info">
-          <span class="module-label">{{ mod.label }}</span>
+          <span class="module-label">
+            {{ mod.label }}
+            <span class="badge-mandatory" *ngIf="mod.mandatory">Obrigatório</span>
+          </span>
           <span class="module-description">{{ mod.description }}</span>
+        </div>
+        <label class="switch" [class.switch--locked]="mod.mandatory">
+          <input
+            type="checkbox"
+            [checked]="mod.mandatory ? true : config.modules()[mod.key]"
+            [disabled]="mod.mandatory ? true : saving() !== null"
+            (change)="toggleModule(mod.key)"
+            [attr.aria-label]="mod.mandatory ? mod.label + ' é um módulo obrigatório e não pode ser desativado' : 'Ativar ou desativar módulo ' + mod.label"
+          />
+          <span class="slider"></span>
+        </label>
+      </li>
+
+      <li class="module-item">
+        <div class="module-info">
+          <span class="module-label">Notificações</span>
+          <span class="module-description">Avisos automáticos do sistema</span>
+        </div>
+      </li>
+
+      <li
+        class="module-item module-item--sub"
+        [class.module-item--saving]="saving() === 'notificacoes'"
+      >
+        <div class="module-info">
+          <span class="module-label">Aniversário</span>
+          <span class="module-description">Painel de clientes aniversariantes do dia na Home (sub-módulo de Notificações)</span>
         </div>
         <label class="switch">
           <input
             type="checkbox"
-            [checked]="config.modules()[mod.key]"
+            [checked]="config.modules().notificacoes.aniversario"
             [disabled]="saving() !== null"
-            (change)="toggleModule(mod.key)"
-            [attr.aria-label]="'Ativar ou desativar módulo ' + mod.label"
+            (change)="toggleNotificacaoAniversario()"
+            aria-label="Ativar ou desativar notificação de aniversário"
           />
           <span class="slider"></span>
         </label>

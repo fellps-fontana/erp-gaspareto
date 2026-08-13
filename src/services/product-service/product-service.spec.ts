@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Product } from '../../models/product-model';
 import { Firestore } from '@angular/fire/firestore';
 import { getDoc, doc, setDoc } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
 describe('ProductService - Multi-tenant (companyId isolation)', () => {
@@ -32,45 +32,49 @@ describe('ProductService - Multi-tenant (companyId isolation)', () => {
   describe('Regra: Isolamento de tenant por companyId (CRÍTICA)', () => {
     describe('[RED] getProducts() - Leitura', () => {
       it('[RED] should filter by companyId - own products appear, foreign products do not', async () => {
-        // EXPECTED TO FAIL (RED): getProducts() does not filter by companyId
-        // Seed: own company's product
-        const ownProduct: Product = {
-          companyId: setup.mockCompanyId as string,
-          title: 'Own Product',
-          buyPrice: 10,
-          sellPrice: 20,
-          stock: 100
-        };
-        await setDoc(doc(setup.firestore, `products/own-product-${Date.now()}`), ownProduct);
+        const secondSetup = await setupSecondUserContext();
+        try {
+          // Seed: own company's product
+          const ownProduct: Product = {
+            companyId: setup.mockCompanyId as string,
+            title: 'Own Product',
+            buyPrice: 10,
+            sellPrice: 20,
+            stock: 100
+          };
+          await setDoc(doc(setup.firestore, `products/own-product-${Date.now()}`), ownProduct);
 
-        // Seed: foreign company's product (should NOT appear)
-        const foreignProduct: Product = {
-          companyId: 'foreign-company-xyz',
-          title: 'Foreign Product',
-          buyPrice: 15,
-          sellPrice: 30,
-          stock: 50
-        };
-        await setDoc(doc(setup.firestore, `products/foreign-product-${Date.now()}`), foreignProduct);
+          // Seed: foreign company's product (written by second user, should NOT appear to first user)
+          const foreignProduct: Product = {
+            companyId: secondSetup.mockCompanyId as string,
+            title: 'Foreign Product',
+            buyPrice: 15,
+            sellPrice: 30,
+            stock: 50
+          };
+          await setDoc(doc(secondSetup.firestore, `products/foreign-product-${Date.now()}`), foreignProduct);
 
-        // Call service
-        const products = await firstValueFrom(service.getProducts());
+          // Call service (as first user)
+          const products = await firstValueFrom(service.getProducts());
 
-        // ASSERTION (RED fails): own product must appear
-        const ownAppears = products.some(
-          (p: any) => p.companyId === setup.mockCompanyId && p.title === 'Own Product'
-        );
-        expect(ownAppears).toBeTruthy(
-          'Own company product must appear in getProducts() result'
-        );
+          // ASSERTION: own product must appear
+          const ownAppears = products.some(
+            (p: any) => p.companyId === setup.mockCompanyId && p.title === 'Own Product'
+          );
+          expect(ownAppears).toBeTruthy(
+            'Own company product must appear in getProducts() result'
+          );
 
-        // ASSERTION (RED fails): foreign product must NOT appear
-        const foreignAppears = products.some(
-          (p: any) => p.companyId === 'foreign-company-xyz'
-        );
-        expect(foreignAppears).toBeFalsy(
-          'Foreign company product must NOT appear in getProducts() result - this proves isolation'
-        );
+          // ASSERTION: foreign product must NOT appear
+          const foreignAppears = products.some(
+            (p: any) => p.companyId === secondSetup.mockCompanyId
+          );
+          expect(foreignAppears).toBeFalsy(
+            'Foreign company product must NOT appear in getProducts() result - this proves isolation'
+          );
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 

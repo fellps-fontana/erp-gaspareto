@@ -112,6 +112,21 @@
 .module-label {
   font-weight: 600;
   font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.badge-mandatory {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-info);
+  color: var(--text-inverse);
+  white-space: nowrap;
 }
 
 .module-description {
@@ -168,6 +183,11 @@
 
 .switch input:disabled + .slider {
   cursor: wait;
+}
+
+.switch--locked input:disabled + .slider {
+  cursor: not-allowed;
+  opacity: 0.85;
 }
 
 .switch input:focus-visible + .slider {

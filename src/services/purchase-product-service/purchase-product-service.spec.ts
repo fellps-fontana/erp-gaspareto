@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { PurchaseProduct } from '../../models/purchase-product-model';
 import { Firestore } from '@angular/fire/firestore';
 import { setDoc, doc } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
 describe('PurchaseProductService - Multi-tenant (companyId isolation)', () => {
@@ -30,39 +30,44 @@ describe('PurchaseProductService - Multi-tenant (companyId isolation)', () => {
   describe('Regra: Isolamento de tenant por companyId (CRÍTICA)', () => {
     describe('[RED] getPurchaseProducts() - Leitura', () => {
       it('[RED] should filter by companyId - own products appear, foreign products do not', async () => {
-        const now = new Date() as any;
+        const secondSetup = await setupSecondUserContext();
+        try {
+          const now = new Date() as any;
 
-        // Seed: own company's purchase product
-        const ownProduct: PurchaseProduct = {
-          companyId: setup.mockCompanyId as string,
-          name: 'Own Product',
-          defaultValue: 100,
-          recurring: true,
-          recurrencePeriod: 'monthly',
-          createdAt: now
-        };
-        await setDoc(doc(setup.firestore, `purchaseProducts/own-pp-${Date.now()}`), ownProduct);
+          // Seed: own company's purchase product
+          const ownProduct: PurchaseProduct = {
+            companyId: setup.mockCompanyId as string,
+            name: 'Own Product',
+            defaultValue: 100,
+            recurring: true,
+            recurrencePeriod: 'monthly',
+            createdAt: now
+          };
+          await setDoc(doc(setup.firestore, `purchaseProducts/own-pp-${Date.now()}`), ownProduct);
 
-        // Seed: foreign company's purchase product (should NOT appear)
-        const foreignProduct: PurchaseProduct = {
-          companyId: 'foreign-company-xyz',
-          name: 'Foreign Product',
-          defaultValue: 50,
-          recurring: false,
-          createdAt: now
-        };
-        await setDoc(doc(setup.firestore, `purchaseProducts/foreign-pp-${Date.now()}`), foreignProduct);
+          // Seed: foreign company's purchase product (written by second user, should NOT appear to first user)
+          const foreignProduct: PurchaseProduct = {
+            companyId: secondSetup.mockCompanyId as string,
+            name: 'Foreign Product',
+            defaultValue: 50,
+            recurring: false,
+            createdAt: now
+          };
+          await setDoc(doc(secondSetup.firestore, `purchaseProducts/foreign-pp-${Date.now()}`), foreignProduct);
 
-        // Call service
-        const products = await firstValueFrom(service.getPurchaseProducts());
+          // Call service (as first user)
+          const products = await firstValueFrom(service.getPurchaseProducts());
 
-        // ASSERTION: own product must appear
-        const ownAppears = products.some((p: any) => p.companyId === setup.mockCompanyId && p.name === 'Own Product');
-        expect(ownAppears).toBeTruthy('Own company purchase product must appear');
+          // ASSERTION: own product must appear
+          const ownAppears = products.some((p: any) => p.companyId === setup.mockCompanyId && p.name === 'Own Product');
+          expect(ownAppears).toBeTruthy('Own company purchase product must appear');
 
-        // ASSERTION: foreign product must NOT appear
-        const foreignAppears = products.some((p: any) => p.companyId === 'foreign-company-xyz');
-        expect(foreignAppears).toBeFalsy('Foreign company purchase product must NOT appear');
+          // ASSERTION: foreign product must NOT appear
+          const foreignAppears = products.some((p: any) => p.companyId === secondSetup.mockCompanyId);
+          expect(foreignAppears).toBeFalsy('Foreign company purchase product must NOT appear');
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 

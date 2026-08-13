@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Purchase } from '../../models/buy-model';
 import { Firestore } from '@angular/fire/firestore';
 import { setDoc, doc } from 'firebase/firestore';
-import { setupFirestoreEmulatorTest, EmulatorTestSetup } from '../test-helpers';
+import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
 describe('PurchaseService - Multi-tenant (companyId isolation)', () => {
@@ -30,40 +30,45 @@ describe('PurchaseService - Multi-tenant (companyId isolation)', () => {
   describe('Regra: Isolamento de tenant por companyId (CRÍTICA)', () => {
     describe('[RED] getPurchases() - Leitura', () => {
       it('[RED] should filter by companyId - own purchases appear, foreign purchases do not', async () => {
-        const now = new Date() as any;
+        const secondSetup = await setupSecondUserContext();
+        try {
+          const now = new Date() as any;
 
-        // Seed: own company's purchase
-        const ownPurchase: Purchase = {
-          id: `own-${Date.now()}`,
-          companyId: setup.mockCompanyId as string,
-          idProduct: 'prod-1',
-          amount: 10,
-          unityValue: 50,
-          date: now
-        };
-        await setDoc(doc(setup.firestore, `purchases/own-purchase-${Date.now()}`), ownPurchase);
+          // Seed: own company's purchase
+          const ownPurchase: Purchase = {
+            id: `own-${Date.now()}`,
+            companyId: setup.mockCompanyId as string,
+            idProduct: 'prod-1',
+            amount: 10,
+            unityValue: 50,
+            date: now
+          };
+          await setDoc(doc(setup.firestore, `purchases/own-purchase-${Date.now()}`), ownPurchase);
 
-        // Seed: foreign company's purchase (should NOT appear)
-        const foreignPurchase: Purchase = {
-          id: `foreign-${Date.now()}`,
-          companyId: 'foreign-company-xyz',
-          idProduct: 'prod-2',
-          amount: 5,
-          unityValue: 100,
-          date: now
-        };
-        await setDoc(doc(setup.firestore, `purchases/foreign-purchase-${Date.now()}`), foreignPurchase);
+          // Seed: foreign company's purchase (written by second user, should NOT appear to first user)
+          const foreignPurchase: Purchase = {
+            id: `foreign-${Date.now()}`,
+            companyId: secondSetup.mockCompanyId as string,
+            idProduct: 'prod-2',
+            amount: 5,
+            unityValue: 100,
+            date: now
+          };
+          await setDoc(doc(secondSetup.firestore, `purchases/foreign-purchase-${Date.now()}`), foreignPurchase);
 
-        // Call service
-        const purchases = await firstValueFrom(service.getPurchases());
+          // Call service (as first user)
+          const purchases = await firstValueFrom(service.getPurchases());
 
-        // ASSERTION: own purchase must appear
-        const ownAppears = purchases.some((p: any) => p.companyId === setup.mockCompanyId && p.idProduct === 'prod-1');
-        expect(ownAppears).toBeTruthy('Own company purchase must appear');
+          // ASSERTION: own purchase must appear
+          const ownAppears = purchases.some((p: any) => p.companyId === setup.mockCompanyId && p.idProduct === 'prod-1');
+          expect(ownAppears).toBeTruthy('Own company purchase must appear');
 
-        // ASSERTION: foreign purchase must NOT appear
-        const foreignAppears = purchases.some((p: any) => p.companyId === 'foreign-company-xyz');
-        expect(foreignAppears).toBeFalsy('Foreign company purchase must NOT appear');
+          // ASSERTION: foreign purchase must NOT appear
+          const foreignAppears = purchases.some((p: any) => p.companyId === secondSetup.mockCompanyId);
+          expect(foreignAppears).toBeFalsy('Foreign company purchase must NOT appear');
+        } finally {
+          await secondSetup.cleanup();
+        }
       });
     });
 

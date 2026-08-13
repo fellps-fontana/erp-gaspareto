@@ -608,3 +608,47 @@ confirmado) e aprovou. Commit da correcao: e0b8fa3.
 Regra de negocio coberta: regra-de-negocio.md secao 7 (bills/recorrencia,
 CRITICA) e secao 10 (multi-tenant/companyId, CRITICA, padrao TASK-027
 respeitado apos correcao do style).
+
+## TASK-031 — Corrigir seeding de empresa estrangeira nos testes de isolamento tenant
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-030
+FLUXO: Correcao
+CONTEXTO A LER: src/services/test-helpers.ts (setupFirestoreEmulatorTest atual, login real via signInAnonymously adicionado na TASK-030); test/firestore.rules.spec.ts (padrao de referencia: usa @firebase/rules-unit-testing com testEnv.authenticatedContext(uid, {email}) para autenticar DOIS usuarios distintos — nao aplicavel direto ao Karma por causa do gap de process.env em browser ja documentado, mas o padrao conceitual — dois usuarios autenticados, cada um grava so o proprio dado — e o que precisa ser replicado); firestore.rules linhas 54-61 (regra de create/update exige request.resource.data.companyId == userCompanyId() do usuario autenticado)
+ESCOPO: os testes de isolamento "nao deve vazar dado de empresa estrangeira" em 9 arquivos (bill-service.spec.ts, product-service.spec.ts, sale-service.spec.ts, comanda-service.spec.ts, order-service.spec.ts, purchase-service.spec.ts, purchase-product-service.spec.ts, customer-service.spec.ts, bill-recurrence-service.spec.ts) seedam um documento de empresa estrangeira gravando atraves da sessao do UNICO usuario autenticado do teste — desde que test-helpers.ts passou a autenticar de verdade (TASK-030), esse seed e barrado pelas firestore.rules com PERMISSION_DENIED antes do teste conseguir provar isolamento. Adicionar a test-helpers.ts uma forma de autenticar um SEGUNDO usuario de teste (segunda empresa, segundo companyId real, proprio users/{uid}) e usar esse segundo usuario pra gravar o dado "estrangeiro" em cada um dos 9 specs, em vez do usuario principal escrever em nome de outra empresa.
+CRITERIO DE ACEITE: os ~10 testes de isolamento "nao deve vazar dado de empresa estrangeira" (contando os 2 do bill-recurrence-service.spec.ts) passam a dar GREEN de verdade, provando isolamento real via dois usuarios autenticados distintos — nao mais PERMISSION_DENIED no arranjo do teste; nenhum teste que ja passava antes regride (rodar suite Karma completa antes/depois e comparar contagem exata).
+ARQUIVOS PERMITIDOS: src/services/test-helpers.ts, src/services/bill-service/bill-service.spec.ts, src/services/product-service/product-service.spec.ts, src/services/sale-service/sale-service.spec.ts, src/services/comanda-service/comanda-service.spec.ts, src/services/order-service/order-service.spec.ts, src/services/purchase-service/purchase-service.spec.ts, src/services/purchase-product-service/purchase-product-service.spec.ts, src/services/customer-service/customer-service.spec.ts, src/services/bill-recurrence-service/bill-recurrence-service.spec.ts
+NAO FAZER: nao alterar nenhum arquivo de producao (services, models, components, firestore.rules) — e puramente infra de teste; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff de test-helpers.ts + confirmacao, com contagem exata rodada por mike, de quantos testes de isolamento passaram a dar GREEN e que nenhum teste pre-existente regrediu.
+HISTORICO: mike extraiu _createEmulatorContext (logica compartilhada) e
+adicionou setupSecondUserContext() em test-helpers.ts, sem mudar o
+comportamento de setupFirestoreEmulatorTest (mesmo shape de retorno). Os 9
+testes de isolamento (10 contando os 2 do bill-recurrence-service.spec.ts)
+passaram a seedar o dado estrangeiro pela sessao de um segundo usuario
+autenticado de verdade. Kira conferiu o diff (limpo, sem duplicacao) e
+rodou a suite completa pessoalmente para validar — nao aceitou so o
+relatorio do mike, dado o historico de achados imprecisos nesta sessao.
+Resultado confirmado: 38 SUCCESS / 2 FAILED (era 28 SUCCESS antes da
+TASK-030). As 2 falhas restantes: AppComponent/SwUpdate (nao relacionado,
+pre-existente) e PurchaseService.addPurchase — este ultimo Kira investigou
+a causa raiz: a transaction faz update(product) + create(purchase) na
+mesma transaction, e o create da nova purchase esbarra em PERMISSION_DENIED
+nas firestore.rules. Mike confirmou via git stash que isso ja falhava antes
+de qualquer mudanca desta task — bug real, provavelmente pre-existente,
+so ficou visivel com a aplicacao real de auth+rules (TASK-030). Fica fora
+do escopo desta task; reportado ao usuario como possivel TASK-032.
+
+Regra de negocio coberta: nenhuma nova — task e infraestrutura de teste,
+fecha a divida tecnica registrada na TASK-030/regra-de-negocio.md secao 10.
+
+## TASK-032 — Diagnosticar PERMISSION_DENIED em PurchaseService.addPurchase
+STATUS: PENDENTE
+AGENT: mike
+DEPENDENCIAS: TASK-031
+FLUXO: Correcao
+CONTEXTO A LER: regra-de-negocio.md secao 2 (Estoque — CRITICA — PurchaseService.addPurchase incrementa stock e sobrescreve buyPrice); src/services/purchase-service/purchase-service.ts (metodo addPurchase — runTransaction com transaction.update no produto + transaction.set na nova compra); src/services/purchase-service/purchase-service.spec.ts (teste "[RED] should auto-inject companyId when adding purchase", falha com PERMISSION_DENIED); firestore.rules linhas 49-66 (regras de create/update para colecoes operacionais, isOperationalCollection inclui 'products' e 'purchases')
+ESCOPO: reproduzir o erro (`npx ng test --include='**/purchase-service.spec.ts' --browsers=ChromeHeadless --watch=false`, emuladores Firestore+Auth rodando) e identificar com precisao qual das duas escritas da transaction (`transaction.update(productDocRef, ...)` ou `transaction.set(newPurchaseRef, ...)`) e qual linha exata da firestore.rules estao causando o PERMISSION_DENIED — usar os logs de erro do emulador (costumam indicar a linha da regra) e, se necessario, testar as duas escritas isoladas (fora de transaction) pra isolar qual delas falha sozinha. NAO alterar codigo de producao nem firestore.rules — so diagnosticar e reportar.
+CRITERIO DE ACEITE: relatorio identificando (1) se o bug esta no service (transaction mal formada) ou nas regras (regra bloqueando uma escrita legitima) ou no fixture do teste (dado semeado incorreto); (2) a causa raiz exata, com a linha da regra e o motivo pelo qual ela avalia falso; (3) se afeta so o teste ou tambem o app real em producao (ex.: registrar uma compra de verdade pela tela iria falhar do mesmo jeito?).
+ARQUIVOS PERMITIDOS: nenhum arquivo alterado — task e so de diagnostico, leitura e execucao de teste.
+NAO FAZER: nao corrigir o bug nesta task — reportar ao Kira, que redespacha levi (se for bug de producao) ou o proprio mike (se for so fixture de teste) numa task de correcao separada. Nao editar .claude/tasks.md.
+RETORNO ESPERADO: relatorio de diagnostico com a causa raiz identificada e recomendacao de quem deve corrigir (levi pra producao, mike pra fixture de teste).

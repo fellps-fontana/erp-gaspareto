@@ -26,16 +26,19 @@ const EMULATOR_HOST = '127.0.0.1';
 const FIRESTORE_EMULATOR_PORT = 8080;
 const AUTH_EMULATOR_PORT = 9099;
 
-export interface EmulatorTestSetup {
+export interface EmulatorTestContext {
   firestore: Firestore;
   app: FirebaseApp;
   auth: Auth;
   mockCompanyId: string | null;
-  tenantService: any;
   cleanup: () => Promise<void>;
 }
 
-export async function setupFirestoreEmulatorTest(companyId?: string | null): Promise<EmulatorTestSetup> {
+export interface EmulatorTestSetup extends EmulatorTestContext {
+  tenantService: any;
+}
+
+async function _createEmulatorContext(companyId?: string | null): Promise<EmulatorTestContext> {
   // Initialize Firebase app connected to the emulators. apiKey e um valor
   // fake: o Auth Emulator nao valida contra o Identity Toolkit real, mas o
   // SDK do firebase/auth exige o campo presente (auth/invalid-api-key) pra
@@ -75,19 +78,11 @@ export async function setupFirestoreEmulatorTest(companyId?: string | null): Pro
     await setDoc(doc(firestore, 'users', uid), userDoc);
   }
 
-  // Create tenant service mock with signal
-  const tenantService = {
-    companyId: signal(mockCompanyId),
-    isCompanyLoaded: () => mockCompanyId !== null,
-    isAuthInitialized: () => true,
-  };
-
   return {
     firestore,
     app,
     auth,
     mockCompanyId,
-    tenantService,
     cleanup: async () => {
       try {
         await signOut(auth);
@@ -106,4 +101,24 @@ export async function setupFirestoreEmulatorTest(companyId?: string | null): Pro
       }
     }
   };
+}
+
+export async function setupFirestoreEmulatorTest(companyId?: string | null): Promise<EmulatorTestSetup> {
+  const context = await _createEmulatorContext(companyId);
+
+  // Create tenant service mock with signal
+  const tenantService = {
+    companyId: signal(context.mockCompanyId),
+    isCompanyLoaded: () => context.mockCompanyId !== null,
+    isAuthInitialized: () => true,
+  };
+
+  return {
+    ...context,
+    tenantService
+  };
+}
+
+export async function setupSecondUserContext(companyId?: string | null): Promise<EmulatorTestContext> {
+  return _createEmulatorContext(companyId);
 }

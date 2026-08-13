@@ -45,6 +45,19 @@
     <p>Selecione o módulo de acesso</p>
   </div>
 
+  <div
+    class="birthday-panel"
+    *ngIf="config.modules().notificacoes.aniversario && aniversariantes().length > 0"
+  >
+    <h2 class="birthday-panel__title">🎂 Aniversariantes de hoje</h2>
+    <ul class="birthday-panel__list">
+      <li class="birthday-panel__item" *ngFor="let cliente of aniversariantes()">
+        <span class="birthday-panel__name">{{ cliente.name }}</span>
+        <span class="birthday-panel__phone" *ngIf="cliente.phone">{{ cliente.phone }}</span>
+      </li>
+    </ul>
+  </div>
+
   <div class="grid-menu">
     <div *ngIf="config.modules().pdv" [routerLink]="['/pdv']" class="menu-card card-pdv">
       <div class="icon">
