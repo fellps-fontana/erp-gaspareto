@@ -53,8 +53,16 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes), seção 10
   sub-item "Aniversário", toggle dedicado `toggleNotificacaoAniversario()`
   que monta o objeto `notificacoes` completo via spread antes de gravar
   (nunca passa pelo `toggleModule` genérico).
-- **Tela:** Home (`home.ts`/`.html`/`.css`) — painel condicional listando
-  aniversariantes do dia (`toSignal(getAniversariantesDoDia())`).
+- **Tela:** Home (`home.ts`/`.html`/`.css`) — ícone de sino fixo no canto
+  inferior direito (`.notif-fab-wrapper`, mesmo padrão visual do
+  `theme-toggle-fab` que já ocupava o canto superior direito), opacidade
+  reduzida (`0.55`) em repouso subindo a `1` no hover/focus, com badge de
+  contador (`aniversariantes().length`, some em zero). Clique abre um
+  painel dropdown ancorado acima do ícone com a lista do dia (ou "Nenhum
+  aniversariante hoje"); clique fora ou no ícone de novo fecha
+  (`@HostListener('document:click')` + `stopPropagation` nos cliques
+  internos). Substituiu a primeira versão (painel sempre visível no fluxo
+  da página) por feedback direto do usuário — ver Notas operacionais.
 
 ## Lacunas conhecidas / pendências
 
@@ -82,7 +90,8 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes), seção 10
   (`getAniversariantesDoDia`) — implementação em paralelo com hanzo, sem
   conflito de arquivo.
 - **hanzo**: campo de aniversário no formulário de cliente, toggle
-  dedicado em Configurações, painel de aniversariantes na Home.
+  dedicado em Configurações, painel de aniversariantes na Home (v1) e
+  depois o redesenho pra ícone/dropdown (v2, ver Notas operacionais).
 - **style**: gate único, aprovado sem rodada de correção. Validou
   isolamento multi-tenant na query, merge profundo do config, ausência de
   corrupção de dado no toggle, campo realmente opcional, separação de
@@ -105,3 +114,16 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes), seção 10
   do PR e o commit de merge para os 12 arquivos da entrega). Branch local
   apagada; branch remota pendente de deleção (permissão negada na sessão —
   usuário pode rodar `git push origin --delete feature/notificacoes-aniversario-cliente`).
+- **Revisão pós-merge (mesma sessão)**: usuário não gostou do painel
+  sempre visível na Home e pediu redesenho — ícone de sino no canto
+  inferior direito, opacidade reduzida até o hover, painel abrindo por
+  clique, badge de contador. Mudança puramente visual (mesmo
+  `CustomerService`/`getAniversariantesDoDia()`, nenhum model/service
+  tocado), então seguiu o fluxo Melhoria com revisão inline do Kira — sem
+  passar pelo gate do `style` (regra da seção 5: mudança puramente visual
+  ou textual dispensa o gate). Commitada direto em `homologacao`, sem PR.
+- Commit de notificações (v2, ícone/dropdown) feito junto com este arquivo
+  de doc, sem tocar `config.ts`/`.html`/`.css` — esses três arquivos têm,
+  no momento deste commit, uma mudança não relacionada de outra sessão
+  (reversão da feature de badge "Obrigatório" citada acima), deixada de
+  fora propositalmente.
