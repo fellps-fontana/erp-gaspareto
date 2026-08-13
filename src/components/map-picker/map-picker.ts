@@ -1,3 +1,4 @@
+/// <reference types="google.maps" />
 import {
   AfterViewInit,
   Component,
@@ -13,19 +14,13 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import * as L from 'leaflet';
 import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
+import { GoogleMapsLoaderService } from '../../services/google-maps-loader-service/google-maps-loader-service';
 
 // Centro genérico do Brasil, usado quando não há posição salva nem
 // geolocalização do navegador disponível — o usuário navega manualmente.
-const BRAZIL_FALLBACK_CENTER: L.LatLngTuple = [-14.235, -51.9253];
+const BRAZIL_FALLBACK_CENTER: google.maps.LatLngLiteral = { lat: -14.235, lng: -51.9253 };
 const BRAZIL_FALLBACK_ZOOM = 4;
-
-L.Icon.Default.mergeOptions({
-  iconUrl: '/leaflet/marker-icon.png',
-  iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-  shadowUrl: '/leaflet/marker-shadow.png',
-});
 
 @Component({
   selector: 'app-map-picker',
@@ -36,6 +31,7 @@ L.Icon.Default.mergeOptions({
 })
 export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
   private geocodingService = inject(GeocodingService);
+  private googleMapsLoader = inject(GoogleMapsLoaderService);
 
   @Input() lat?: number;
   @Input() lng?: number;
@@ -47,33 +43,42 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
   searchTerm = '';
   searchLoading = false;
   searchError = '';
+  mapLoadError = '';
 
-  private map?: L.Map;
-  private marker?: L.Marker;
+  private map?: google.maps.Map;
+  private marker?: google.maps.Marker;
   private viewInitialized = false;
 
   async ngAfterViewInit() {
-    this.map = L.map(this.mapContainerRef.nativeElement);
+    try {
+      await this.googleMapsLoader.load();
+    } catch {
+      this.mapLoadError = 'Não foi possível carregar o mapa. Verifique a conexão e recarregue a página.';
+      return;
+    }
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(this.map);
+    this.map = new google.maps.Map(this.mapContainerRef.nativeElement, {
+      center: BRAZIL_FALLBACK_CENTER,
+      zoom: BRAZIL_FALLBACK_ZOOM,
+    });
 
-    this.map.on('click', (e: L.LeafletMouseEvent) => {
-      this.setMarker(e.latlng.lat, e.latlng.lng);
-      this.positionChange.emit({ lat: e.latlng.lat, lng: e.latlng.lng });
+    this.map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (!e.latLng) return;
+      const clickedLat = e.latLng.lat();
+      const clickedLng = e.latLng.lng();
+      this.setMarker(clickedLat, clickedLng);
+      this.positionChange.emit({ lat: clickedLat, lng: clickedLng });
     });
 
     if (this.lat != null && this.lng != null) {
-      this.map.setView([this.lat, this.lng], this.zoom);
+      this.centerMap(this.lat, this.lng);
       this.setMarker(this.lat, this.lng);
     } else {
       const current = await this.getCurrentPosition();
       if (current) {
-        this.map.setView([current.lat, current.lng], this.zoom);
+        this.centerMap(current.lat, current.lng);
       } else {
-        this.map.setView(BRAZIL_FALLBACK_CENTER, BRAZIL_FALLBACK_ZOOM);
+        this.centerMap(BRAZIL_FALLBACK_CENTER.lat, BRAZIL_FALLBACK_CENTER.lng, BRAZIL_FALLBACK_ZOOM);
       }
     }
 
@@ -83,13 +88,16 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges) {
     if (!this.viewInitialized || !this.map) return;
     if (('lat' in changes || 'lng' in changes) && this.lat != null && this.lng != null) {
-      this.map.setView([this.lat, this.lng], this.zoom);
+      this.centerMap(this.lat, this.lng);
       this.setMarker(this.lat, this.lng);
     }
   }
 
   ngOnDestroy() {
-    this.map?.remove();
+    if (this.marker) google.maps.event.clearInstanceListeners(this.marker);
+    if (this.map) google.maps.event.clearInstanceListeners(this.map);
+    this.marker = undefined;
+    this.map = undefined;
   }
 
   async onSearch() {
@@ -101,7 +109,7 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
     try {
       const result = await this.geocodingService.geocode(term);
       if (result) {
-        this.map.setView([result.lat, result.lng], this.zoom);
+        this.centerMap(result.lat, result.lng);
       } else {
         this.searchError = 'Endereço não encontrado. Tente refinar a busca.';
       }
@@ -110,16 +118,22 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
+  private centerMap(lat: number, lng: number, zoom = this.zoom) {
+    if (!this.map) return;
+    this.map.setCenter({ lat, lng });
+    this.map.setZoom(zoom);
+  }
+
   private setMarker(lat: number, lng: number) {
     if (!this.map) return;
     if (this.marker) {
-      this.marker.setLatLng([lat, lng]);
+      this.marker.setPosition({ lat, lng });
       return;
     }
-    this.marker = L.marker([lat, lng], { draggable: true }).addTo(this.map);
-    this.marker.on('dragend', () => {
-      const pos = this.marker!.getLatLng();
-      this.positionChange.emit({ lat: pos.lat, lng: pos.lng });
+    this.marker = new google.maps.Marker({ position: { lat, lng }, map: this.map, draggable: true });
+    this.marker.addListener('dragend', (e: google.maps.MapMouseEvent) => {
+      if (!e.latLng) return;
+      this.positionChange.emit({ lat: e.latLng.lat(), lng: e.latLng.lng() });
     });
   }
 

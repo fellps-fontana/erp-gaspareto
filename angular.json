@@ -25,8 +25,7 @@
               }
             ],
             "styles": [
-              "src/styles.css",
-              "./node_modules/leaflet/dist/leaflet.css"
+              "src/styles.css"
             ]
           },
           "configurations": {
@@ -98,8 +97,7 @@
               }
             ],
             "styles": [
-              "src/styles.css",
-              "./node_modules/leaflet/dist/leaflet.css"
+              "src/styles.css"
             ]
           }
         }
