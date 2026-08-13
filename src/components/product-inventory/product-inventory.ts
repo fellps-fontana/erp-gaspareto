@@ -300,8 +300,13 @@ export class ProductInventoryComponent implements OnInit {
       if (this.filtroHistoricoClienteId && item.clienteId !== this.filtroHistoricoClienteId) return false;
       if (this.filtroHistoricoProdutoId && !item.itens.some(i => i.idProduct === this.filtroHistoricoProdutoId)) return false;
       if (busca) {
-        const bateId = item.id.toLowerCase().includes(busca);
-        const bateNumero = item.numero !== undefined && item.numero.toString().includes(busca.replace('#', ''));
+        const buscaNumero = busca.replace('#', '');
+        const somenteNumero = /^\d+$/.test(buscaNumero);
+        const bateNumero = item.numero !== undefined && item.numero.toString().includes(buscaNumero);
+        // busca puramente numerica so compara com o numero do pedido — o
+        // id interno do Firestore e uma string aleatoria que quase sempre
+        // contem algum digito, entao comparar substring nele gera ruido.
+        const bateId = !somenteNumero && item.id.toLowerCase().includes(busca);
         if (!bateId && !bateNumero) return false;
       }
       return true;
