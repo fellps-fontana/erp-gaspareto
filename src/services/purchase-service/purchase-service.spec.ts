@@ -78,7 +78,13 @@ describe('PurchaseService - Multi-tenant (companyId isolation)', () => {
 
         // Seed: product that addPurchase() will reference
         // addPurchase() validates that the product exists before registering the purchase
-        await setDoc(doc(setup.firestore, 'products/prod-1'), {
+        // ID único por execução: um ID fixo colide com dado remanescente de
+        // outras execuções no mesmo emulador (Firestore não é limpo entre
+        // arquivos de spec) — o doc antigo pode pertencer a outra empresa,
+        // barrado pelas firestore.rules com PERMISSION_DENIED antes mesmo
+        // de addPurchase() ser chamado.
+        const productId = `prod-${Date.now()}`;
+        await setDoc(doc(setup.firestore, `products/${productId}`), {
           companyId: setup.mockCompanyId,
           title: 'Test Product',
           buyPrice: 10,
@@ -88,7 +94,7 @@ describe('PurchaseService - Multi-tenant (companyId isolation)', () => {
 
         const newPurchase = {
           id: `purchase-${Date.now()}`,
-          idProduct: 'prod-1',
+          idProduct: productId,
           amount: 10,
           unityValue: 50,
           date: now
