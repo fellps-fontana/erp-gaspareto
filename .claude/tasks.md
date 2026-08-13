@@ -642,8 +642,8 @@ Regra de negocio coberta: nenhuma nova — task e infraestrutura de teste,
 fecha a divida tecnica registrada na TASK-030/regra-de-negocio.md secao 10.
 
 ## TASK-032 — Diagnosticar PERMISSION_DENIED em PurchaseService.addPurchase
-STATUS: PENDENTE
-AGENT: mike
+STATUS: CONCLUIDA
+AGENT: mike (diagnostico incompleto) + Kira (causa raiz + correcao)
 DEPENDENCIAS: TASK-031
 FLUXO: Correcao
 CONTEXTO A LER: regra-de-negocio.md secao 2 (Estoque — CRITICA — PurchaseService.addPurchase incrementa stock e sobrescreve buyPrice); src/services/purchase-service/purchase-service.ts (metodo addPurchase — runTransaction com transaction.update no produto + transaction.set na nova compra); src/services/purchase-service/purchase-service.spec.ts (teste "[RED] should auto-inject companyId when adding purchase", falha com PERMISSION_DENIED); firestore.rules linhas 49-66 (regras de create/update para colecoes operacionais, isOperationalCollection inclui 'products' e 'purchases')
@@ -652,3 +652,36 @@ CRITERIO DE ACEITE: relatorio identificando (1) se o bug esta no service (transa
 ARQUIVOS PERMITIDOS: nenhum arquivo alterado — task e so de diagnostico, leitura e execucao de teste.
 NAO FAZER: nao corrigir o bug nesta task — reportar ao Kira, que redespacha levi (se for bug de producao) ou o proprio mike (se for so fixture de teste) numa task de correcao separada. Nao editar .claude/tasks.md.
 RETORNO ESPERADO: relatorio de diagnostico com a causa raiz identificada e recomendacao de quem deve corrigir (levi pra producao, mike pra fixture de teste).
+HISTORICO: mike investigou mas nao concluiu com evidencia solida — teorizou
+"race condition no Firestore Emulator" entre signInAnonymously/setDoc de
+users/{uid} e o get() de userCompanyId() nas rules, admitindo no proprio
+relatorio nao ter conseguido rodar o teste isolado que confirmaria a
+hipotese. A teoria nao batia com evidencia ja disponivel na sessao (os
+outros ~9 testes usando o mesmo test-helpers.ts, corrigidos na TASK-031,
+passavam de forma consistente com o mesmo padrao login+setDoc+uso
+imediato) — perdida porque a task foi despachada como agent novo, sem o
+contexto da TASK-030/031 que ja apontava pra causa real. Mike tambem
+deixou 3 arquivos de spec de debug no working tree
+(purchase-service-{basic-user,debug,isolation}.spec.ts) fora do
+ARQUIVOS PERMITIDOS ("nenhum") — removidos pelo Kira antes de prosseguir.
+
+Kira reexaminou e conectou o dado que ja estava registrado no HISTORICO da
+TASK-030 (achado do mike na epoca, nao aproveitado agora): o teste seedava
+o produto com ID fixo ('products/prod-1') em vez de unico. Como o Firestore
+do emulador nao e limpo entre execucoes de specs nesta sessao, um documento
+remanescente de execucao anterior (pertencente a companyId de outro teste)
+ocupava o mesmo path — firestore.rules bloqueava a escrita corretamente
+(companyId divergente), antes mesmo de addPurchase() rodar. Confirmado
+empiricamente: com Firestore limpo, 3/3 SUCCESS; 5 rodadas consecutivas
+sem limpar entre elas, 3/3 estavel em todas. NAO e bug de producao nem de
+firestore.rules -- PurchaseService.addPurchase esta correto.
+
+Correcao aplicada por Kira (mudanca minima, tarefa trivial): productId
+gerado com Date.now() em vez de string fixa, mesmo padrao ja usado nos
+outros testes do arquivo. Suite completa: 39/40 SUCCESS apos a correcao
+(a 1 falha restante e AppComponent/SwUpdate, pre-existente, nao
+relacionada, fora de qualquer escopo desta sessao).
+
+Regra de negocio coberta: nenhuma nova — confirma que regra-de-negocio.md
+secao 2 (Estoque, PurchaseService.addPurchase) esta implementada
+corretamente; o problema era so higiene de teste.
