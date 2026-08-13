@@ -610,7 +610,7 @@ CRITICA) e secao 10 (multi-tenant/companyId, CRITICA, padrao TASK-027
 respeitado apos correcao do style).
 
 ## TASK-031 — Corrigir seeding de empresa estrangeira nos testes de isolamento tenant
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-030
 FLUXO: Correcao
@@ -620,3 +620,23 @@ CRITERIO DE ACEITE: os ~10 testes de isolamento "nao deve vazar dado de empresa 
 ARQUIVOS PERMITIDOS: src/services/test-helpers.ts, src/services/bill-service/bill-service.spec.ts, src/services/product-service/product-service.spec.ts, src/services/sale-service/sale-service.spec.ts, src/services/comanda-service/comanda-service.spec.ts, src/services/order-service/order-service.spec.ts, src/services/purchase-service/purchase-service.spec.ts, src/services/purchase-product-service/purchase-product-service.spec.ts, src/services/customer-service/customer-service.spec.ts, src/services/bill-recurrence-service/bill-recurrence-service.spec.ts
 NAO FAZER: nao alterar nenhum arquivo de producao (services, models, components, firestore.rules) — e puramente infra de teste; nao editar .claude/tasks.md.
 RETORNO ESPERADO: diff de test-helpers.ts + confirmacao, com contagem exata rodada por mike, de quantos testes de isolamento passaram a dar GREEN e que nenhum teste pre-existente regrediu.
+HISTORICO: mike extraiu _createEmulatorContext (logica compartilhada) e
+adicionou setupSecondUserContext() em test-helpers.ts, sem mudar o
+comportamento de setupFirestoreEmulatorTest (mesmo shape de retorno). Os 9
+testes de isolamento (10 contando os 2 do bill-recurrence-service.spec.ts)
+passaram a seedar o dado estrangeiro pela sessao de um segundo usuario
+autenticado de verdade. Kira conferiu o diff (limpo, sem duplicacao) e
+rodou a suite completa pessoalmente para validar — nao aceitou so o
+relatorio do mike, dado o historico de achados imprecisos nesta sessao.
+Resultado confirmado: 38 SUCCESS / 2 FAILED (era 28 SUCCESS antes da
+TASK-030). As 2 falhas restantes: AppComponent/SwUpdate (nao relacionado,
+pre-existente) e PurchaseService.addPurchase — este ultimo Kira investigou
+a causa raiz: a transaction faz update(product) + create(purchase) na
+mesma transaction, e o create da nova purchase esbarra em PERMISSION_DENIED
+nas firestore.rules. Mike confirmou via git stash que isso ja falhava antes
+de qualquer mudanca desta task — bug real, provavelmente pre-existente,
+so ficou visivel com a aplicacao real de auth+rules (TASK-030). Fica fora
+do escopo desta task; reportado ao usuario como possivel TASK-032.
+
+Regra de negocio coberta: nenhuma nova — task e infraestrutura de teste,
+fecha a divida tecnica registrada na TASK-030/regra-de-negocio.md secao 10.
