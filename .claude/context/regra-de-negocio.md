@@ -217,7 +217,24 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
 
 - `ModuleConfig` liga/desliga módulos inteiros da aplicação: `pdv`, `pedidos`,
   `gestao`, `rotas`, `contas`, `clientes` (sub-módulo de gestão), `compras`
-  (sub-módulo de gestão).
+  (sub-módulo de gestão, opcional — pode ser desativado independentemente).
+- `gestao` e `clientes` são módulos **obrigatórios**: nunca podem ser
+  desativados pela tela de Configurações, ao contrário dos demais módulos
+  — incluindo `compras`, que segue opcional mesmo sendo sub-módulo de
+  `gestao`. Essa garantia se aplica em três pontos, e falha em qualquer um
+  deles quebra a regra:
+  1. UI — `gestao` e `clientes` nem aparecem em `moduleOptions`
+     (`ConfigComponent`/`config.html`): a tela de Configurações só lista
+     módulos que de fato podem ser desligados (os outros 5, incluindo
+     `compras`, continuam com toggle livre).
+  2. Escrita — `ConfigService.updateModules` força `gestao: true` e
+     `clientes: true` no documento salvo, independente do que for passado
+     no `Partial<ModuleConfig>` (correção silenciosa, não lança erro — a UI
+     já impede a tentativa).
+  3. Leitura — `ConfigService.loadCompanyModules` corrige dado legado: o
+     merge com `DEFAULT_MODULES` passa a também sobrescrever `gestao`/
+     `clientes` para `true` quando já existirem no Firestore como `false`
+     (config criada antes desta regra existir).
 - Todas as rotas protegidas usam `moduleGuard`: se o módulo estiver desligado,
   redireciona para `/`. Módulos novos adicionados ao `DEFAULT_MODULES` nascem
   habilitados por padrão para configs já existentes no banco (merge com

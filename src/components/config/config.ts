@@ -10,7 +10,6 @@ interface ModuleOption {
   label: string;
   description: string;
   sub?: boolean;
-  mandatory?: boolean;
 }
 
 @Component({
@@ -26,20 +25,18 @@ export class ConfigComponent {
 
   readonly saving = signal<keyof ModuleConfig | null>(null);
 
+  // Gestão e Clientes são módulos obrigatórios (regra-de-negocio.md seção 11):
+  // nem aparecem aqui como opção — só módulos que podem ser desligados são configuráveis.
   readonly moduleOptions: ModuleOption[] = [
     { key: 'pdv', label: 'PDV', description: 'Vendas no balcão' },
     { key: 'pedidos', label: 'Pedidos', description: 'Encomendas e cozinha' },
-    { key: 'gestao', label: 'Gestão', description: 'Estoque, relatórios e compras', mandatory: true },
     { key: 'rotas', label: 'Rotas', description: 'Entregas e navegação' },
     { key: 'contas', label: 'Contas', description: 'Contas a pagar' },
-    { key: 'clientes', label: 'Clientes', description: 'Cadastro de clientes (sub-módulo do Gestão)', sub: true, mandatory: true },
     { key: 'compras', label: 'Compras', description: 'Entrada de estoque (sub-módulo do Gestão)', sub: true },
   ];
 
   async toggleModule(key: keyof ModuleConfig) {
     if (this.saving()) return;
-    const option = this.moduleOptions.find((opt) => opt.key === key);
-    if (option?.mandatory) return; // gestão e clientes são obrigatórios, nunca desativam
     this.saving.set(key);
     try {
       await this.config.updateModules({ [key]: !this.config.modules()[key] });

@@ -18,19 +18,16 @@
         [class.module-item--saving]="saving() === mod.key"
       >
         <div class="module-info">
-          <span class="module-label">
-            {{ mod.label }}
-            <span class="badge-mandatory" *ngIf="mod.mandatory">Obrigatório</span>
-          </span>
+          <span class="module-label">{{ mod.label }}</span>
           <span class="module-description">{{ mod.description }}</span>
         </div>
-        <label class="switch" [class.switch--locked]="mod.mandatory">
+        <label class="switch">
           <input
             type="checkbox"
-            [checked]="mod.mandatory ? true : config.modules()[mod.key]"
-            [disabled]="mod.mandatory ? true : saving() !== null"
+            [checked]="config.modules()[mod.key]"
+            [disabled]="saving() !== null"
             (change)="toggleModule(mod.key)"
-            [attr.aria-label]="mod.mandatory ? mod.label + ' é um módulo obrigatório e não pode ser desativado' : 'Ativar ou desativar módulo ' + mod.label"
+            [attr.aria-label]="'Ativar ou desativar módulo ' + mod.label"
           />
           <span class="slider"></span>
         </label>
