@@ -189,7 +189,7 @@ export class OrderService extends FirestoreBaseService {
     return updateDoc(orderRef, { status });
   }
 
-  async finalizeOrder(order: Order, paymentMethod: PaymentMethod): Promise<boolean> {
+  async finalizeOrder(order: Order, paymentMethod: PaymentMethod, installments: number = 1): Promise<boolean> {
     if (!order.id) throw new Error('Pedido sem ID não pode ser finalizado.');
 
     try {
@@ -204,6 +204,7 @@ export class OrderService extends FirestoreBaseService {
         total: Number(order.total),
         sale_type: 'order',
         paymentMethod: paymentMethod,
+        installments: installments,
         date: serverTimestamp(),
         ...(order.customerId ? { customerId: order.customerId } : {})
       };
@@ -213,6 +214,8 @@ export class OrderService extends FirestoreBaseService {
       const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${order.id}`);
       await updateDoc(orderRef, {
         status: 'finished',
+        paymentMethod: paymentMethod,
+        installments: installments,
         paymentDate: serverTimestamp(),
         closingDate: serverTimestamp()
       });

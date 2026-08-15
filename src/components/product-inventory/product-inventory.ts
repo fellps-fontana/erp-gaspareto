@@ -13,6 +13,7 @@ import { Customer } from '../../models/customer-model';
 import { Bill } from '../../models/bill-model';
 import { PurchaseProduct } from '../../models/purchase-product-model';
 import { Order } from '../../models/order-model';
+import { PaymentMethod, PAYMENT_METHOD_LABELS } from '../../models/sell-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
@@ -38,6 +39,7 @@ export interface HistoricoItem {
   clienteId?: string;
   status: string;
   total: number;
+  paymentMethod?: PaymentMethod; // só pdv/pedido — comanda não tem
   itens: { idProduct: string; productName: string; quantity: number }[];
 }
 
@@ -70,6 +72,7 @@ export class ProductInventoryComponent implements OnInit {
   filtroProdutoId: string = '';
   filtroOrigem: string = 'todos'; // 'todos' | 'pdv' | 'order'
   filtroClienteId: string = '';
+  filtroFormaPagamento: PaymentMethod | 'todos' = 'todos';
 
   // --- MODAL DE EXCLUSÃO DE PRODUTO ---
   isDeleteModalOpen: boolean = false;
@@ -144,6 +147,7 @@ export class ProductInventoryComponent implements OnInit {
   filtroHistoricoClienteId: string = '';
   filtroHistoricoProdutoId: string = '';
   filtroHistoricoBusca: string = '';
+  filtroHistoricoFormaPagamento: PaymentMethod | 'todos' = 'todos';
 
   // campos de endereço resolvidos via mini-mapa (lat/lng -> geocodificação reversa)
   clienteRua = '';
@@ -251,6 +255,7 @@ export class ProductInventoryComponent implements OnInit {
         clienteId: undefined,
         status: v.status || 'completed',
         total: v.total || 0,
+        paymentMethod: v.paymentMethod,
         itens: (v.items || []).map((i: any) => ({
           idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
         }))
@@ -265,6 +270,7 @@ export class ProductInventoryComponent implements OnInit {
       clienteId: p.customerId,
       status: p.status,
       total: p.total || 0,
+      paymentMethod: p.paymentMethod,
       itens: (p.items || []).map(i => ({
         idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
       }))
@@ -299,6 +305,7 @@ export class ProductInventoryComponent implements OnInit {
       if (this.filtroHistoricoOrigem !== 'todos' && item.origem !== this.filtroHistoricoOrigem) return false;
       if (this.filtroHistoricoClienteId && item.clienteId !== this.filtroHistoricoClienteId) return false;
       if (this.filtroHistoricoProdutoId && !item.itens.some(i => i.idProduct === this.filtroHistoricoProdutoId)) return false;
+      if (this.filtroHistoricoFormaPagamento !== 'todos' && item.paymentMethod !== this.filtroHistoricoFormaPagamento) return false;
       if (busca) {
         const buscaNumero = busca.replace('#', '');
         const somenteNumero = /^\d+$/.test(buscaNumero);
@@ -318,10 +325,16 @@ export class ProductInventoryComponent implements OnInit {
     this.filtroHistoricoClienteId = '';
     this.filtroHistoricoProdutoId = '';
     this.filtroHistoricoBusca = '';
+    this.filtroHistoricoFormaPagamento = 'todos';
   }
 
   origemLabel(origem: HistoricoItem['origem']): string {
     return { pdv: 'PDV', pedido: 'Pedido', comanda: 'Comanda' }[origem];
+  }
+
+  paymentMethodLabel(method: PaymentMethod | undefined): string {
+    if (!method) return '';
+    return PAYMENT_METHOD_LABELS[method] || '';
   }
 
   statusLabelHistorico(item: HistoricoItem): string {
@@ -454,6 +467,9 @@ export class ProductInventoryComponent implements OnInit {
         // Filtro por Cliente — PDV nunca terá customerId, só pedidos com vínculo passam
         if (this.filtroClienteId && venda.customerId !== this.filtroClienteId) return;
 
+        // Filtro por Forma de Pagamento
+        if (this.filtroFormaPagamento !== 'todos' && venda.paymentMethod !== this.filtroFormaPagamento) return;
+
         let vendaEntrouNoFiltro = false;
         if (venda.items) {
           venda.items.forEach((item: any) => {
@@ -536,6 +552,8 @@ export class ProductInventoryComponent implements OnInit {
       if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
       // Filtro por Cliente
       if (this.filtroClienteId && v.customerId !== this.filtroClienteId) return;
+      // Filtro por Forma de Pagamento
+      if (this.filtroFormaPagamento !== 'todos' && v.paymentMethod !== this.filtroFormaPagamento) return;
 
       const vDate = (v.date?.toDate ? v.date.toDate() : new Date(v.date));
       const dayKey = vDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -604,6 +622,8 @@ export class ProductInventoryComponent implements OnInit {
       if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
       // Filtro por Cliente
       if (this.filtroClienteId && v.customerId !== this.filtroClienteId) return;
+      // Filtro por Forma de Pagamento
+      if (this.filtroFormaPagamento !== 'todos' && v.paymentMethod !== this.filtroFormaPagamento) return;
 
       v.items?.forEach((item: any) => {
         if (!productsMap[item.idProduct]) {
@@ -667,6 +687,7 @@ export class ProductInventoryComponent implements OnInit {
     this.filtroProdutoId = '';
     this.filtroOrigem = 'todos';
     this.filtroClienteId = '';
+    this.filtroFormaPagamento = 'todos';
     this.atualizarRelatorio();
   }
 

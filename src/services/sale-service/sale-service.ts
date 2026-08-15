@@ -78,6 +78,7 @@ export class SaleService extends FirestoreBaseService {
           paymentMethod: sale.paymentMethod
         };
         if (sale.customerId) saleDoc['customerId'] = sale.customerId;
+        if (sale.installments !== undefined) saleDoc['installments'] = sale.installments;
         transaction.set(newSaleRef, saleDoc);
       });
     } catch (error) {

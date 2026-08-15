@@ -89,6 +89,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
   isPaymentModalOpen       = false;
   selectedOrderToFinalize: Order | null = null;
   selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
+  selectedInstallments: number = 1;
+
+  get requiresInstallments(): boolean {
+    return this.selectedPaymentMethod !== PaymentMethod.PIX;
+  }
 
   // ── EDIÇÃO ────────────────────────────────────────────────────────
   editingOrderId: string | null = null;
@@ -468,7 +473,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (!this.selectedOrderToFinalize) return;
     this.isProcessingAction = true;
     try {
-      await this.orderService.finalizeOrder(this.selectedOrderToFinalize, this.selectedPaymentMethod);
+      await this.orderService.finalizeOrder(this.selectedOrderToFinalize, this.selectedPaymentMethod, this.selectedInstallments);
       this.notif.success('💰 Venda Registrada e Pedido Finalizado!');
       this.closePaymentModal();
     } catch (error) {
