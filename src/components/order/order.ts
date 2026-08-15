@@ -89,7 +89,24 @@ export class OrdersComponent implements OnInit, OnDestroy {
   // ── PAGAMENTO ─────────────────────────────────────────────────────
   isPaymentModalOpen       = false;
   selectedOrderToFinalize: Order | null = null;
-  selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
+  private _selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
+  selectedInstallments: number = 1;
+
+  get selectedPaymentMethod(): PaymentMethod {
+    return this._selectedPaymentMethod;
+  }
+
+  set selectedPaymentMethod(value: PaymentMethod) {
+    this._selectedPaymentMethod = value;
+    // Reset installments to 1 when switching to PIX (always à vista)
+    if (value === PaymentMethod.PIX) {
+      this.selectedInstallments = 1;
+    }
+  }
+
+  get requiresInstallments(): boolean {
+    return this._selectedPaymentMethod !== PaymentMethod.PIX;
+  }
 
   // ── EDIÇÃO ────────────────────────────────────────────────────────
   editingOrderId: string | null = null;
@@ -119,7 +136,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.isLoadingOrders = true;
     this.products$ = this.productService.getProducts();
 
-    this.orders$ = this.orderService.getPendingOrders().pipe(
+    this.orders$ = this.orderService.getOrders().pipe(
       catchError(err => {
         console.error('OrdersComponent: Erro ao carregar pedidos', err);
         this.notif.error('Erro ao carregar pedidos. Verifique a conexão.');
@@ -141,13 +158,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
         this.isLoadingOrders = false;
         if (!orders) return [];
 
-        let result = orders;
+        // Pedidos finalizados/cancelados não aparecem mais nesta tela (nem
+        // no filtro "Todos") — a tela de Pedidos é só operacional agora.
+        // Esse histórico vive na aba Histórico Geral (Gestão), que já cobre
+        // os 3 status por lá (Pedido, PDV, Comanda) sem duplicar aqui.
+        let result = orders.filter(o => !['finished', 'canceled'].includes(o.status));
+
         if (this._filterStatus === 'pending') {
-          result = orders.filter(o =>
+          result = result.filter(o =>
             ['open', 'pending', 'preparing', 'ready', 'delivering'].includes(o.status)
           );
         } else if (this._filterStatus === 'delivered') {
-          result = orders.filter(o => ['delivered', 'finished'].includes(o.status));
+          result = result.filter(o => o.status === 'delivered');
         }
 
         if (this._sortOrder === 'oldest') {
@@ -529,7 +551,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (!this.selectedOrderToFinalize) return;
     this.isProcessingAction = true;
     try {
-      await this.orderService.finalizeOrder(this.selectedOrderToFinalize, this.selectedPaymentMethod);
+      await this.orderService.finalizeOrder(this.selectedOrderToFinalize, this.selectedPaymentMethod, this.selectedInstallments);
       this.notif.success('💰 Venda Registrada e Pedido Finalizado!');
       this.closePaymentModal();
     } catch (error) {

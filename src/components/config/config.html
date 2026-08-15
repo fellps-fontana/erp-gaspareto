@@ -32,6 +32,33 @@
           <span class="slider"></span>
         </label>
       </li>
+
+      <li class="module-item">
+        <div class="module-info">
+          <span class="module-label">Notificações</span>
+          <span class="module-description">Avisos automáticos do sistema</span>
+        </div>
+      </li>
+
+      <li
+        class="module-item module-item--sub"
+        [class.module-item--saving]="saving() === 'notificacoes'"
+      >
+        <div class="module-info">
+          <span class="module-label">Aniversário</span>
+          <span class="module-description">Painel de clientes aniversariantes do dia na Home (sub-módulo de Notificações)</span>
+        </div>
+        <label class="switch">
+          <input
+            type="checkbox"
+            [checked]="config.modules().notificacoes.aniversario"
+            [disabled]="saving() !== null"
+            (change)="toggleNotificacaoAniversario()"
+            aria-label="Ativar ou desativar notificação de aniversário"
+          />
+          <span class="slider"></span>
+        </label>
+      </li>
     </ul>
 
     <button class="btn-voltar" [routerLink]="['/']">⬅ Voltar</button>

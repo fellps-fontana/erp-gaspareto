@@ -25,13 +25,13 @@ export class ConfigComponent {
 
   readonly saving = signal<keyof ModuleConfig | null>(null);
 
+  // Gestão e Clientes são módulos obrigatórios (regra-de-negocio.md seção 11):
+  // nem aparecem aqui como opção — só módulos que podem ser desligados são configuráveis.
   readonly moduleOptions: ModuleOption[] = [
     { key: 'pdv', label: 'PDV', description: 'Vendas no balcão' },
     { key: 'pedidos', label: 'Pedidos', description: 'Encomendas e cozinha' },
-    { key: 'gestao', label: 'Gestão', description: 'Estoque, relatórios e compras' },
     { key: 'rotas', label: 'Rotas', description: 'Entregas e navegação' },
     { key: 'contas', label: 'Contas', description: 'Contas a pagar' },
-    { key: 'clientes', label: 'Clientes', description: 'Cadastro de clientes (sub-módulo do Gestão)', sub: true },
     { key: 'compras', label: 'Compras', description: 'Entrada de estoque (sub-módulo do Gestão)', sub: true },
   ];
 
@@ -40,6 +40,21 @@ export class ConfigComponent {
     this.saving.set(key);
     try {
       await this.config.updateModules({ [key]: !this.config.modules()[key] });
+    } catch {
+      this.notif.error('Erro ao salvar configuração. ❌');
+    } finally {
+      this.saving.set(null);
+    }
+  }
+
+  // Toggle dedicado: `notificacoes` é objeto aninhado ({ aniversario: boolean }),
+  // não pode passar por toggleModule (que faz !valor direto e corromperia o dado).
+  async toggleNotificacaoAniversario() {
+    if (this.saving()) return;
+    this.saving.set('notificacoes');
+    try {
+      const atual = this.config.modules().notificacoes;
+      await this.config.updateModules({ notificacoes: { ...atual, aniversario: !atual.aniversario } });
     } catch {
       this.notif.error('Erro ao salvar configuração. ❌');
     } finally {

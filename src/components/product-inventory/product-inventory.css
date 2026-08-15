@@ -203,6 +203,10 @@ h1 {
 }
 
 /* --- BOTÕES PREMIUM DASHBOARD --- */
+.btn-toggle-filtros {
+  margin-bottom: 0.9375rem;
+}
+
 .filter-actions {
   display: flex;
   gap: 10px;
@@ -1247,9 +1251,17 @@ input[type="color"] {
 
 .pedido-historico-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.header-left-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .pedido-historico-data {
@@ -1329,6 +1341,49 @@ input[type="color"] {
   color: var(--text-inverse);
 }
 
+/* Histórico Geral: badge de origem (PDV/Pedido/Comanda) — classes próprias
+   pra não colidir com as de status de pedido acima (ex.: "open" existe tanto
+   em pedido quanto em comanda, com significados diferentes). */
+.status-badge.pdv {
+  background: var(--color-info);
+  color: var(--text-inverse);
+}
+
+.status-badge.pedido {
+  background: var(--color-primary);
+}
+
+.status-badge.comanda {
+  background: var(--color-secondary);
+}
+
+/* Histórico Geral: status de comanda e de venda PDV, com prefixo pra não
+   colidir com os status de pedido (.open, .canceled etc. acima). */
+.status-badge.comanda-open {
+  background: var(--color-warning);
+}
+
+.status-badge.comanda-closed {
+  background: var(--color-success);
+  color: var(--text-inverse);
+}
+
+.status-badge.pdv-completed {
+  background: var(--color-success);
+  color: var(--text-inverse);
+}
+
+.status-badge.pdv-canceled {
+  background: var(--color-danger);
+  color: var(--text-inverse);
+}
+
+.order-number {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
 /* ==========================================================
    ABA COMPRAS
    ========================================================== */
@@ -1369,6 +1424,18 @@ input[type="color"] {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.header-right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.historico-valor {
+  align-self: flex-end;
+  margin-top: 0.4rem;
 }
 
 .valor-badge {

@@ -46,3 +46,9 @@ Thumbs.db
 .firebase
 *-debug.log
 .runtimeconfig.json
+/emulator-data
+
+# Credenciais (nunca commitar)
+service-account*.json
+*-service-account.json
+*firebase-adminsdk*.json

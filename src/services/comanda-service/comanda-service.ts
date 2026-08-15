@@ -8,18 +8,41 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Comanda } from '../../models/comanda-model';
 import { FirestoreBaseService } from '../firestore-base.service';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ComandaService extends FirestoreBaseService {
   private firestore = inject(Firestore);
+  private tenantService = inject(TenantService);
   private readonly COLLECTION_NAME = 'comandas';
 
   getOpenComandas(): Observable<Comanda[]> {
     const q = query(
       collection(this.firestore, this.COLLECTION_NAME),
-      where('status', '==', 'open')
+      where('status', '==', 'open'),
+      where('companyId', '==', this.tenantService.companyId())
+    );
+
+    return this.collectionDataObservable<Comanda>(q).pipe(
+      map(comandas => [...comandas].sort((a, b) => {
+        const dateA = (a.createdAt as any)?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
+        const dateB = (b.createdAt as any)?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
+        return dateB - dateA;
+      }))
+    );
+  }
+
+  /**
+   * Todas as comandas da empresa (abertas e fechadas), usado no histórico
+   * geral. Diferente de getOpenComandas(), que só traz status 'open' pro
+   * fluxo operacional do PDV.
+   */
+  getAllComandas(): Observable<Comanda[]> {
+    const q = query(
+      collection(this.firestore, this.COLLECTION_NAME),
+      where('companyId', '==', this.tenantService.companyId())
     );
 
     return this.collectionDataObservable<Comanda>(q).pipe(
@@ -32,6 +55,13 @@ export class ComandaService extends FirestoreBaseService {
   }
 
   async addComanda(comanda: Omit<Comanda, 'id' | 'createdAt' | 'status' | 'companyId'>): Promise<void> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível criar comanda sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     try {
       await runTransaction(this.firestore, async (transaction: Transaction) => {
         const productsToUpdate: { ref: any; quantity: number }[] = [];
@@ -58,7 +88,8 @@ export class ComandaService extends FirestoreBaseService {
         transaction.set(newComandaRef, {
           ...comanda,
           status: 'open',
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          companyId
         });
       });
     } catch (error) {

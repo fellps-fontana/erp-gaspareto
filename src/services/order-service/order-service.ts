@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, addDoc, updateDoc, serverTimestamp, query, where,
+  collection, doc, updateDoc, serverTimestamp, query, where,
   CollectionReference, DocumentReference, runTransaction, increment
 } from 'firebase/firestore';
 import { Observable, of } from 'rxjs';
@@ -10,6 +10,7 @@ import { Order } from '../../models/order-model';
 import { SaleService } from '../sale-service/sale-service';
 import { PaymentMethod, Sale } from '../../models/sell-model';
 import { FirestoreBaseService } from '../firestore-base.service';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({
   providedIn: 'root',
@@ -17,6 +18,7 @@ import { FirestoreBaseService } from '../firestore-base.service';
 export class OrderService extends FirestoreBaseService {
   private firestore = inject(Firestore);
   private saleService = inject(SaleService);
+  private tenantService = inject(TenantService);
 
   private readonly ORDERS_COLLECTION = 'orders';
   private ordersCollection: CollectionReference;
@@ -27,7 +29,7 @@ export class OrderService extends FirestoreBaseService {
   }
 
   getOrders(): Observable<Order[]> {
-    const q = query(this.ordersCollection);
+    const q = query(this.ordersCollection, where('companyId', '==', this.tenantService.companyId()));
     return this.collectionDataObservable<Order>(q).pipe(
       map(orders => [...orders].sort((a, b) => {
         const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
@@ -39,7 +41,11 @@ export class OrderService extends FirestoreBaseService {
 
   getPendingOrders(): Observable<Order[]> {
     const activeStatuses = ['open', 'pending', 'preparing', 'ready', 'delivering', 'delivered'];
-    const q = query(this.ordersCollection, where('status', 'in', activeStatuses));
+    const q = query(
+      this.ordersCollection,
+      where('companyId', '==', this.tenantService.companyId()),
+      where('status', 'in', activeStatuses)
+    );
 
     return this.collectionDataObservable<Order>(q).pipe(
       map(orders => [...orders].sort((a, b) => {
@@ -55,7 +61,11 @@ export class OrderService extends FirestoreBaseService {
   }
 
   getOrdersByCustomer(customerId: string): Observable<Order[]> {
-    const q = query(this.ordersCollection, where('customerId', '==', customerId));
+    const q = query(
+      this.ordersCollection,
+      where('companyId', '==', this.tenantService.companyId()),
+      where('customerId', '==', customerId)
+    );
     return this.collectionDataObservable<Order>(q).pipe(
       map(orders => [...orders].sort((a, b) => {
         const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
@@ -69,16 +79,48 @@ export class OrderService extends FirestoreBaseService {
     );
   }
 
-  addOrder(order: Omit<Order, 'id' | 'createdAt' | 'companyId'>): Promise<DocumentReference> {
-    const newOrder = {
-      ...order,
-      status: 'pending',
-      createdAt: serverTimestamp(),
-      itemsTotal: Number(order.itemsTotal),
-      shippingCost: Number(order.shippingCost || 0),
-      total: Number(order.itemsTotal) + Number(order.shippingCost || 0)
-    };
-    return addDoc(this.ordersCollection, newOrder);
+  /**
+   * Cria o pedido com um orderNumber sequencial por empresa (#1, #2, ...).
+   * Usa runTransaction pra ler e incrementar o contador (counters/{companyId})
+   * atomicamente junto com a criação do pedido — evita dois pedidos criados
+   * ao mesmo tempo saírem com o mesmo número (race condition).
+   */
+  async addOrder(
+    order: Omit<Order, 'id' | 'createdAt' | 'companyId' | 'orderNumber'>
+  ): Promise<DocumentReference> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível criar pedido sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
+
+    const newOrderRef = doc(this.ordersCollection);
+    const counterRef = doc(this.firestore, `counters/${companyId}`);
+
+    await runTransaction(this.firestore, async (transaction) => {
+      const counterSnap = await transaction.get(counterRef);
+      const nextNumber: number = counterSnap.exists()
+        ? (counterSnap.data()['nextOrderNumber'] as number)
+        : 1;
+
+      const newOrder = {
+        ...order,
+        orderNumber: nextNumber,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        companyId,
+        itemsTotal: Number(order.itemsTotal),
+        shippingCost: Number(order.shippingCost || 0),
+        total: Number(order.itemsTotal) + Number(order.shippingCost || 0)
+      };
+
+      transaction.set(newOrderRef, newOrder);
+      transaction.set(counterRef, { nextOrderNumber: nextNumber + 1 }, { merge: true });
+    });
+
+    return newOrderRef;
   }
 
   async updateOrder(orderId: string, orderData: Partial<Order>): Promise<void> {
@@ -147,8 +189,18 @@ export class OrderService extends FirestoreBaseService {
     return updateDoc(orderRef, { status });
   }
 
-  async finalizeOrder(order: Order, paymentMethod: PaymentMethod): Promise<boolean> {
+  async finalizeOrder(order: Order, paymentMethod: PaymentMethod, installments: number = 1): Promise<boolean> {
     if (!order.id) throw new Error('Pedido sem ID não pode ser finalizado.');
+
+    // Normalize installments defensively: always Number, minimum 1
+    let normalizedInstallments = Number(installments) || 1;
+    if (normalizedInstallments < 1) {
+      normalizedInstallments = 1;
+    }
+    // PIX is always 1x (à vista) — enforce regardless of input
+    if (paymentMethod === PaymentMethod.PIX) {
+      normalizedInstallments = 1;
+    }
 
     try {
       const saleData: Omit<Sale, 'id' | 'companyId'> = {
@@ -162,6 +214,7 @@ export class OrderService extends FirestoreBaseService {
         total: Number(order.total),
         sale_type: 'order',
         paymentMethod: paymentMethod,
+        installments: normalizedInstallments,
         date: serverTimestamp(),
         ...(order.customerId ? { customerId: order.customerId } : {})
       };
@@ -171,6 +224,8 @@ export class OrderService extends FirestoreBaseService {
       const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${order.id}`);
       await updateDoc(orderRef, {
         status: 'finished',
+        paymentMethod: paymentMethod,
+        installments: normalizedInstallments,
         paymentDate: serverTimestamp(),
         closingDate: serverTimestamp()
       });

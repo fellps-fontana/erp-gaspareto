@@ -1,8 +1,68 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userCompanyId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isOperationalCollection(collection) {
+      return collection in ['products', 'sales', 'comandas', 'orders', 'bills', 'customers', 'purchases', 'purchaseProducts'];
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.companyId == uid
+        && request.resource.data.role == 'owner';
+      allow update, delete: if false;
+    }
+
+    // Contador de numeração sequencial por empresa (ex.: nextOrderNumber
+    // pra pedidos). Qualquer membro da empresa pode ler/escrever — não é
+    // restrito a owner/admin como companies/{id}, porque criar um pedido
+    // é uma ação operacional comum, não administrativa.
+    match /counters/{companyId} {
+      allow read, write: if isSignedIn() && userCompanyId() == companyId;
+    }
+
+    match /companies/{companyId} {
+      allow read: if isSignedIn() && userCompanyId() == companyId;
+      allow create: if isSignedIn() && (
+        companyId == request.auth.uid ||
+        (userCompanyId() == companyId && userRole() in ['owner', 'admin'])
+      );
+      allow update, delete: if isSignedIn()
+        && userCompanyId() == companyId
+        && userRole() in ['owner', 'admin'];
+    }
+
+    match /{collection}/{docId} {
+      allow read: if isSignedIn()
+        && isOperationalCollection(collection)
+        && resource.data.companyId == userCompanyId();
+
+      allow create: if isSignedIn()
+        && isOperationalCollection(collection)
+        && request.resource.data.companyId == userCompanyId();
+
+      allow update: if isSignedIn()
+        && isOperationalCollection(collection)
+        && resource.data.companyId == userCompanyId()
+        && request.resource.data.companyId == resource.data.companyId;
+
+      allow delete: if isSignedIn()
+        && isOperationalCollection(collection)
+        && resource.data.companyId == userCompanyId();
     }
   }
 }

@@ -36,24 +36,51 @@ transações (`runTransaction`) para operações que envolvem estoque.
     no código-fonte — normal para Firebase client SDK (não é secreto de servidor),
     mas vale confirmar se é intencional manter assim no repo.
   - `provideFirestore` — banco principal, todas as coleções abaixo.
-  - `provideAuth` — Auth está registrado no `app.config.ts` mas ⚠️ nenhum guard/
-    componente usa `getAuth()`/login hoje. Não há tela de login nem checagem de
-    usuário autenticado no código atual.
-- **Regras do Firestore (`firestore.rules`):** ⚠️ liberado geral —
-  `allow read, write: if true;` para qualquer documento. Sem autenticação nem
-  validação de schema no servidor. Todo o controle de acesso hoje é só via UI
-  (módulos habilitados/desabilitados em `ConfigService`).
+  - `provideAuth` — Auth em uso: `AuthService` (`src/services/auth/`) faz
+    login/logout por email+senha e expõe usuário atual; `TenantService`
+    (`src/services/tenant/`) expõe o `companyId` da sessão como signal, usado
+    por todos os services de dados pra filtrar/gravar `companyId`.
+    `AuthGuard` (`src/guards/auth.guard.ts`) bloqueia rotas sem sessão —
+    proteção de UX, não de segurança (quem garante isolamento real é
+    `firestore.rules`). Telas: `src/components/login/`,
+    `src/components/signup/` (cadastro self-service de empresa nova).
+    Custom claims (`companyId`/`role` no token JWT) via Cloud Function é
+    fase 2/opcional — fase 1 opera com leitura direta de `users/{uid}` na
+    regra.
+- **Regras do Firestore (`firestore.rules`):** isolamento multi-tenant —
+  toda leitura/escrita nas coleções operacionais (`products`, `sales`,
+  `orders`, `comandas`, `bills`, `customers`, `purchases`,
+  `purchaseProducts`) exige `resource.data.companyId` (leitura) ou
+  `request.resource.data.companyId` (escrita) igual ao `companyId` do
+  usuário autenticado (token ou lookup em `users/{uid}`). `companies/{id}`
+  só é legível/gravável pelo próprio tenant (escrita restrita a
+  `owner`/`admin`); `users/{uid}` só é legível pelo próprio usuário e nunca
+  gravável direto pelo cliente (só via Cloud Function/Admin SDK). Ver
+  `regra-de-negocio.md` seção 10 para o racional de campo vs. subcoleção.
 - **Hosting:** Firebase Hosting, `dist/erp-gaspareto/browser` como pasta pública,
   rewrite total para `index.html` (SPA).
 - **Coleções Firestore identificadas no código:**
   `products`, `sales`, `orders`, `purchases`, `purchaseProducts`, `bills`,
-  `customers`, `comandas`, `config` (doc único `company`).
+  `customers`, `comandas`, `companies` (substitui o antigo doc único
+  `config/company`), `users`.
 
 ## Ferramentas / qualidade
 
-- **Testes:** Karma + Jasmine (setup padrão do Angular CLI). ⚠️ Não foi encontrado
-  nenhum arquivo `*.spec.ts` além do `app.spec.ts` gerado pelo scaffold — cobertura
-  de teste real parece inexistente hoje.
+- **Testes:** dois runners, propósitos diferentes.
+  - **Karma + Jasmine** (`npm test` / `ng test`, setup padrão do Angular CLI):
+    testes de componentes/services Angular, incluindo os 8 services de dados
+    (`src/services/*/*.spec.ts`), que rodam contra um Firestore Emulator real
+    (ver abaixo), não contra Firestore de produção nem mock.
+  - **Jest + ts-jest** (`npm run test:rules`, devDependency adicionada junto
+    com `@firebase/rules-unit-testing`): só para `test/firestore.rules.spec.ts`
+    — testa as regras de segurança do Firestore isoladamente, também contra o
+    emulador. Runner separado porque `@firebase/rules-unit-testing` roda em
+    Node (não em browser/Karma) e é o padrão oficial da Firebase para esse
+    tipo de teste.
+  - **Firestore Emulator:** `firebase.json` tem `emulators.firestore` (porta
+    8080, `firebase emulators:start --only firestore`) — pré-requisito: Java
+    (JRE/JDK 11+) instalado. Sem o emulador rodando, nenhum dos dois runners
+    consegue testar código que toca Firestore de verdade.
 - **Lint/format:** Prettier configurado no `package.json` (printWidth 100,
   singleQuote, parser `angular` para `.html`). Não há ESLint configurado.
 - **Estilo de código:** `.editorconfig` — indent 2 espaços, aspas simples em `.ts`,
@@ -75,3 +102,23 @@ transações (`runTransaction`) para operações que envolvem estoque.
   `environments`) — mantido assim por já estar em uso nos imports
   (`app.config.ts` importa de `'../enviroments/enviroments'`). Não corrigir
   sem avaliar impacto em todos os imports.
+- **Dois ambientes reais, dois projetos Firebase separados:**
+  - **Produção**: branch `main`, projeto `projetosfelipe-9e458`, config em
+    `enviroments.ts` (`useEmulator: true` só em dev local — build de prod usa
+    Firebase real). Onde o cliente Gasparetto roda hoje.
+  - **Homologação/staging**: branch `homologacao`, projeto Firebase próprio
+    `hologaerp` (alias `hml` no `.firebaserc`), config em
+    `enviroments.staging.ts` (`useEmulator: false`, Firestore/Auth reais do
+    `hologaerp`, isolado de produção). Usado pra validar multi-tenant e
+    features novas antes de ir pra produção — TASK-024 (isolamento entre
+    empresas) validada manualmente aqui.
+  - `angular.json` tem configuration `staging` (`fileReplacements` troca
+    `enviroments.ts` por `enviroments.staging.ts`). Scripts: `npm run
+    start:staging`, `npm run build:staging`, `npm run deploy:rules:staging`
+    (`firestore.rules` + `firestore.indexes.json` pro projeto `hml`), `npm
+    run deploy:hosting:staging` (build + deploy Hosting pro `hml`).
+- **CI/CD:** GitHub Actions. `.github/workflows/firebase-hosting-merge.yml`
+  builda/deploya produção em push pra `main`; `.github/workflows/
+  firebase-hosting-homolog.yml` builda com `--configuration staging` e
+  deploya em push pra `homologacao`, usando o secret
+  `FIREBASE_SERVICE_ACCOUNT_HOLOGAERP`.

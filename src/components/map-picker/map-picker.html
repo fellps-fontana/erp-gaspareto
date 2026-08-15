@@ -1,0 +1,19 @@
+<div class="map-picker">
+  <div class="map-picker-search">
+    <input
+      type="text"
+      [(ngModel)]="searchTerm"
+      (keydown.enter)="onSearch()"
+      placeholder="Buscar endereço para centralizar o mapa..."
+    >
+    <button type="button" class="btn btn-outline" (click)="onSearch()" [disabled]="searchLoading">
+      {{ searchLoading ? 'Buscando...' : 'Buscar' }}
+    </button>
+  </div>
+  <small class="map-picker-search-error" *ngIf="searchError">{{ searchError }}</small>
+  <small class="map-picker-search-error" *ngIf="mapLoadError">{{ mapLoadError }}</small>
+
+  <div #mapContainer class="map-picker-canvas"></div>
+
+  <p class="map-picker-hint">Clique no mapa ou arraste o marcador para confirmar a localização exata.</p>
+</div>

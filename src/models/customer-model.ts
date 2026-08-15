@@ -1,5 +1,6 @@
 export interface Customer {
   id?: string;
+  companyId: string;
   name: string;
   phone?: string;
   address?: string;
@@ -12,4 +13,5 @@ export interface Customer {
   uf?: string;
   lat?: number;
   lng?: number;
+  dataAniversario?: string; // 'YYYY-MM-DD', date-only sem hora/timezone
 }

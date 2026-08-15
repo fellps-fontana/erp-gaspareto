@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Chart, registerables } from 'chart.js';
-import { Observable, of } from 'rxjs';
+import { Observable, of, combineLatest } from 'rxjs';
 
 Chart.register(...registerables);
 
@@ -13,6 +13,7 @@ import { Customer } from '../../models/customer-model';
 import { Bill } from '../../models/bill-model';
 import { PurchaseProduct } from '../../models/purchase-product-model';
 import { Order } from '../../models/order-model';
+import { PaymentMethod, PAYMENT_METHOD_LABELS } from '../../models/sell-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
@@ -22,19 +23,40 @@ import { PurchaseProductService } from '../../services/purchase-product-service/
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { ConfigService } from '../../services/config/config.service';
 import { OrderService } from '../../services/order-service/order-service';
+import { ComandaService } from '../../services/comanda-service/comanda-service';
+import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
+import { MapPickerComponent } from '../map-picker/map-picker';
+
+// --- HISTÓRICO GERAL: item unificado das 3 origens (pdv/pedido/comanda) ---
+// Não é uma coleção do Firestore, é só uma forma comum de exibir sales,
+// orders e comandas juntos na mesma lista/filtro.
+export interface HistoricoItem {
+  id: string;
+  numero?: number; // só existe pra origem 'pedido' — número sequencial por empresa
+  origem: 'pdv' | 'pedido' | 'comanda';
+  data: Date | null;
+  clienteNome: string;
+  clienteId?: string;
+  status: string;
+  total: number;
+  paymentMethod?: PaymentMethod; // só pdv/pedido — comanda não tem
+  installments?: number; // 1/ausente = à vista, N = parcelado — espelha Sale/Order.installments
+  itens: { idProduct: string; productName: string; quantity: number }[];
+}
 
 @Component({
   selector: 'app-estoque',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, MapPickerComponent],
   templateUrl: './product-inventory.html',
   styleUrls: ['./product-inventory.css', './product-inventory-mobile.css']
 })
 export class ProductInventoryComponent implements OnInit {
   readonly config = inject(ConfigService);
+  private geocodingService = inject(GeocodingService);
 
   // Controle das Abas
-  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' = 'relatorio';
+  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' = 'relatorio';
   reportTab: 'vendas' | 'contas' | 'balanco' = 'vendas';
 
   // Controle de Visualização do Formulário
@@ -51,6 +73,8 @@ export class ProductInventoryComponent implements OnInit {
   filtroProdutoId: string = '';
   filtroOrigem: string = 'todos'; // 'todos' | 'pdv' | 'order'
   filtroClienteId: string = '';
+  filtroFormaPagamento: PaymentMethod | 'todos' = 'todos';
+  filtrosRelatorioVisiveis: boolean = false;
 
   // --- MODAL DE EXCLUSÃO DE PRODUTO ---
   isDeleteModalOpen: boolean = false;
@@ -70,7 +94,7 @@ export class ProductInventoryComponent implements OnInit {
   topProductsChart: any;
 
   // --- DADOS PARA CADASTRO / EDIÇÃO (CAMPOS NOVOS ADICIONADOS) ---
-  novoProduto: Product = {
+  novoProduto: Omit<Product, 'companyId'> = {
     title: '',
     sellPrice: 0,
     buyPrice: 0,
@@ -98,7 +122,7 @@ export class ProductInventoryComponent implements OnInit {
   produtoCompraEmEdicao: PurchaseProduct | null = null;
   isDeleteCompraModalOpen: boolean = false;
   produtoCompraToDelete: PurchaseProduct | null = null;
-  novoProdutoCompra: Omit<PurchaseProduct, 'id' | 'createdAt'> = {
+  novoProdutoCompra: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'> = {
     name: '',
     defaultValue: 0,
     recurring: false,
@@ -109,7 +133,7 @@ export class ProductInventoryComponent implements OnInit {
   customers: Customer[] = [];
   clienteEmEdicao: Customer | null = null;
   exibirFormularioCliente: boolean = false;
-  novoCliente: Omit<Customer, 'id'> = { name: '', phone: '', address: '' };
+  novoCliente: Omit<Customer, 'id' | 'companyId'> = { name: '', phone: '', address: '', dataAniversario: '' };
   isDeleteClienteModalOpen: boolean = false;
   clienteToDelete: Customer | null = null;
 
@@ -118,16 +142,29 @@ export class ProductInventoryComponent implements OnInit {
   clienteHistorico: Customer | null = null;
   pedidosCliente$: Observable<Order[]> = of([]);
 
-  // campos de endereço por CEP
-  clienteCep = '';
+  // --- HISTÓRICO GERAL (aba própria em Gestão) ---
+  historicoItems: HistoricoItem[] = [];
+  historicoCarregando = true;
+  filtroHistoricoOrigem: 'todos' | 'pdv' | 'pedido' | 'comanda' = 'todos';
+  filtroHistoricoClienteId: string = '';
+  filtroHistoricoProdutoId: string = '';
+  filtroHistoricoBusca: string = '';
+  filtroHistoricoFormaPagamento: PaymentMethod | 'todos' = 'todos';
+  filtrosHistoricoVisiveis: boolean = false;
+
+  // campos de endereço resolvidos via mini-mapa (lat/lng -> geocodificação reversa)
   clienteRua = '';
   clienteBairro = '';
   clienteCidade = '';
   clienteUf = '';
   clienteNumero = '';
   clienteComplemento = '';
-  clienteCepLoading = false;
-  clienteCepError = '';
+  clienteLat?: number;
+  clienteLng?: number;
+  geocodeLoading = false;
+  geocodeError = '';
+  /** CEP não é mais digitado — vem do resultado da geocodificação reversa, best-effort. */
+  private resolvedCep = '';
 
   get clienteFormattedAddress(): string {
     if (!this.clienteRua || !this.clienteNumero.trim() || !this.clienteBairro || !this.clienteCidade) return '';
@@ -149,6 +186,7 @@ export class ProductInventoryComponent implements OnInit {
     private billService: BillService,
     private purchaseProductService: PurchaseProductService,
     private orderService: OrderService,
+    private comandaService: ComandaService,
     private notif: NotificationService
   ) { }
 
@@ -189,6 +227,138 @@ export class ProductInventoryComponent implements OnInit {
     this.purchaseProductService.getPurchaseProducts().subscribe(data => {
       this.purchaseProducts = data;
     });
+
+    // 7. Carrega e combina Histórico Geral (PDV + Pedidos + Comandas)
+    combineLatest([
+      this.saleService.getSales(),
+      this.orderService.getOrders(),
+      this.comandaService.getAllComandas()
+    ]).subscribe(([vendas, pedidos, comandas]) => {
+      this.historicoItems = this.montarHistorico(vendas, pedidos, comandas);
+      this.historicoCarregando = false;
+    });
+  }
+
+  // ==========================================================
+  // ABA 5: HISTÓRICO GERAL
+  // ==========================================================
+
+  private montarHistorico(vendas: any[], pedidos: Order[], comandas: any[]): HistoricoItem[] {
+    // PDV: só vendas de balcão (sale_type 'pdv'). Vendas com sale_type
+    // 'order' não entram aqui pra não duplicar — o mesmo evento de negócio
+    // já aparece como o Pedido correspondente (mais rico: nome do cliente,
+    // endereço, ciclo de status), então a origem "pedido" cobre esse caso.
+    const itensPdv: HistoricoItem[] = vendas
+      .filter(v => v.sale_type === 'pdv')
+      .map(v => ({
+        id: v.id!,
+        origem: 'pdv' as const,
+        data: this.dataDoPedido(v.date),
+        clienteNome: 'Balcão (sem cliente)',
+        clienteId: undefined,
+        status: v.status || 'completed',
+        total: v.total || 0,
+        paymentMethod: v.paymentMethod,
+        installments: v.installments,
+        itens: (v.items || []).map((i: any) => ({
+          idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
+        }))
+      }));
+
+    const itensPedido: HistoricoItem[] = pedidos.map(p => ({
+      id: p.id!,
+      numero: p.orderNumber,
+      origem: 'pedido' as const,
+      data: this.dataDoPedido(p.createdAt),
+      clienteNome: p.customerName || 'Sem nome',
+      clienteId: p.customerId,
+      status: p.status,
+      total: p.total || 0,
+      paymentMethod: p.paymentMethod,
+      installments: p.installments,
+      itens: (p.items || []).map(i => ({
+        idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
+      }))
+    }));
+
+    // Comandas guardam o nome do cliente como texto livre, não vinculado a
+    // um Customer.id — por isso não entram no filtro por cliente (mesma
+    // limitação que já existe hoje pras vendas de PDV no Relatório).
+    const itensComanda: HistoricoItem[] = comandas.map(c => ({
+      id: c.id!,
+      origem: 'comanda' as const,
+      data: this.dataDoPedido(c.createdAt),
+      clienteNome: c.customerName || 'Sem nome',
+      clienteId: undefined,
+      status: c.status,
+      total: c.total || 0,
+      itens: (c.items || []).map((i: any) => ({
+        idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
+      }))
+    }));
+
+    return [...itensPdv, ...itensPedido, ...itensComanda].sort((a, b) => {
+      const ta = a.data ? a.data.getTime() : 0;
+      const tb = b.data ? b.data.getTime() : 0;
+      return tb - ta;
+    });
+  }
+
+  get historicoFiltrado(): HistoricoItem[] {
+    const busca = this.filtroHistoricoBusca.trim().toLowerCase();
+    return this.historicoItems.filter(item => {
+      if (this.filtroHistoricoOrigem !== 'todos' && item.origem !== this.filtroHistoricoOrigem) return false;
+      if (this.filtroHistoricoClienteId && item.clienteId !== this.filtroHistoricoClienteId) return false;
+      if (this.filtroHistoricoProdutoId && !item.itens.some(i => i.idProduct === this.filtroHistoricoProdutoId)) return false;
+      if (this.filtroHistoricoFormaPagamento !== 'todos' && item.paymentMethod !== this.filtroHistoricoFormaPagamento) return false;
+      if (busca) {
+        const buscaNumero = busca.replace('#', '');
+        const somenteNumero = /^\d+$/.test(buscaNumero);
+        const bateNumero = item.numero !== undefined && item.numero.toString().includes(buscaNumero);
+        // busca puramente numerica so compara com o numero do pedido — o
+        // id interno do Firestore e uma string aleatoria que quase sempre
+        // contem algum digito, entao comparar substring nele gera ruido.
+        const bateId = !somenteNumero && item.id.toLowerCase().includes(busca);
+        if (!bateId && !bateNumero) return false;
+      }
+      return true;
+    });
+  }
+
+  limparFiltrosHistorico() {
+    this.filtroHistoricoOrigem = 'todos';
+    this.filtroHistoricoClienteId = '';
+    this.filtroHistoricoProdutoId = '';
+    this.filtroHistoricoBusca = '';
+    this.filtroHistoricoFormaPagamento = 'todos';
+  }
+
+  origemLabel(origem: HistoricoItem['origem']): string {
+    return { pdv: 'PDV', pedido: 'Pedido', comanda: 'Comanda' }[origem];
+  }
+
+  paymentMethodLabel(method: PaymentMethod | undefined): string {
+    if (!method) return '';
+    return PAYMENT_METHOD_LABELS[method] || '';
+  }
+
+  statusLabelHistorico(item: HistoricoItem): string {
+    if (item.origem === 'pedido') return this.traduzirStatusPedido(item.status);
+    if (item.origem === 'comanda') return item.status === 'open' ? 'Aberta' : 'Fechada';
+    return item.status === 'canceled' ? 'Cancelada' : 'Concluída';
+  }
+
+  // Classe CSS do badge de status — com prefixo por origem pra "open" de
+  // comanda não pegar a mesma cor de "open" de pedido (mesmo texto, coisas
+  // diferentes). Pedido usa a classe crua porque já tem 8 status próprios
+  // e nenhum colide com os de comanda/pdv.
+  statusClassHistorico(item: HistoricoItem): string {
+    if (item.origem === 'pedido') return item.status;
+    return `${item.origem}-${item.status}`;
+  }
+
+  trackByHistorico(index: number, item: HistoricoItem): string {
+    return item.id || index.toString();
   }
 
   // ==========================================================
@@ -244,7 +414,7 @@ export class ProductInventoryComponent implements OnInit {
 
   billStatusLabel(status: Bill['status']): string {
     const labels: Record<Bill['status'], string> = {
-      pendente: 'Pendente', recebido: 'A Pagar', pago: 'Pago'
+      pendente: 'Pendente', recebido: 'Recebido', pago: 'Pago'
     };
     return labels[status];
   }
@@ -301,6 +471,9 @@ export class ProductInventoryComponent implements OnInit {
 
         // Filtro por Cliente — PDV nunca terá customerId, só pedidos com vínculo passam
         if (this.filtroClienteId && venda.customerId !== this.filtroClienteId) return;
+
+        // Filtro por Forma de Pagamento
+        if (this.filtroFormaPagamento !== 'todos' && venda.paymentMethod !== this.filtroFormaPagamento) return;
 
         let vendaEntrouNoFiltro = false;
         if (venda.items) {
@@ -384,6 +557,8 @@ export class ProductInventoryComponent implements OnInit {
       if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
       // Filtro por Cliente
       if (this.filtroClienteId && v.customerId !== this.filtroClienteId) return;
+      // Filtro por Forma de Pagamento
+      if (this.filtroFormaPagamento !== 'todos' && v.paymentMethod !== this.filtroFormaPagamento) return;
 
       const vDate = (v.date?.toDate ? v.date.toDate() : new Date(v.date));
       const dayKey = vDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -452,6 +627,8 @@ export class ProductInventoryComponent implements OnInit {
       if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
       // Filtro por Cliente
       if (this.filtroClienteId && v.customerId !== this.filtroClienteId) return;
+      // Filtro por Forma de Pagamento
+      if (this.filtroFormaPagamento !== 'todos' && v.paymentMethod !== this.filtroFormaPagamento) return;
 
       v.items?.forEach((item: any) => {
         if (!productsMap[item.idProduct]) {
@@ -515,6 +692,7 @@ export class ProductInventoryComponent implements OnInit {
     this.filtroProdutoId = '';
     this.filtroOrigem = 'todos';
     this.filtroClienteId = '';
+    this.filtroFormaPagamento = 'todos';
     this.atualizarRelatorio();
   }
 
@@ -633,22 +811,38 @@ export class ProductInventoryComponent implements OnInit {
 
   abrirNovoCliente() {
     this.clienteEmEdicao = null;
-    this.novoCliente = { name: '', phone: '', address: '' };
-    this.limparCamposCep();
+    this.novoCliente = { name: '', phone: '', address: '', dataAniversario: '' };
+    this.clienteRua = '';
+    this.clienteBairro = '';
+    this.clienteCidade = '';
+    this.clienteUf = '';
+    this.clienteNumero = '';
+    this.clienteComplemento = '';
+    this.clienteLat = undefined;
+    this.clienteLng = undefined;
+    this.resolvedCep = '';
+    this.geocodeError = '';
     this.exibirFormularioCliente = true;
   }
 
   abrirEdicaoCliente(c: Customer) {
     this.clienteEmEdicao = c;
-    this.novoCliente     = { name: c.name, phone: c.phone || '', address: c.address || '' };
-    this.clienteCep          = c.cep         ?? '';
+    this.novoCliente     = {
+      name: c.name,
+      phone: c.phone || '',
+      address: c.address || '',
+      dataAniversario: c.dataAniversario || ''
+    };
     this.clienteRua          = c.rua         ?? c.address ?? '';
     this.clienteNumero       = c.numero      ?? '';
     this.clienteComplemento  = c.complemento ?? '';
     this.clienteBairro       = c.bairro      ?? '';
     this.clienteCidade       = c.cidade      ?? '';
     this.clienteUf           = c.uf          ?? '';
-    this.clienteCepError     = '';
+    this.clienteLat          = c.lat;
+    this.clienteLng          = c.lng;
+    this.resolvedCep         = c.cep ?? '';
+    this.geocodeError        = '';
     this.exibirFormularioCliente = true;
   }
 
@@ -657,48 +851,33 @@ export class ProductInventoryComponent implements OnInit {
     this.clienteEmEdicao = null;
   }
 
-  private limparCamposCep() {
-    this.clienteCep = '';
-    this.clienteRua = '';
-    this.clienteBairro = '';
-    this.clienteCidade = '';
-    this.clienteUf = '';
-    this.clienteNumero = '';
-    this.clienteComplemento = '';
-    this.clienteCepError = '';
-  }
-
-  onClienteCepInput() {
-    const digits = this.clienteCep.replace(/\D/g, '');
-    if (digits.length > 8) { this.clienteCep = this.clienteCep.slice(0, 9); return; }
-    this.clienteCep = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
-    this.clienteCepError = '';
-    if (digits.length === 8) {
-      this.buscarCep(digits);
-    } else {
-      this.clienteRua = '';
-      this.clienteBairro = '';
-      this.clienteCidade = '';
-      this.clienteUf = '';
-      this.clienteNumero = '';
-      this.clienteComplemento = '';
-    }
-  }
-
-  private async buscarCep(cep: string) {
-    this.clienteCepLoading = true;
+  async onClientePositionChange({ lat, lng }: { lat: number; lng: number }) {
+    this.clienteLat = lat;
+    this.clienteLng = lng;
+    this.geocodeLoading = true;
+    this.geocodeError = '';
     try {
-      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-      const data = await res.json();
-      if (data.erro) { this.clienteCepError = 'CEP não encontrado.'; return; }
-      this.clienteRua    = data.logradouro || '';
-      this.clienteBairro = data.bairro     || '';
-      this.clienteCidade = data.localidade || '';
-      this.clienteUf     = data.uf         || '';
-    } catch {
-      this.clienteCepError = 'Erro ao buscar CEP.';
+      const result = await this.geocodingService.reverseGeocode(lat, lng);
+      if (result) {
+        this.clienteRua    = result.rua    ?? '';
+        this.clienteBairro = result.bairro ?? '';
+        this.clienteCidade = result.cidade ?? '';
+        this.clienteUf     = result.uf     ?? '';
+        this.resolvedCep   = result.cep    ?? '';
+        if (result.numero) {
+          this.clienteNumero = result.numero;
+        }
+      } else {
+        this.clienteRua    = '';
+        this.clienteBairro = '';
+        this.clienteCidade = '';
+        this.clienteUf     = '';
+        this.resolvedCep   = '';
+        this.geocodeError = 'Não foi possível identificar o endereço desta posição. '
+          + 'Você pode salvar assim mesmo — a localização será usada para calcular a rota de entrega.';
+      }
     } finally {
-      this.clienteCepLoading = false;
+      this.geocodeLoading = false;
     }
   }
 
@@ -708,17 +887,20 @@ export class ProductInventoryComponent implements OnInit {
       return;
     }
     const address = this.clienteFormattedAddress || this.novoCliente.address || '';
-    const data: Omit<Customer, 'id'> = {
+    const data: Omit<Customer, 'id' | 'companyId'> = {
       name:        this.novoCliente.name.trim(),
       phone:       this.novoCliente.phone?.trim() || '',
       address,
-      cep:         this.clienteCep,
+      dataAniversario: this.novoCliente.dataAniversario || '',
+      cep:         this.resolvedCep,
       rua:         this.clienteRua,
       numero:      this.clienteNumero,
       complemento: this.clienteComplemento,
       bairro:      this.clienteBairro,
       cidade:      this.clienteCidade,
       uf:          this.clienteUf,
+      ...(this.clienteLat != null ? { lat: this.clienteLat } : {}),
+      ...(this.clienteLng != null ? { lng: this.clienteLng } : {})
     };
     try {
       if (this.clienteEmEdicao?.id) {
@@ -823,7 +1005,7 @@ export class ProductInventoryComponent implements OnInit {
       this.notif.warning('Preencha nome e valor.');
       return;
     }
-    const data: Omit<PurchaseProduct, 'id' | 'createdAt'> = {
+    const data: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'> = {
       name: this.novoProdutoCompra.name.trim(),
       defaultValue: Number(this.novoProdutoCompra.defaultValue),
       recurring: this.novoProdutoCompra.recurring,

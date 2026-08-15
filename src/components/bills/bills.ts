@@ -8,6 +8,8 @@ import { PurchaseProduct } from '../../models/purchase-product-model';
 import { BillService } from '../../services/bill-service/bill-service';
 import { PurchaseProductService } from '../../services/purchase-product-service/purchase-product-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
+import { BillRecurrenceService } from '../../services/bill-recurrence-service/bill-recurrence-service';
+import { TenantService } from '../../services/tenant-service/tenant-service';
 
 @Component({
   selector: 'app-bills',
@@ -36,16 +38,31 @@ export class BillsComponent implements OnInit {
   constructor(
     private billService: BillService,
     private purchaseProductService: PurchaseProductService,
-    private notif: NotificationService
+    private notif: NotificationService,
+    private billRecurrenceService: BillRecurrenceService,
+    private tenantService: TenantService
   ) {}
 
   ngOnInit() {
+    this.checkAndGenerateRecurringBills();
     this.billService.getBills().subscribe(data => {
       this.bills = data;
     });
     this.purchaseProductService.getPurchaseProducts().subscribe(data => {
       this.purchaseProducts = data;
     });
+  }
+
+  private async checkAndGenerateRecurringBills() {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) return;
+
+    try {
+      await this.billRecurrenceService.checkAndGenerateDueOccurrences(companyId);
+    } catch (error) {
+      console.error('Erro ao gerar ocorrências de bills recorrentes:', error);
+      this.notif.warning('Não foi possível verificar contas recorrentes automaticamente.');
+    }
   }
 
   onPurchaseProductChange(productId: string) {
@@ -108,7 +125,7 @@ export class BillsComponent implements OnInit {
       this.notif.warning('Preencha nome e valor.');
       return;
     }
-    const data: Omit<Bill, 'id' | 'createdAt'> = {
+    const data: Omit<Bill, 'id' | 'createdAt' | 'companyId'> = {
       name: this.novaConta.name.trim(),
       value: Number(this.novaConta.value),
       status: 'pendente',
@@ -156,7 +173,7 @@ export class BillsComponent implements OnInit {
   statusLabel(status: Bill['status']): string {
     const labels: Record<Bill['status'], string> = {
       pendente: 'Pendente',
-      recebido: 'A Pagar',
+      recebido: 'Recebido',
       pago: 'Pago'
     };
     return labels[status];

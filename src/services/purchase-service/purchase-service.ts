@@ -1,10 +1,11 @@
 import { Injectable, inject, NgZone } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, runTransaction, serverTimestamp, increment, onSnapshot, query
+  collection, doc, runTransaction, serverTimestamp, increment, onSnapshot, query, where
 } from 'firebase/firestore';
 import { Purchase } from '../../models/buy-model';
 import { Observable } from 'rxjs';
+import { TenantService } from '../tenant-service/tenant-service';
 
 @Injectable({
   providedIn: 'root',
@@ -12,6 +13,7 @@ import { Observable } from 'rxjs';
 export class PurchaseService {
   private firestore = inject(Firestore);
   private ngZone = inject(NgZone);
+  private tenantService = inject(TenantService);
 
   constructor() { }
 
@@ -39,11 +41,18 @@ export class PurchaseService {
 
   getPurchases(): Observable<Purchase[]> {
     const purchaseCol = collection(this.firestore, 'purchases');
-    const q = query(purchaseCol);
+    const q = query(purchaseCol, where('companyId', '==', this.tenantService.companyId()));
     return this.collectionDataObservable<Purchase>(q);
   }
 
   async addPurchase(purchase: Omit<Purchase, 'id' | 'companyId'>) {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      throw new Error(
+        'Não é possível registrar compra sem uma empresa (companyId) ' +
+        'associada à sessão atual.'
+      );
+    }
     try {
       await runTransaction(this.firestore, async (transaction) => {
         const productDocRef = doc(this.firestore, `products/${purchase.idProduct}`);
@@ -65,6 +74,7 @@ export class PurchaseService {
 
         transaction.set(newPurchaseRef, {
           ...purchase,
+          companyId,
           date: serverTimestamp()
         });
       });

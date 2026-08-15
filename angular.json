@@ -49,6 +49,17 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "staging": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/enviroments/enviroments.ts",
+                  "with": "src/enviroments/enviroments.staging.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -61,6 +72,9 @@
             },
             "development": {
               "buildTarget": "erp-gaspareto:build:development"
+            },
+            "staging": {
+              "buildTarget": "erp-gaspareto:build:staging"
             }
           },
           "defaultConfiguration": "development"
