@@ -1,4 +1,5 @@
 import { Timestamp } from "@angular/fire/firestore";
+import { PaymentMethod } from "./sell-model";
 
 export interface OrderItem {
   idProduct: string;
@@ -35,6 +36,10 @@ export interface Order {
   actualDeliveryDate?: Timestamp;// DATA DE ENTREGA (Preenchida no status 'delivered')
   paymentDate?: Timestamp;       // DATA DE PAGAMENTO (Preenchida quando pagar)
   closingDate?: Timestamp;       // DATA DE FECHAMENTO (Preenchida no status 'finished')
+
+  // --- PAGAMENTO (preenchido só em finalizeOrder, junto com paymentDate/closingDate) ---
+  paymentMethod?: PaymentMethod;
+  installments?: number; // Espelha Sale.installments — evita join Histórico -> sales por orderId.
 
   observations?: string;
 

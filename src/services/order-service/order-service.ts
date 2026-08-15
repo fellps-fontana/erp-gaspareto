@@ -192,6 +192,16 @@ export class OrderService extends FirestoreBaseService {
   async finalizeOrder(order: Order, paymentMethod: PaymentMethod, installments: number = 1): Promise<boolean> {
     if (!order.id) throw new Error('Pedido sem ID não pode ser finalizado.');
 
+    // Normalize installments defensively: always Number, minimum 1
+    let normalizedInstallments = Number(installments) || 1;
+    if (normalizedInstallments < 1) {
+      normalizedInstallments = 1;
+    }
+    // PIX is always 1x (à vista) — enforce regardless of input
+    if (paymentMethod === PaymentMethod.PIX) {
+      normalizedInstallments = 1;
+    }
+
     try {
       const saleData: Omit<Sale, 'id' | 'companyId'> = {
         items: order.items.map(item => ({
@@ -204,7 +214,7 @@ export class OrderService extends FirestoreBaseService {
         total: Number(order.total),
         sale_type: 'order',
         paymentMethod: paymentMethod,
-        installments: installments,
+        installments: normalizedInstallments,
         date: serverTimestamp(),
         ...(order.customerId ? { customerId: order.customerId } : {})
       };
@@ -215,7 +225,7 @@ export class OrderService extends FirestoreBaseService {
       await updateDoc(orderRef, {
         status: 'finished',
         paymentMethod: paymentMethod,
-        installments: installments,
+        installments: normalizedInstallments,
         paymentDate: serverTimestamp(),
         closingDate: serverTimestamp()
       });

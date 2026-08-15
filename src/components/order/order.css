@@ -936,6 +936,40 @@ textarea:focus {
   font-size: 1.1rem;
 }
 
+/* FORMULÁRIO DE PAGAMENTO (forma + parcelas) */
+.payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.payment-form .form-field label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.payment-form .form-field select,
+.payment-form .form-field input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.payment-form .form-field select:focus,
+.payment-form .form-field input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
 .modal-actions {
   display: flex;
   gap: 10px;

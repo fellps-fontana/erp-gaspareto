@@ -77,6 +77,16 @@
             </select>
           </div>
 
+          <div class="source-selection">
+            <select [(ngModel)]="filtroFormaPagamento" (change)="atualizarRelatorio()">
+              <option value="todos">Todas as Formas de Pagamento</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix">Pix</option>
+              <option value="cartao">Cartão</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </div>
+
           <div class="client-selection">
             <select [(ngModel)]="filtroClienteId" (change)="atualizarRelatorio()">
               <option value="">Todos os Clientes</option>
@@ -627,6 +637,16 @@
             </select>
           </div>
 
+          <div class="source-selection">
+            <select [(ngModel)]="filtroHistoricoFormaPagamento">
+              <option value="todos">Todas as Formas de Pagamento</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix">Pix</option>
+              <option value="cartao">Cartão</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </div>
+
           <div class="custom-dates">
             <input type="text" [(ngModel)]="filtroHistoricoBusca" placeholder="Buscar por nº do pedido (#12) ou ID...">
           </div>
@@ -662,7 +682,12 @@
             <ul class="pedido-historico-itens">
               <li *ngFor="let i of item.itens">{{ i.quantity }}x {{ i.productName }}</li>
             </ul>
-            <span class="meta-badge valor-badge historico-valor">R$ {{ item.total | number:'1.2-2' }}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+              <span class="meta-badge">
+                💳 {{ item.paymentMethod ? paymentMethodLabel(item.paymentMethod) : '—' }}
+              </span>
+              <span class="meta-badge valor-badge historico-valor">R$ {{ item.total | number:'1.2-2' }}</span>
+            </div>
           </div>
         </div>
       </div>

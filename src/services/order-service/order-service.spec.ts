@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { OrderService } from './order-service';
+import { SaleService } from '../sale-service/sale-service';
 import { TenantService } from '../tenant-service/tenant-service';
 import { Order } from '../../models/order-model';
 import { Firestore } from '@angular/fire/firestore';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, collection, query, where, getDoc } from 'firebase/firestore';
 import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
@@ -16,6 +17,7 @@ describe('OrderService - Multi-tenant (companyId isolation)', () => {
     TestBed.configureTestingModule({
       providers: [
         OrderService,
+        SaleService,
         { provide: TenantService, useValue: setup.tenantService },
         { provide: Firestore, useValue: setup.firestore }
       ]
@@ -139,6 +141,317 @@ describe('OrderService - Multi-tenant (companyId isolation)', () => {
         } finally {
           await setupWithNullCompany.cleanup();
         }
+      });
+    });
+  });
+
+  describe('NOVA REGRA: finalizeOrder com paymentMethod e installments (CRÍTICA)', () => {
+    describe('[RED] finalizeOrder() - Grava paymentMethod e installments', () => {
+      it('[RED] should save installments to Sale when finalizing order', async () => {
+        const now = new Date() as any;
+        const { PaymentMethod } = await import('../../models/sell-model');
+
+        // Seed: create Order directly with status 'delivered' (single transaction in finalizeOrder only)
+        const orderId = `order-${Date.now()}-123`;
+        const order: Order = {
+          id: orderId,
+          companyId: setup.mockCompanyId as string,
+          orderNumber: 1,
+          customerName: 'Client with installments',
+          items: [
+            {
+              idProduct: 'prod-123',
+              productName: 'Test Product',
+              quantity: 2,
+              priceAtSale: 50,
+              priceAtCost: 30
+            }
+          ],
+          itemsTotal: 100,
+          shippingCost: 10,
+          total: 110,
+          status: 'delivered',
+          deliveryType: 'delivery',
+          scheduledDate: now,
+          actualDeliveryDate: now,
+          createdAt: now,
+          address: 'Test Street 123'
+        };
+
+        await setDoc(doc(setup.firestore, `orders/${orderId}`), order);
+
+        // Finalize with 3 installments (this is the ONLY transaction in this test)
+        await service.finalizeOrder(
+          order,
+          PaymentMethod.CARTAO,
+          3
+        );
+
+        // Verify Sale was created with installments
+        const salesRef = collection(setup.firestore, 'sales');
+        const salesSnapshot = await firstValueFrom(
+          service['collectionDataObservable']<any>(
+            query(salesRef, where('sale_type', '==', 'order'), where('companyId', '==', setup.mockCompanyId))
+          )
+        );
+
+        const lastSale = salesSnapshot[salesSnapshot.length - 1];
+        expect(lastSale['installments']).toBe(3, 'Sale should have installments=3');
+        expect(lastSale['paymentMethod']).toBe(PaymentMethod.CARTAO, 'Sale should have correct paymentMethod');
+      });
+
+      it('[RED] should default installments to 1 when not provided', async () => {
+        const now = new Date() as any;
+        const { PaymentMethod } = await import('../../models/sell-model');
+
+        // Seed: create Order directly with status 'delivered' (single transaction in finalizeOrder only)
+        const orderId = `order-${Date.now()}-456`;
+        const order: Order = {
+          id: orderId,
+          companyId: setup.mockCompanyId as string,
+          orderNumber: 2,
+          customerName: 'Client cash payment',
+          items: [
+            {
+              idProduct: 'prod-456',
+              productName: 'Another Product',
+              quantity: 1,
+              priceAtSale: 25,
+              priceAtCost: 15
+            }
+          ],
+          itemsTotal: 25,
+          shippingCost: 5,
+          total: 30,
+          status: 'delivered',
+          deliveryType: 'pickup',
+          scheduledDate: now,
+          actualDeliveryDate: now,
+          createdAt: now
+        };
+
+        await setDoc(doc(setup.firestore, `orders/${orderId}`), order);
+
+        // Finalize WITHOUT specifying installments (should default to 1)
+        // This is the ONLY transaction in this test
+        await service.finalizeOrder(
+          order,
+          PaymentMethod.DINHEIRO
+        );
+
+        const salesRef = collection(setup.firestore, 'sales');
+        const salesSnapshot = await firstValueFrom(
+          service['collectionDataObservable']<any>(
+            query(salesRef, where('sale_type', '==', 'order'), where('companyId', '==', setup.mockCompanyId))
+          )
+        );
+
+        const lastSale = salesSnapshot[salesSnapshot.length - 1];
+        expect(lastSale['installments']).toBe(1, 'Sale should default installments to 1');
+      });
+
+      it('[RED] should save paymentMethod and installments to Order document', async () => {
+        const now = new Date() as any;
+        const { PaymentMethod } = await import('../../models/sell-model');
+
+        // Seed: create Order directly with status 'delivered' (single transaction in finalizeOrder only)
+        const orderId = `order-${Date.now()}-789`;
+        const order: Order = {
+          id: orderId,
+          companyId: setup.mockCompanyId as string,
+          orderNumber: 3,
+          customerName: 'Client for Order update',
+          items: [
+            {
+              idProduct: 'prod-789',
+              productName: 'Pix Product',
+              quantity: 1,
+              priceAtSale: 100,
+              priceAtCost: 60
+            }
+          ],
+          itemsTotal: 100,
+          shippingCost: 0,
+          total: 100,
+          status: 'delivered',
+          deliveryType: 'delivery',
+          scheduledDate: now,
+          actualDeliveryDate: now,
+          createdAt: now,
+          address: 'Pix Street 456'
+        };
+
+        await setDoc(doc(setup.firestore, `orders/${orderId}`), order);
+
+        // Finalize with PIX (1 installment, à vista)
+        // This is the ONLY transaction in this test
+        await service.finalizeOrder(
+          order,
+          PaymentMethod.PIX,
+          1
+        );
+
+        // Verify Order was updated with paymentMethod and installments
+        const orderRefAfter = doc(setup.firestore, `orders/${orderId}`);
+        const orderSnapAfter = await getDoc(orderRefAfter);
+
+        expect(orderSnapAfter.data()?.['paymentMethod']).toBe(PaymentMethod.PIX, 'Order should have paymentMethod=PIX');
+        expect(orderSnapAfter.data()?.['installments']).toBe(1, 'Order should have installments=1');
+        expect(orderSnapAfter.data()?.['status']).toBe('finished', 'Order should be finished');
+      });
+
+      it('[RED] should normalize installments to 1 when PIX is selected with installments > 1', async () => {
+        const now = new Date() as any;
+        const { PaymentMethod } = await import('../../models/sell-model');
+
+        // Seed: create Order directly with status 'delivered'
+        const orderId = `order-${Date.now()}-pix-normalize`;
+        const order: Order = {
+          id: orderId,
+          companyId: setup.mockCompanyId as string,
+          orderNumber: 10,
+          customerName: 'PIX with wrong installments',
+          items: [
+            {
+              idProduct: 'prod-pix-1',
+              productName: 'PIX Test Product',
+              quantity: 1,
+              priceAtSale: 100,
+              priceAtCost: 60
+            }
+          ],
+          itemsTotal: 100,
+          shippingCost: 0,
+          total: 100,
+          status: 'delivered',
+          deliveryType: 'pickup',
+          scheduledDate: now,
+          actualDeliveryDate: now,
+          createdAt: now
+        };
+
+        await setDoc(doc(setup.firestore, `orders/${orderId}`), order);
+
+        // Attempt to finalize with PIX but installments=5 (should be normalized to 1)
+        await service.finalizeOrder(
+          order,
+          PaymentMethod.PIX,
+          5
+        );
+
+        // Verify Sale was created with installments normalized to 1
+        const salesRef = collection(setup.firestore, 'sales');
+        const salesSnapshot = await firstValueFrom(
+          service['collectionDataObservable']<any>(
+            query(salesRef, where('sale_type', '==', 'order'), where('companyId', '==', setup.mockCompanyId))
+          )
+        );
+
+        const lastSale = salesSnapshot[salesSnapshot.length - 1];
+        expect(lastSale['installments']).toBe(1, 'PIX should always have installments=1, not 5');
+        expect(lastSale['paymentMethod']).toBe(PaymentMethod.PIX, 'Sale should have paymentMethod=PIX');
+
+        // Verify Order also has installments normalized to 1
+        const orderRefAfter = doc(setup.firestore, `orders/${orderId}`);
+        const orderSnapAfter = await getDoc(orderRefAfter);
+
+        expect(orderSnapAfter.data()?.['installments']).toBe(1, 'Order PIX should have installments=1, not 5');
+      });
+
+      it('[RED] should normalize installments to minimum 1 when installments <= 0', async () => {
+        const now = new Date() as any;
+        const { PaymentMethod } = await import('../../models/sell-model');
+
+        // Test with installments = 0
+        const orderId1 = `order-${Date.now()}-zero-inst`;
+        const order1: Order = {
+          id: orderId1,
+          companyId: setup.mockCompanyId as string,
+          orderNumber: 11,
+          customerName: 'Zero installments order',
+          items: [
+            {
+              idProduct: 'prod-zero-1',
+              productName: 'Zero Installment Product',
+              quantity: 1,
+              priceAtSale: 50,
+              priceAtCost: 30
+            }
+          ],
+          itemsTotal: 50,
+          shippingCost: 0,
+          total: 50,
+          status: 'delivered',
+          deliveryType: 'pickup',
+          scheduledDate: now,
+          actualDeliveryDate: now,
+          createdAt: now
+        };
+
+        await setDoc(doc(setup.firestore, `orders/${orderId1}`), order1);
+
+        // Finalize with installments=0 (should normalize to 1)
+        await service.finalizeOrder(
+          order1,
+          PaymentMethod.DINHEIRO,
+          0
+        );
+
+        // Verify Sale has installments normalized to 1
+        const salesRef = collection(setup.firestore, 'sales');
+        const salesSnapshot = await firstValueFrom(
+          service['collectionDataObservable']<any>(
+            query(salesRef, where('sale_type', '==', 'order'), where('companyId', '==', setup.mockCompanyId))
+          )
+        );
+
+        const lastSale = salesSnapshot[salesSnapshot.length - 1];
+        expect(lastSale['installments']).toBe(1, 'Installments 0 should be normalized to minimum 1');
+
+        // Test with installments = -3
+        const orderId2 = `order-${Date.now()}-negative-inst`;
+        const order2: Order = {
+          id: orderId2,
+          companyId: setup.mockCompanyId as string,
+          orderNumber: 12,
+          customerName: 'Negative installments order',
+          items: [
+            {
+              idProduct: 'prod-neg-1',
+              productName: 'Negative Installment Product',
+              quantity: 1,
+              priceAtSale: 75,
+              priceAtCost: 45
+            }
+          ],
+          itemsTotal: 75,
+          shippingCost: 0,
+          total: 75,
+          status: 'delivered',
+          deliveryType: 'pickup',
+          scheduledDate: now,
+          actualDeliveryDate: now,
+          createdAt: now
+        };
+
+        await setDoc(doc(setup.firestore, `orders/${orderId2}`), order2);
+
+        // Finalize with installments=-3 (should normalize to 1)
+        await service.finalizeOrder(
+          order2,
+          PaymentMethod.CARTAO,
+          -3
+        );
+
+        // Verify Sale has installments normalized to 1
+        const salesSnapshot2 = await firstValueFrom(
+          service['collectionDataObservable']<any>(
+            query(salesRef, where('sale_type', '==', 'order'), where('companyId', '==', setup.mockCompanyId))
+          )
+        );
+
+        const lastSale2 = salesSnapshot2[salesSnapshot2.length - 1];
+        expect(lastSale2['installments']).toBe(1, 'Installments -3 should be normalized to minimum 1');
       });
     });
   });

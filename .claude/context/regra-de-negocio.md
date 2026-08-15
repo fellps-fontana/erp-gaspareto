@@ -44,7 +44,20 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
 - Toda venda tem `sale_type`: `'pdv'` (balcão) ou `'order'` (originada de um
   pedido finalizado). `customerId` só é preenchido em vendas do tipo `order`
   com cliente vinculado — vendas de PDV nunca têm `customerId`.
-- `paymentMethod`: `'dinheiro' | 'pix'` (enum `PaymentMethod`).
+- `paymentMethod`: `'dinheiro' | 'pix' | 'cartao' | 'cheque'` (enum
+  `PaymentMethod`, em `src/models/sell-model.ts`), com
+  `PAYMENT_METHOD_LABELS: Record<PaymentMethod, string>` mapeando cada valor
+  pro rótulo pt-BR de exibição. Escopo real hoje: só `Sale`s originadas de
+  Pedidos (`sale_type: 'order'`, via `OrderService.finalizeOrder` — seção 5)
+  usam os 4 valores. PDV e Comandas não mudaram — continuam gerando venda só
+  com `'dinheiro'`/`'pix'` na prática (o enum é compartilhado e mais largo,
+  mas a UI deles não expõe as opções novas).
+- `installments?: number` (novo campo em `Sale`): metadado de parcelamento —
+  `1`/ausente = à vista, `N` = parcelado em N vezes. **Não** gera controle de
+  parcela individual nem lançamento em `bills`/Contas a Receber, é só
+  informação de exibição/filtro. Sempre forçado a `1` quando
+  `paymentMethod === PaymentMethod.PIX` (Pix não parcela) — trava aplicada na
+  camada de serviço, não só na UI (ver seção 5).
 - Cada item de venda guarda `priceAtSale` **e** `priceAtCost` no momento da
   venda (snapshot) — o lucro é calculado sobre esses valores congelados, não
   sobre o preço atual do produto. Isso preserva o histórico de margem mesmo
@@ -94,10 +107,21 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
 - **Cancelamento** (`cancelOrder`): só devolve estoque se o pedido já estava
   `delivered` no momento do cancelamento (senão o estoque nunca foi baixado,
   então não há o que devolver).
-- **Finalização financeira** (`finalizeOrder`): gera um registro em `sales`
-  (`sale_type: 'order'`, com `paymentMethod` escolhido), sem baixar estoque de
-  novo (`processSale(saleData, false)` — o estoque já saiu em `markAsDelivered`),
-  e marca o pedido como `finished` com `paymentDate` e `closingDate`.
+- **Finalização financeira**
+  (`OrderService.finalizeOrder(order, paymentMethod, installments = 1)`):
+  gera um registro em `sales` (`sale_type: 'order'`, com `paymentMethod` e
+  `installments` escolhidos), sem baixar estoque de novo
+  (`processSale(saleData, false)` — o estoque já saiu em `markAsDelivered`), e
+  marca o pedido como `finished` com `paymentDate` e `closingDate` — no mesmo
+  `updateDoc` o pedido também grava `paymentMethod`/`installments`
+  (redundante com o `Sale` de propósito: permite filtrar por forma de
+  pagamento tanto no Relatório/Dash, que lê de `Sale`, quanto no Histórico
+  Geral, que lê `Order` direto na branch "pedido" — seção 5.1 — sem precisar
+  de join). `installments` é sempre normalizado (`Number(...)`, mínimo `1`) e
+  forçado a `1` sempre que `paymentMethod === PaymentMethod.PIX` — trava de
+  "Pix é sempre à vista" garantida na camada de serviço, não só na UI (mesma
+  regra da seção 3). Escopo: só a finalização de Pedidos. PDV e Comandas não
+  passaram por essa mudança.
 - Datas do ciclo de vida: `createdAt`, `scheduledDate` (previsão),
   `actualDeliveryDate` (preenchida em `delivered`), `paymentDate` e
   `closingDate` (preenchidas em `finished`).
@@ -108,8 +132,13 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   `sales` (só `sale_type: 'pdv'`, pra não duplicar com `orders`), `orders` e
   `comandas` (via `ComandaService.getAllComandas()`, sem filtro de status) num
   único feed ordenado por data.
-- Filtros combináveis: origem (PDV/Pedido/Comanda), cliente, produto e busca
-  livre (por id do documento ou por `orderNumber`).
+- Filtros combináveis: origem (PDV/Pedido/Comanda), cliente, produto, forma
+  de pagamento (`filtroHistoricoFormaPagamento`, mesmos valores de
+  `PaymentMethod` — seção 3) e busca livre (por id do documento ou por
+  `orderNumber`). O filtro de forma de pagamento só encontra correspondência
+  em itens de `orders` (únicos que gravam `paymentMethod` hoje, via
+  `finalizeOrder` — seção 5) — itens de PDV/Comanda no feed não têm esse
+  campo.
 - **Limitação conhecida**: vendas de PDV e Comandas não têm `customerId`
   vinculado (só `orders` tem cliente cadastrado) — ao filtrar por cliente,
   itens de PDV/Comanda simplesmente não aparecem, mesmo que sejam do mesmo

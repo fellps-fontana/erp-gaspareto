@@ -297,6 +297,24 @@
     <div class="modal-content">
       <h3>Finalizar Pedido</h3>
       <p>Confirmar recebimento e finalizar?</p>
+
+      <div class="payment-form">
+        <div class="form-field">
+          <label for="paymentMethodSelect">Forma de Pagamento</label>
+          <select id="paymentMethodSelect" [(ngModel)]="selectedPaymentMethod">
+            <option value="dinheiro">Dinheiro</option>
+            <option value="pix">Pix</option>
+            <option value="cartao">Cartão</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
+
+        <div class="form-field" *ngIf="requiresInstallments">
+          <label for="installmentsInput">Parcelas</label>
+          <input id="installmentsInput" type="number" min="1" [(ngModel)]="selectedInstallments">
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button (click)="closePaymentModal()" [disabled]="isProcessingAction">Cancelar</button>
         <button class="btn-confirm" (click)="confirmPayment()" [disabled]="isProcessingAction">

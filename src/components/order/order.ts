@@ -88,11 +88,23 @@ export class OrdersComponent implements OnInit, OnDestroy {
   // ── PAGAMENTO ─────────────────────────────────────────────────────
   isPaymentModalOpen       = false;
   selectedOrderToFinalize: Order | null = null;
-  selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
+  private _selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
   selectedInstallments: number = 1;
 
+  get selectedPaymentMethod(): PaymentMethod {
+    return this._selectedPaymentMethod;
+  }
+
+  set selectedPaymentMethod(value: PaymentMethod) {
+    this._selectedPaymentMethod = value;
+    // Reset installments to 1 when switching to PIX (always à vista)
+    if (value === PaymentMethod.PIX) {
+      this.selectedInstallments = 1;
+    }
+  }
+
   get requiresInstallments(): boolean {
-    return this.selectedPaymentMethod !== PaymentMethod.PIX;
+    return this._selectedPaymentMethod !== PaymentMethod.PIX;
   }
 
   // ── EDIÇÃO ────────────────────────────────────────────────────────
