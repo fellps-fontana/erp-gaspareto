@@ -322,4 +322,39 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
       });
     });
   });
+
+  describe('Contador por empresa (counters/{companyId}) - usado na numeracao sequencial de pedidos', () => {
+    it('usuario de company A pode ler e escrever no contador da propria empresa', async () => {
+      await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+      const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+      const counterRef = doc(contextCompanyA.firestore(), 'counters', 'company-a');
+
+      await assertSucceeds(setDoc(counterRef, { nextOrderNumber: 1 }));
+      await assertSucceeds(getDoc(counterRef));
+      await assertSucceeds(updateDoc(counterRef, { nextOrderNumber: 2 }));
+    });
+
+    it('usuario de company A nao pode ler o contador de company B', async () => {
+      await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+      await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+
+      const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+      const counterRefB = doc(contextCompanyB.firestore(), 'counters', 'company-b');
+      await setDoc(counterRefB, { nextOrderNumber: 5 });
+
+      const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+      const readRef = doc(contextCompanyA.firestore(), 'counters', 'company-b');
+      await assertFails(getDoc(readRef));
+    });
+
+    it('usuario de company A nao pode escrever no contador de company B', async () => {
+      await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+      await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+
+      const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+      const counterRefB = doc(contextCompanyA.firestore(), 'counters', 'company-b');
+      await assertFails(setDoc(counterRefB, { nextOrderNumber: 999 }));
+    });
+  });
 });

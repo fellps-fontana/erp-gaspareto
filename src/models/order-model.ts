@@ -11,6 +11,7 @@ export interface OrderItem {
 export interface Order {
   id?: string;
   companyId: string;
+  orderNumber: number;     // Sequencial por empresa (#1, #2, ...), pra controle humano — não usar como id.
   customerName: string;
   customerPhone?: string;
 

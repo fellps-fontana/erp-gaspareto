@@ -193,6 +193,18 @@
   /* Texto escuro no badge */
 }
 
+.header-left-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order-number {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
 /* Status Colors no Badge */
 .order-card.pending .status-badge {
   background: var(--color-primary);

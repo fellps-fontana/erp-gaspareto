@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, addDoc, updateDoc, serverTimestamp, query, where,
+  collection, doc, updateDoc, serverTimestamp, query, where,
   CollectionReference, DocumentReference, runTransaction, increment
 } from 'firebase/firestore';
 import { Observable, of } from 'rxjs';
@@ -79,8 +79,14 @@ export class OrderService extends FirestoreBaseService {
     );
   }
 
+  /**
+   * Cria o pedido com um orderNumber sequencial por empresa (#1, #2, ...).
+   * Usa runTransaction pra ler e incrementar o contador (counters/{companyId})
+   * atomicamente junto com a criação do pedido — evita dois pedidos criados
+   * ao mesmo tempo saírem com o mesmo número (race condition).
+   */
   async addOrder(
-    order: Omit<Order, 'id' | 'createdAt' | 'companyId'>
+    order: Omit<Order, 'id' | 'createdAt' | 'companyId' | 'orderNumber'>
   ): Promise<DocumentReference> {
     const companyId = this.tenantService.companyId();
     if (!companyId) {
@@ -89,16 +95,32 @@ export class OrderService extends FirestoreBaseService {
         'associada à sessão atual.'
       );
     }
-    const newOrder = {
-      ...order,
-      status: 'pending',
-      createdAt: serverTimestamp(),
-      companyId,
-      itemsTotal: Number(order.itemsTotal),
-      shippingCost: Number(order.shippingCost || 0),
-      total: Number(order.itemsTotal) + Number(order.shippingCost || 0)
-    };
-    return addDoc(this.ordersCollection, newOrder);
+
+    const newOrderRef = doc(this.ordersCollection);
+    const counterRef = doc(this.firestore, `counters/${companyId}`);
+
+    await runTransaction(this.firestore, async (transaction) => {
+      const counterSnap = await transaction.get(counterRef);
+      const nextNumber: number = counterSnap.exists()
+        ? (counterSnap.data()['nextOrderNumber'] as number)
+        : 1;
+
+      const newOrder = {
+        ...order,
+        orderNumber: nextNumber,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        companyId,
+        itemsTotal: Number(order.itemsTotal),
+        shippingCost: Number(order.shippingCost || 0),
+        total: Number(order.itemsTotal) + Number(order.shippingCost || 0)
+      };
+
+      transaction.set(newOrderRef, newOrder);
+      transaction.set(counterRef, { nextOrderNumber: nextNumber + 1 }, { merge: true });
+    });
+
+    return newOrderRef;
   }
 
   async updateOrder(orderId: string, orderData: Partial<Order>): Promise<void> {

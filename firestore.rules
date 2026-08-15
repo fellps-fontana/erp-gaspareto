@@ -27,6 +27,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Contador de numeração sequencial por empresa (ex.: nextOrderNumber
+    // pra pedidos). Qualquer membro da empresa pode ler/escrever — não é
+    // restrito a owner/admin como companies/{id}, porque criar um pedido
+    // é uma ação operacional comum, não administrativa.
+    match /counters/{companyId} {
+      allow read, write: if isSignedIn() && userCompanyId() == companyId;
+    }
+
     match /companies/{companyId} {
       allow read: if isSignedIn() && userCompanyId() == companyId;
       allow create: if isSignedIn() && (
