@@ -203,6 +203,10 @@ h1 {
 }
 
 /* --- BOTÕES PREMIUM DASHBOARD --- */
+.btn-toggle-filtros {
+  margin-bottom: 0.9375rem;
+}
+
 .filter-actions {
   display: flex;
   gap: 10px;

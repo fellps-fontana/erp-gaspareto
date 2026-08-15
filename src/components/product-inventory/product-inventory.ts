@@ -73,6 +73,7 @@ export class ProductInventoryComponent implements OnInit {
   filtroOrigem: string = 'todos'; // 'todos' | 'pdv' | 'order'
   filtroClienteId: string = '';
   filtroFormaPagamento: PaymentMethod | 'todos' = 'todos';
+  filtrosRelatorioVisiveis: boolean = false;
 
   // --- MODAL DE EXCLUSÃO DE PRODUTO ---
   isDeleteModalOpen: boolean = false;
@@ -148,6 +149,7 @@ export class ProductInventoryComponent implements OnInit {
   filtroHistoricoProdutoId: string = '';
   filtroHistoricoBusca: string = '';
   filtroHistoricoFormaPagamento: PaymentMethod | 'todos' = 'todos';
+  filtrosHistoricoVisiveis: boolean = false;
 
   // campos de endereço resolvidos via mini-mapa (lat/lng -> geocodificação reversa)
   clienteRua = '';

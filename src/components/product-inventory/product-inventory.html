@@ -47,7 +47,10 @@
       <div *ngIf="reportTab === 'vendas'">
 
       <!-- FILTROS AVANÇADOS -->
-      <div class="filtros-dashboard card-base">
+      <button class="btn-dashboard-action secondary btn-toggle-filtros" (click)="filtrosRelatorioVisiveis = !filtrosRelatorioVisiveis">
+        <span>{{ filtrosRelatorioVisiveis ? '▲' : '▼' }}</span> Filtros
+      </button>
+      <div class="filtros-dashboard card-base" *ngIf="filtrosRelatorioVisiveis">
         <div class="filter-row main-filters">
           <div class="date-presets">
             <button class="btn-preset" (click)="setPreset('hoje')">Hoje</button>
@@ -612,7 +615,10 @@
       </div>
 
       <!-- FILTROS -->
-      <div class="filtros-dashboard card-base">
+      <button class="btn-dashboard-action secondary btn-toggle-filtros" (click)="filtrosHistoricoVisiveis = !filtrosHistoricoVisiveis">
+        <span>{{ filtrosHistoricoVisiveis ? '▲' : '▼' }}</span> Filtros
+      </button>
+      <div class="filtros-dashboard card-base" *ngIf="filtrosHistoricoVisiveis">
         <div class="filter-row main-filters">
           <div class="source-selection">
             <select [(ngModel)]="filtroHistoricoOrigem">
