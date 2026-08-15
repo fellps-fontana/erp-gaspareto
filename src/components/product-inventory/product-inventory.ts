@@ -40,6 +40,7 @@ export interface HistoricoItem {
   status: string;
   total: number;
   paymentMethod?: PaymentMethod; // só pdv/pedido — comanda não tem
+  installments?: number; // 1/ausente = à vista, N = parcelado — espelha Sale/Order.installments
   itens: { idProduct: string; productName: string; quantity: number }[];
 }
 
@@ -258,6 +259,7 @@ export class ProductInventoryComponent implements OnInit {
         status: v.status || 'completed',
         total: v.total || 0,
         paymentMethod: v.paymentMethod,
+        installments: v.installments,
         itens: (v.items || []).map((i: any) => ({
           idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
         }))
@@ -273,6 +275,7 @@ export class ProductInventoryComponent implements OnInit {
       status: p.status,
       total: p.total || 0,
       paymentMethod: p.paymentMethod,
+      installments: p.installments,
       itens: (p.items || []).map(i => ({
         idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
       }))

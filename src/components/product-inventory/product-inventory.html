@@ -690,7 +690,7 @@
             </ul>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
               <span class="meta-badge">
-                💳 {{ item.paymentMethod ? paymentMethodLabel(item.paymentMethod) : '—' }}
+                💳 {{ item.paymentMethod ? paymentMethodLabel(item.paymentMethod) : '—' }}<ng-container *ngIf="item.installments && item.installments > 1"> · {{ item.installments }}x</ng-container>
               </span>
               <span class="meta-badge valor-badge historico-valor">R$ {{ item.total | number:'1.2-2' }}</span>
             </div>
