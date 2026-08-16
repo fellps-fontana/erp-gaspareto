@@ -1,0 +1,95 @@
+<div class="super-admin-page">
+
+  <div class="super-admin-header">
+    <button class="btn-voltar" [routerLink]="['/']">Início</button>
+    <div>
+      <h1>Administrador da Plataforma</h1>
+      <p>Usuários, empresas e permissões de super-admin</p>
+    </div>
+  </div>
+
+  <div class="super-admin-card">
+    <div class="state-message" *ngIf="isLoading">
+      <span class="spinner" aria-hidden="true"></span> Carregando usuários...
+    </div>
+
+    <div class="state-message state-message--error" *ngIf="!isLoading && loadError">
+      {{ loadError }}
+    </div>
+
+    <div class="state-message" *ngIf="!isLoading && !loadError && users.length === 0">
+      Nenhum usuário encontrado.
+    </div>
+
+    <table class="users-table" *ngIf="!isLoading && !loadError && users.length > 0">
+      <thead>
+        <tr>
+          <th>E-mail</th>
+          <th>Empresa (companyId)</th>
+          <th>Papel</th>
+          <th>Super-admin</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let user of users">
+          <tr>
+            <td class="col-email">{{ user.email }}</td>
+            <td class="col-company"><code>{{ user.companyId }}</code></td>
+            <td>
+              <span class="role-badge role-{{ user.role }}">{{ roleLabel(user.role) }}</span>
+            </td>
+            <td>
+              <label
+                class="switch"
+                [title]="isSelf(user) ? 'Você não pode alterar sua própria permissão de super-admin' : ''"
+              >
+                <input
+                  type="checkbox"
+                  [checked]="user.isSuperAdmin === true"
+                  [disabled]="isSelf(user) || savingSuperAdminUid === user.uid"
+                  (change)="toggleSuperAdmin(user)"
+                  [attr.aria-label]="'Permissão de super-admin para ' + user.email"
+                />
+                <span class="slider"></span>
+              </label>
+            </td>
+            <td>
+              <button
+                class="btn btn-outline btn-sm"
+                type="button"
+                (click)="resetSenhaUid === user.uid ? fecharResetSenha() : abrirResetSenha(user)"
+              >
+                {{ resetSenhaUid === user.uid ? 'Cancelar' : 'Resetar senha' }}
+              </button>
+            </td>
+          </tr>
+
+          <tr class="reset-row" *ngIf="resetSenhaUid === user.uid">
+            <td colspan="5">
+              <div class="reset-form">
+                <input
+                  type="password"
+                  [(ngModel)]="novaSenha"
+                  placeholder="Nova senha (mínimo 6 caracteres)"
+                  minlength="6"
+                  [disabled]="isResetting"
+                  [attr.aria-label]="'Nova senha para ' + user.email"
+                />
+                <button
+                  class="btn btn-primary btn-sm"
+                  type="button"
+                  [disabled]="isResetting"
+                  (click)="confirmarResetSenha(user)"
+                >
+                  {{ isResetting ? 'Salvando...' : 'Confirmar' }}
+                </button>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
+  </div>
+
+</div>

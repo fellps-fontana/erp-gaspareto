@@ -10,6 +10,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   getDocs,
@@ -37,7 +38,13 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
     await testEnv.clearFirestore();
   });
 
-  const semeiaUserDoc = async (uid: string, email: string, companyId: string, role: string) => {
+  const semeiaUserDoc = async (
+    uid: string,
+    email: string,
+    companyId: string,
+    role: string,
+    isSuperAdmin?: boolean,
+  ) => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const userRef = doc(context.firestore(), 'users', uid);
       await setDoc(userRef, {
@@ -45,6 +52,7 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
         email,
         companyId,
         role,
+        ...(isSuperAdmin !== undefined && { isSuperAdmin }),
         createdAt: Timestamp.now(),
       });
     });
@@ -355,6 +363,177 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
       const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
       const counterRefB = doc(contextCompanyA.firestore(), 'counters', 'company-b');
       await assertFails(setDoc(counterRefB, { nextOrderNumber: 999 }));
+    });
+  });
+
+  describe('Super-admin bypass cross-tenant (isSuperAdmin: true)', () => {
+    describe('Leitura cross-tenant PERMITIDA pra super-admin', () => {
+      it('super-admin pode ler doc de outra empresa em products', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const docRef = doc(contextCompanyA.firestore(), 'products', 'product-001');
+        await setDoc(docRef, { name: 'Produto A', companyId: 'company-a' });
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const readRef = doc(contextSuperAdmin.firestore(), 'products', 'product-001');
+        const result = await assertSucceeds(getDoc(readRef));
+        expect(result.exists()).toBe(true);
+      });
+
+      it('super-admin pode ler doc de outra empresa em sales', async () => {
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const docRef = doc(contextCompanyB.firestore(), 'sales', 'sale-001');
+        await setDoc(docRef, { total: 150, companyId: 'company-b' });
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const readRef = doc(contextSuperAdmin.firestore(), 'sales', 'sale-001');
+        const result = await assertSucceeds(getDoc(readRef));
+        expect(result.exists()).toBe(true);
+      });
+    });
+
+    describe('Leitura cross-tenant NEGADA pra usuario comum', () => {
+      it('usuario comum continua negado cross-tenant mesmo com isSuperAdmin=false explicito em products', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner', false);
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner', false);
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const docRef = doc(contextCompanyB.firestore(), 'products', 'product-001');
+        await setDoc(docRef, { name: 'Produto B', companyId: 'company-b' });
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const readRef = doc(contextCompanyA.firestore(), 'products', 'product-001');
+        await assertFails(getDoc(readRef));
+      });
+
+      it('usuario sem isSuperAdmin (undefined) continua negado cross-tenant em sales', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const docRef = doc(contextCompanyB.firestore(), 'sales', 'sale-001');
+        await setDoc(docRef, { total: 100, companyId: 'company-b' });
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const readRef = doc(contextCompanyA.firestore(), 'sales', 'sale-001');
+        await assertFails(getDoc(readRef));
+      });
+    });
+
+    describe('Escrita (create) cross-tenant PERMITIDA pra super-admin', () => {
+      it('super-admin pode criar doc em products de outra empresa', async () => {
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const docRef = doc(contextSuperAdmin.firestore(), 'products', 'product-cross');
+        await assertSucceeds(setDoc(docRef, { name: 'Produto cross', companyId: 'company-a' }));
+      });
+
+      it('super-admin pode criar doc em sales de outra empresa', async () => {
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const docRef = doc(contextSuperAdmin.firestore(), 'sales', 'sale-cross');
+        await assertSucceeds(setDoc(docRef, { total: 200, companyId: 'company-b' }));
+      });
+    });
+
+    describe('Escrita (update) cross-tenant PERMITIDA, MAS companyId e imutavel', () => {
+      it('super-admin pode atualizar doc em products de outra empresa', async () => {
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const docRef = doc(contextCompanyB.firestore(), 'products', 'product-001');
+        await setDoc(docRef, { name: 'Produto B', companyId: 'company-b' });
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const updateRef = doc(contextSuperAdmin.firestore(), 'products', 'product-001');
+        await assertSucceeds(updateDoc(updateRef, { name: 'Produto B editado pelo super-admin' }));
+      });
+
+      it('super-admin NAO pode trocar o companyId de um doc no update, mesmo com bypass', async () => {
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const docRef = doc(contextCompanyB.firestore(), 'sales', 'sale-001');
+        await setDoc(docRef, { total: 100, companyId: 'company-b' });
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const updateRef = doc(contextSuperAdmin.firestore(), 'sales', 'sale-001');
+        await assertFails(updateDoc(updateRef, { companyId: 'company-admin' }));
+      });
+    });
+
+    describe('Escrita (delete) cross-tenant PERMITIDA pra super-admin', () => {
+      it('super-admin pode deletar doc de outra empresa em products', async () => {
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const docRef = doc(contextCompanyB.firestore(), 'products', 'product-001');
+        await setDoc(docRef, { name: 'Produto B', companyId: 'company-b' });
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const deleteRef = doc(contextSuperAdmin.firestore(), 'products', 'product-001');
+        await assertSucceeds(deleteDoc(deleteRef));
+      });
+    });
+
+    describe('Leitura users/{uid} cross-usuario PERMITIDA pra super-admin', () => {
+      it('super-admin pode ler users/{uid} de outro usuario', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const readRef = doc(contextSuperAdmin.firestore(), 'users', 'user-a');
+        const result = await assertSucceeds(getDoc(readRef));
+        expect(result.exists()).toBe(true);
+      });
+
+      it('usuario comum continua negado ao ler users/{uid} de outro usuario', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+
+        const contextUserB = autenticarComo('user-b', 'user-b@test.com');
+        const readRef = doc(contextUserB.firestore(), 'users', 'user-a');
+        await assertFails(getDoc(readRef));
+      });
+    });
+
+    describe('Leitura companies/{companyId} cross-empresa PERMITIDA pra super-admin', () => {
+      it('super-admin pode ler companies/{companyId} de outra empresa', async () => {
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const companyBRef = doc(contextCompanyB.firestore(), 'companies', 'company-b');
+        await setDoc(companyBRef, { name: 'Empresa B', plan: 'trial', status: 'active' });
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const readRef = doc(contextSuperAdmin.firestore(), 'companies', 'company-b');
+        const result = await assertSucceeds(getDoc(readRef));
+        expect(result.exists()).toBe(true);
+      });
+
+      it('usuario comum continua negado ao ler companies/{companyId} de outra empresa', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const companyBRef = doc(contextCompanyB.firestore(), 'companies', 'company-b');
+        await setDoc(companyBRef, { name: 'Empresa B', plan: 'trial', status: 'active' });
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const readRef = doc(contextCompanyA.firestore(), 'companies', 'company-b');
+        await assertFails(getDoc(readRef));
+      });
     });
   });
 });
