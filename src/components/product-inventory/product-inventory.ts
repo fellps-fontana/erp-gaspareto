@@ -790,9 +790,7 @@ export class ProductInventoryComponent implements OnInit {
           status: 'pendente',
           recurring: false
         });
-        if (this.filtroContasStatus === 'recebido' || this.filtroContasStatus === 'pago') {
-          this.filtroContasStatus = 'todos';
-        }
+        this.resetFiltroContasStatusSeNecessario();
       }
 
       this.notif.success(`Estoque de "${this.produtoSelecionadoCompra.title}" atualizado! 💰`);
@@ -1041,6 +1039,13 @@ export class ProductInventoryComponent implements OnInit {
       ...(p.recurring && p.recurrencePeriod ? { recurrencePeriod: recPeriodMap[p.recurrencePeriod!] } : {}),
       purchaseProductId: p.id
     });
+    this.resetFiltroContasStatusSeNecessario();
+  }
+
+  private resetFiltroContasStatusSeNecessario() {
+    if (this.filtroContasStatus === 'recebido' || this.filtroContasStatus === 'pago') {
+      this.filtroContasStatus = 'todos';
+    }
   }
 
   openDeleteCompraModal(p: PurchaseProduct) {

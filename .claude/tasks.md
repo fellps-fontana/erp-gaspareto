@@ -717,7 +717,7 @@ Regra de negocio coberta: nenhuma nova — mesma regra critica da secao 7
 conta dentro de product-inventory.ts.
 
 ## TASK-034 — Resetar filtroContasStatus em gerarBillDeProdutoCompra (product-inventory.ts)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-033
 FLUXO: Correcao
@@ -727,4 +727,15 @@ CRITERIO DE ACEITE: (1) apos gerar bill via gerarBillDeProdutoCompra com filtroC
 ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.ts
 NAO FAZER: nao alterar bill-service.ts, bills.ts, firestore.rules, bill-model.ts, confirmarCompra() (ja corrigido na TASK-033). Nao editar .claude/tasks.md.
 RETORNO ESPERADO: diff aplicado, confirmacao de build (ng build), resumo do que mudou.
-HISTORICO: vazio
+HISTORICO: hanzo aplicou o mesmo reset condicional em gerarBillDeProdutoCompra
+(~linha 1044). tsc --noEmit limpo.
+
+Style reprovou na 1a rodada: reset idêntico apareceu em dois lugares
+(confirmarCompra da TASK-033 + este), virou duplicação real. Redespachado
+hanzo: extraiu metodo privado resetFiltroContasStatusSeNecessario(),
+substituiu as duas ocorrencias. Style aprovou na 2a rodada — duplicacao
+eliminada, posicao logica da chamada preservada nos dois pontos, tsc limpo.
+
+Regra de negocio coberta: nenhuma nova — mesma regra critica da secao 7,
+fecha o ultimo caminho de criacao de bill dentro de product-inventory.ts
+que ainda tinha o bug do filtro.
