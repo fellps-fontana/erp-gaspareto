@@ -790,6 +790,9 @@ export class ProductInventoryComponent implements OnInit {
           status: 'pendente',
           recurring: false
         });
+        if (this.filtroContasStatus === 'recebido' || this.filtroContasStatus === 'pago') {
+          this.filtroContasStatus = 'todos';
+        }
       }
 
       this.notif.success(`Estoque de "${this.produtoSelecionadoCompra.title}" atualizado! 💰`);

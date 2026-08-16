@@ -179,6 +179,18 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   automaticamente ao cadastrar um "produto de compra" recorrente
   (`gerarBillDeProdutoCompra`) ou ao confirmar uma entrada de estoque com a
   opção "gerar conta a pagar" marcada.
+- Escopo temporal da listagem em `bills.ts` (tela Contas a Pagar) — regra de
+  exibição, não crítica (não altera a máquina de estado descrita acima).
+  Decidido com o usuário (2026-08-16): a tela não tem seletor de mês, o
+  escopo é sempre "mês atual", fixo. Conta com `status === 'pendente'`
+  sempre aparece na listagem, independente de qualquer data — não tem
+  prazo, precisa ficar visível até ser resolvida. Conta com
+  `status === 'recebido'` só aparece se `receivedAt` cair no mês corrente.
+  Conta com `status === 'pago'` só aparece se `paidAt` cair no mês
+  corrente. Contas recebidas/pagas em meses anteriores saem da tela (ficam
+  só no histórico do Firestore, não na listagem). O filtro `filtroStatus`
+  (todos/pendente/recebido/pago) já existente continua funcionando por
+  cima desse escopo mensal — é um AND, não substitui o escopo temporal.
 
 ## 8. Produtos de compra (`purchaseProducts`)
 
@@ -281,7 +293,9 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   escolha entre Cloud Function de custom claims (mais rápido, exige
   `firebase init functions`) ou leitura direta de `users/{uid}` na regra
   (fase 1, sem backend adicional) fica marcada como opcional/fase 2 na fila
-  de tasks — não bloqueia o resto do multi-tenant.
+  de tasks — não bloqueia o resto do multi-tenant. (Decisão equivalente para
+  o flag `isSuperAdmin` foi tratada e fechada separadamente — ver seção 13 —
+  não depende nem espera esta.)
 - Não há teste automatizado cobrindo as regras críticas (estoque, transições
   de status, cálculo de total) — e agora, também não há teste de regra de
   segurança do Firestore. Se a task de `firestore.rules` for executada, o
@@ -321,3 +335,78 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   composto no Firestore de produção real (o emulador não cobra isso). Sem
   `firestore.indexes.json` (ver TASK-026), essas telas quebram no primeiro
   uso após o deploy.
+
+## 13. Super-admin da plataforma — [CRÍTICA]
+
+- **Campo `isSuperAdmin: boolean`** em `users/{uid}` (default `false`, ausente =
+  `false`). É um flag **global de plataforma**, separado do `role`
+  (`owner|admin|employee`, que continua escopado a uma única empresa via
+  `companyId`). Um usuário pode ser `employee` de uma empresa e `isSuperAdmin`
+  ao mesmo tempo — os dois eixos não se relacionam. Nunca setado `true` no
+  cadastro self-service (`AuthService.signup`); só concedido/revogado via
+  Cloud Function `setSuperAdmin` (ver abaixo), nunca por escrita direta do
+  cliente — `users/{uid}` continua com `allow update, delete: if false`.
+- **Sem custom claims para este flag.** Fase 1 mantém leitura direta de
+  `users/{uid}` em `firestore.rules` (mesmo padrão de `companyId`/`role`,
+  seção 10), por decisão deliberada: revogar `isSuperAdmin` via leitura direta
+  tem efeito no request seguinte; via custom claim, ficaria preso ao JWT até
+  refresh (até 1h) — janela de acesso cross-tenant residual inaceitável pra
+  esse flag. As duas Cloud Functions que dependem dele (abaixo) já
+  revalidam contra o Firestore via Admin SDK de qualquer forma, então claim
+  não seria consultado no ponto que decide a autorização. Fica de fora do
+  item ainda aberto na seção 12 sobre migrar `companyId`/`role` pra claims —
+  são decisões independentes.
+- **Override de `companyId` na sessão** (`TenantService`): quando o usuário
+  logado tem `isSuperAdmin === true`, a home exibe um seletor de empresa
+  (dentre as já cadastradas em `companies/{id}` — não cria empresa nova) que
+  troca o `companyId` efetivo da sessão. Usuário sem `isSuperAdmin` nunca é
+  afetado por esse mecanismo, sem exceção — o override só produz efeito
+  quando `TenantService.isSuperAdmin()` é verdadeiro, checagem repetida tanto
+  no client (`TenantService.companyId`) quanto no servidor
+  (`firestore.rules`, abaixo).
+- **Exceção deliberadamente mais arriscada que as demais do sistema.** Ao
+  contrário de toda outra proteção `companyId` no sistema (seção 10, sem
+  exceção nenhuma), este override libera **leitura e escrita** (`create`,
+  `update`, `delete`) nas 8 coleções operacionais para a empresa selecionada,
+  não só leitura — o super-admin efetivamente opera a empresa selecionada
+  como se fosse dela (criar pedido, dar baixa de estoque, editar cliente,
+  etc.), não apenas visualiza. Decisão confirmada com o usuário: o risco de
+  bug de seleção de empresa gravar dado na empresa errada é conhecido e
+  aceito — não é tratado como bloqueante da feature. `update` mantém uma
+  trava irrestrita mesmo com o bypass: `request.resource.data.companyId ==
+  resource.data.companyId` — nenhuma sessão, nem super-admin, consegue mudar
+  o `companyId` de um documento já existente por essa rule (migração de
+  documento entre empresas continua impossível).
+- **`firestore.rules`**: `isSuperAdminUser()` (leitura ao vivo de
+  `users/{request.auth.uid}.isSuperAdmin`, via `get()`) entra em `OR` com a
+  checagem de `companyId` original em `read`/`create`/`update`/`delete` das
+  coleções operacionais, e em `read` de `users/{uid}` (permite o **client**
+  listar todos os usuários da plataforma direto via listener Firestore —
+  decisão confirmada: sem Cloud Function dedicada de listagem, o bypass de
+  `read`/`list` em `users/{uid}` cobre a tela Administrador) e de
+  `companies/{companyId}` (permite ver qualquer empresa no seletor). Pra
+  usuário sem `isSuperAdmin`, o `OR` colapsa pra exatamente a mesma condição
+  de hoje — o bypass é estritamente aditivo, avaliado a cada request contra
+  o Firestore, não forjável client-side.
+- **Cloud Functions** (`functions/`, primeira infra de Functions do projeto,
+  região `us-central1`, plano Blaze): duas `onCall`, ambas exigem
+  `request.auth` e revalidam `isSuperAdmin` do chamador direto no Firestore
+  via Admin SDK antes de qualquer ação — nunca confiam em claim ou dado vindo
+  do client.
+  - **`resetUserPassword({ targetUid, newPassword })`**: super-admin digita a
+    nova senha direto na tela (sem fluxo de e-mail/link — projeto não tem
+    infra de envio de e-mail hoje); `admin.auth().updateUser(targetUid, {
+    password: newPassword })`. Sem restrição de alvo — super-admin pode
+    resetar a própria senha ou a de qualquer outro usuário, de qualquer
+    empresa.
+  - **`setSuperAdmin({ targetUid, value })`**: única forma legítima de
+    alterar o campo (client nunca escreve `users/{uid}` direto).
+    **`targetUid` não pode ser igual ao uid de quem chama** — bloqueio total,
+    independente de `value` ser `true` ou `false`: um super-admin nunca
+    altera o próprio flag por essa function, elimina o risco de
+    autorrevogação acidental (ficar sem nenhum super-admin ativo) e mantém a
+    regra simples (não distingue conceder de revogar).
+- **Bootstrap do primeiro super-admin**: nenhum usuário nasce com
+  `isSuperAdmin: true` — o primeiro precisa ser setado manualmente (console
+  do Firestore ou script avulso com Admin SDK), fora do fluxo do app. Passo
+  operacional único de implantação, não uma tela do sistema.
