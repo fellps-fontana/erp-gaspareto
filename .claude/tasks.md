@@ -685,3 +685,57 @@ relacionada, fora de qualquer escopo desta sessao).
 Regra de negocio coberta: nenhuma nova — confirma que regra-de-negocio.md
 secao 2 (Estoque, PurchaseService.addPurchase) esta implementada
 corretamente; o problema era so higiene de teste.
+
+## TASK-033 — Resetar filtroContasStatus ao gerar conta a pagar em product-inventory.ts
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: vazio
+FLUXO: Correcao
+CONTEXTO A LER: regra-de-negocio.md secao 7 (Contas a pagar/receber — CRITICA, maquina de estado 'pendente'->'recebido'->'pago'); src/components/bills/bills.ts (referencia da correcao ja aplicada na TASK anterior desta sessao: salvarConta() reseta filtroStatus = 'todos' apos criar conta com sucesso)
+ESCOPO: em src/components/product-inventory/product-inventory.ts, replicar a mesma correcao ja aplicada em bills.ts — apos gerarContaPagar() (linha ~787, dentro da confirmacao de compra) criar a bill com sucesso, resetar filtroContasStatus (linha ~117) para o valor equivalente a 'todos', pra que a conta nova (sempre nasce 'pendente') nao fique invisivel se o filtro ativo estiver em 'recebido'/'pago'. Prefira reset condicional (so mexer no filtro se ele estiver excluindo 'pendente'), corrigindo tambem a observacao do style na correcao anterior de bills.ts (reset incondicional trocava o filtro escolhido de proposito pelo usuario mesmo quando desnecessario).
+CRITERIO DE ACEITE: (1) apos gerar conta a pagar via confirmacao de compra com filtroContasStatus em 'recebido' ou 'pago', a conta nova aparece imediatamente na lista; (2) se filtroContasStatus ja estava em 'todos' ou 'pendente', o filtro NAO e alterado (reset condicional, nao incondicional); (3) nenhuma mudanca na ordem/valores da maquina de estado do status da bill.
+ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.ts
+NAO FAZER: nao alterar bill-service.ts, bills.ts, firestore.rules, bill-model.ts. Nao mudar a logica de avancarStatusBill. Nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, confirmacao de build (ng build), resumo do que mudou.
+HISTORICO: hanzo aplicou reset condicional em confirmarCompra() (~linha 790):
+so volta filtroContasStatus pra 'todos' se estava em 'recebido' ou 'pago';
+se ja estava em 'todos'/'pendente', nao mexe. ng build sem erro (so
+warnings pre-existentes alheios). Achado fora de escopo: existe outra
+chamada a billService.addBill em gerarBillDeProdutoCompra (~linha 1033)
+que NAO recebeu o mesmo tratamento — mesmo padrao de bug pode se repetir
+ali, avaliar task futura.
+
+Style APROVOU de primeira: reset condicional correto (so mexe em
+'recebido'/'pago', preserva 'pendente'/'todos'), confirmado via
+billsFiltradosRelatorio (unico consumidor de filtroContasStatus) que o
+fix resolve o bug real. Maquina de estado intocada. tsc --noEmit limpo.
+Reconfirmou o achado do gerarBillDeProdutoCompra (~linha 1034) como
+mesmo bug, fora do escopo desta task -> virou TASK-034.
+
+Regra de negocio coberta: nenhuma nova — mesma regra critica da secao 7
+(bills.ts), aplicada por consistencia ao segundo fluxo de criacao de
+conta dentro de product-inventory.ts.
+
+## TASK-034 — Resetar filtroContasStatus em gerarBillDeProdutoCompra (product-inventory.ts)
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-033
+FLUXO: Correcao
+CONTEXTO A LER: regra-de-negocio.md secao 7 (Contas a pagar/receber — CRITICA); TASK-033 neste arquivo (correcao equivalente ja aplicada e aprovada em confirmarCompra())
+ESCOPO: em src/components/product-inventory/product-inventory.ts, aplicar o MESMO reset condicional de filtroContasStatus (so reseta pra 'todos' se estiver em 'recebido' ou 'pago') dentro de gerarBillDeProdutoCompra() (~linha 1034-1044), chamada por salvarProdutoCompra() (~linha 1024-1025) — mesmo bug da TASK-033, caminho de criacao de bill diferente (produto de compra recorrente em vez de confirmacao de compra avulsa).
+CRITERIO DE ACEITE: (1) apos gerar bill via gerarBillDeProdutoCompra com filtroContasStatus em 'recebido' ou 'pago', a conta nova aparece imediatamente em billsFiltradosRelatorio; (2) se filtroContasStatus ja estava em 'todos'/'pendente', nao muda; (3) nenhuma alteracao na maquina de estado do status da bill.
+ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.ts
+NAO FAZER: nao alterar bill-service.ts, bills.ts, firestore.rules, bill-model.ts, confirmarCompra() (ja corrigido na TASK-033). Nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, confirmacao de build (ng build), resumo do que mudou.
+HISTORICO: hanzo aplicou o mesmo reset condicional em gerarBillDeProdutoCompra
+(~linha 1044). tsc --noEmit limpo.
+
+Style reprovou na 1a rodada: reset idêntico apareceu em dois lugares
+(confirmarCompra da TASK-033 + este), virou duplicação real. Redespachado
+hanzo: extraiu metodo privado resetFiltroContasStatusSeNecessario(),
+substituiu as duas ocorrencias. Style aprovou na 2a rodada — duplicacao
+eliminada, posicao logica da chamada preservada nos dois pontos, tsc limpo.
+
+Regra de negocio coberta: nenhuma nova — mesma regra critica da secao 7,
+fecha o ultimo caminho de criacao de bill dentro de product-inventory.ts
+que ainda tinha o bug do filtro.

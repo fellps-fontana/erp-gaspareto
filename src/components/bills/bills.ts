@@ -45,8 +45,14 @@ export class BillsComponent implements OnInit {
 
   ngOnInit() {
     this.checkAndGenerateRecurringBills();
-    this.billService.getBills().subscribe(data => {
-      this.bills = data;
+    this.billService.getBills().subscribe({
+      next: data => {
+        this.bills = data;
+      },
+      error: error => {
+        console.error('Erro ao carregar contas:', error);
+        this.notif.error('Erro ao carregar contas.');
+      }
     });
     this.purchaseProductService.getPurchaseProducts().subscribe(data => {
       this.purchaseProducts = data;
@@ -80,25 +86,62 @@ export class BillsComponent implements OnInit {
     return this.purchaseProducts.find(p => p.id === id)?.name ?? '';
   }
 
+  /**
+   * Escopo temporal fixo (mês corrente): conta 'pendente' aparece sempre;
+   * 'recebido'/'pago' só aparecem se a data em que entraram nesse status
+   * (receivedAt/paidAt) cair no mês/ano atual. Filtro aplicado ANTES do
+   * filtroStatus escolhido pelo usuário.
+   *
+   * Timestamp ausente é tratado como "dentro do escopo" (visível), nunca
+   * "fora": a escrita local otimista de `updateBillStatus` chega no
+   * `onSnapshot` antes do `serverTimestamp()` ser confirmado pelo servidor,
+   * e nesse instante `receivedAt`/`paidAt` ainda é `null`. Se o status acabou
+   * de mudar agora, a data de mudança só pode ser o mês corrente — nunca um
+   * mês passado. Só sai do escopo quando o timestamp já está confirmado E
+   * aponta pra um mês diferente do atual.
+   */
+  private dataEstaNoMesCorrente(ts?: Timestamp): boolean {
+    if (!ts) return true;
+    const data = (ts as any).toDate ? (ts as any).toDate() : new Date(ts as any);
+    const agora = new Date();
+    return data.getMonth() === agora.getMonth() && data.getFullYear() === agora.getFullYear();
+  }
+
+  private estaNoEscopoMensal(bill: Bill): boolean {
+    if (bill.status === 'pendente') return true;
+    if (bill.status === 'recebido') return this.dataEstaNoMesCorrente(bill.receivedAt);
+    return this.dataEstaNoMesCorrente(bill.paidAt);
+  }
+
+  get billsNoEscopoMensal(): Bill[] {
+    return this.bills.filter(b => this.estaNoEscopoMensal(b));
+  }
+
   get billsFiltradas(): Bill[] {
-    if (this.filtroStatus === 'todos') return this.bills;
-    return this.bills.filter(b => b.status === this.filtroStatus);
+    if (this.filtroStatus === 'todos') return this.billsNoEscopoMensal;
+    return this.billsNoEscopoMensal.filter(b => b.status === this.filtroStatus);
   }
 
   get totalPendente(): number {
-    return this.bills.filter(b => b.status === 'pendente').reduce((s, b) => s + b.value, 0);
+    return this.billsNoEscopoMensal
+      .filter(b => b.status === 'pendente')
+      .reduce((s, b) => s + b.value, 0);
   }
 
   get totalRecebido(): number {
-    return this.bills.filter(b => b.status === 'recebido').reduce((s, b) => s + b.value, 0);
+    return this.billsNoEscopoMensal
+      .filter(b => b.status === 'recebido')
+      .reduce((s, b) => s + b.value, 0);
   }
 
   get totalPago(): number {
-    return this.bills.filter(b => b.status === 'pago').reduce((s, b) => s + b.value, 0);
+    return this.billsNoEscopoMensal
+      .filter(b => b.status === 'pago')
+      .reduce((s, b) => s + b.value, 0);
   }
 
   countByStatus(status: Bill['status']): number {
-    return this.bills.filter(b => b.status === status).length;
+    return this.billsNoEscopoMensal.filter(b => b.status === status).length;
   }
 
   async avancarStatus(bill: Bill) {
@@ -106,7 +149,8 @@ export class BillsComponent implements OnInit {
     const next: Bill['status'] = bill.status === 'pendente' ? 'recebido' : 'pago';
     try {
       await this.billService.updateBillStatus(bill.id, next);
-    } catch {
+    } catch (error) {
+      console.error('Erro ao atualizar status da conta:', error);
       this.notif.error('Erro ao atualizar status.');
     }
   }
@@ -144,7 +188,9 @@ export class BillsComponent implements OnInit {
       await this.billService.addBill(data);
       this.notif.success('Conta cadastrada!');
       this.fecharFormulario();
-    } catch {
+      this.filtroStatus = 'todos';
+    } catch (error) {
+      console.error('Erro ao salvar conta:', error);
       this.notif.error('Erro ao salvar conta.');
     }
   }
@@ -165,7 +211,8 @@ export class BillsComponent implements OnInit {
       await this.billService.deleteBill(this.billToDelete.id);
       this.notif.success('Conta excluída!');
       this.closeDeleteModal();
-    } catch {
+    } catch (error) {
+      console.error('Erro ao excluir conta:', error);
       this.notif.error('Erro ao excluir conta.');
     }
   }
