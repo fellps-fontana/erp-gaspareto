@@ -45,8 +45,14 @@ export class BillsComponent implements OnInit {
 
   ngOnInit() {
     this.checkAndGenerateRecurringBills();
-    this.billService.getBills().subscribe(data => {
-      this.bills = data;
+    this.billService.getBills().subscribe({
+      next: data => {
+        this.bills = data;
+      },
+      error: error => {
+        console.error('Erro ao carregar contas:', error);
+        this.notif.error('Erro ao carregar contas.');
+      }
     });
     this.purchaseProductService.getPurchaseProducts().subscribe(data => {
       this.purchaseProducts = data;
@@ -106,7 +112,8 @@ export class BillsComponent implements OnInit {
     const next: Bill['status'] = bill.status === 'pendente' ? 'recebido' : 'pago';
     try {
       await this.billService.updateBillStatus(bill.id, next);
-    } catch {
+    } catch (error) {
+      console.error('Erro ao atualizar status da conta:', error);
       this.notif.error('Erro ao atualizar status.');
     }
   }
@@ -144,7 +151,9 @@ export class BillsComponent implements OnInit {
       await this.billService.addBill(data);
       this.notif.success('Conta cadastrada!');
       this.fecharFormulario();
-    } catch {
+      this.filtroStatus = 'todos';
+    } catch (error) {
+      console.error('Erro ao salvar conta:', error);
       this.notif.error('Erro ao salvar conta.');
     }
   }
@@ -165,7 +174,8 @@ export class BillsComponent implements OnInit {
       await this.billService.deleteBill(this.billToDelete.id);
       this.notif.success('Conta excluída!');
       this.closeDeleteModal();
-    } catch {
+    } catch (error) {
+      console.error('Erro ao excluir conta:', error);
       this.notif.error('Erro ao excluir conta.');
     }
   }
