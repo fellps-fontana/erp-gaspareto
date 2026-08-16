@@ -40,6 +40,25 @@
     </span>
   </button>
 
+  <div class="super-admin-banner" *ngIf="tenant.isSuperAdmin()">
+    <span class="super-admin-banner__badge">SUPER-ADMIN</span>
+
+    <div class="super-admin-banner__field">
+      <label for="superAdminCompanySelect">Empresa ativa</label>
+      <select
+        id="superAdminCompanySelect"
+        [(ngModel)]="selectedCompanyId"
+        aria-label="Selecionar empresa ativa (super-admin)"
+      >
+        <option *ngFor="let company of companies()" [value]="company.id">{{ company.name }}</option>
+      </select>
+    </div>
+
+    <span class="super-admin-banner__current">Operando como: <strong>{{ selectedCompanyName }}</strong></span>
+
+    <a class="super-admin-banner__link" [routerLink]="['/admin']">Administrador da plataforma</a>
+  </div>
+
   <div class="header">
     <h1>SISTEMA DE EVENTOS</h1>
     <p>Selecione o módulo de acesso</p>

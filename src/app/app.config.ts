@@ -7,6 +7,7 @@ import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
 import { environment } from '../enviroments/enviroments';
 import { getAuth, provideAuth, connectAuthEmulator } from '@angular/fire/auth';
+import { getFunctions, provideFunctions, connectFunctionsEmulator } from '@angular/fire/functions';
 
 // Conecta nos emuladores locais SOMENTE em dev mode + flag explicita
 // (environment.useEmulator) -- nunca em build de producao, mesmo que a
@@ -63,6 +64,13 @@ export const appConfig: ApplicationConfig = {
         connectFirestoreEmulator(firestore, emulatorHost, 8080);
       }
       return firestore;
+    }),
+    provideFunctions(() => {
+      const functions = getFunctions(undefined, 'us-central1');
+      if (useEmulator) {
+        connectFunctionsEmulator(functions, emulatorHost, 5001);
+      }
+      return functions;
     })
   ]
 };

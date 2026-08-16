@@ -83,6 +83,92 @@
   /* Garante scroll */
 }
 
+/* Faixa do super-admin — seletor de empresa ativa (regra-de-negocio.md seção 13).
+   Centralizada no topo, acima do cabeçalho normal, visível só para isSuperAdmin. */
+.super-admin-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-md);
+  width: 100%;
+  max-width: 720px;
+  margin-bottom: var(--sp-lg);
+  padding: var(--sp-sm) var(--sp-lg);
+  background-color: var(--bg-card);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.super-admin-banner__badge {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-primary);
+  color: var(--text-on-primary);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.super-admin-banner__field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.super-admin-banner__field label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.super-admin-banner__field select {
+  min-width: 200px;
+}
+
+.super-admin-banner__current {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.super-admin-banner__current strong {
+  color: var(--text-primary);
+}
+
+.super-admin-banner__link {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.super-admin-banner__link:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+@media (max-width: 480px) {
+  .super-admin-banner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--sp-md);
+  }
+
+  .super-admin-banner__field select {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 /* Cabeçalho */
 .header {
   text-align: center;

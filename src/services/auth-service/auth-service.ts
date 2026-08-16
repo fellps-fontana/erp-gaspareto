@@ -96,6 +96,7 @@ export class AuthService {
             email,
             companyId: uid,
             role: 'owner' as const,
+            isSuperAdmin: false,
             createdAt: serverTimestamp(),
           };
 
@@ -107,6 +108,7 @@ export class AuthService {
             email,
             companyId: uid,
             role: 'owner',
+            isSuperAdmin: false,
             createdAt: Timestamp.now(),
           };
         });
