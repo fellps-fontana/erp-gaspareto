@@ -6,12 +6,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function callerUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function userCompanyId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
+      return callerUser().companyId;
     }
 
     function userRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return callerUser().role;
+    }
+
+    function isSuperAdminUser() {
+      return callerUser().get('isSuperAdmin', false) == true;
     }
 
     function isOperationalCollection(collection) {
@@ -19,11 +27,12 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdminUser());
       allow create: if isSignedIn()
         && request.auth.uid == uid
         && request.resource.data.companyId == uid
-        && request.resource.data.role == 'owner';
+        && request.resource.data.role == 'owner'
+        && request.resource.data.get('isSuperAdmin', false) == false;
       allow update, delete: if false;
     }
 
@@ -36,7 +45,7 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      allow read: if isSignedIn() && userCompanyId() == companyId;
+      allow read: if isSignedIn() && (userCompanyId() == companyId || isSuperAdminUser());
       allow create: if isSignedIn() && (
         companyId == request.auth.uid ||
         (userCompanyId() == companyId && userRole() in ['owner', 'admin'])
@@ -49,20 +58,20 @@ service cloud.firestore {
     match /{collection}/{docId} {
       allow read: if isSignedIn()
         && isOperationalCollection(collection)
-        && resource.data.companyId == userCompanyId();
+        && (resource.data.companyId == userCompanyId() || isSuperAdminUser());
 
       allow create: if isSignedIn()
         && isOperationalCollection(collection)
-        && request.resource.data.companyId == userCompanyId();
+        && (request.resource.data.companyId == userCompanyId() || isSuperAdminUser());
 
       allow update: if isSignedIn()
         && isOperationalCollection(collection)
-        && resource.data.companyId == userCompanyId()
+        && (resource.data.companyId == userCompanyId() || isSuperAdminUser())
         && request.resource.data.companyId == resource.data.companyId;
 
       allow delete: if isSignedIn()
         && isOperationalCollection(collection)
-        && resource.data.companyId == userCompanyId();
+        && (resource.data.companyId == userCompanyId() || isSuperAdminUser());
     }
   }
 }

@@ -5,5 +5,6 @@ export interface AppUser {
   email: string;
   companyId: string;
   role: 'owner' | 'admin' | 'employee';
+  isSuperAdmin?: boolean;
   createdAt: Timestamp;
 }
