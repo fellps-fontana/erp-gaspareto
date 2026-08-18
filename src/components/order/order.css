@@ -960,6 +960,11 @@ textarea:focus {
   padding: 2px 4px;
   text-align: center;
   font-size: 0.9rem;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  -moz-appearance: textfield;
 }
 
 .qty-input::-webkit-outer-spin-button,
