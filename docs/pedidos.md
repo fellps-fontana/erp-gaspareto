@@ -120,3 +120,31 @@ Resumo:
   login.html`/`login.ts`) sentadas no mesmo working tree, sinalizadas pelo
   `style` — não fazem parte desta entrega e não devem ir no mesmo commit
   sem confirmação separada do usuário.
+
+## Atualização 2026-08-18 — Boleto + edição de quantidade no carrinho
+
+Duas melhorias independentes na tela de Pedidos, publicadas direto na
+`main` (sem branch/PR — decisão explícita do usuário).
+
+**Boleto como forma de pagamento** ([CRÍTICA], regra-de-negocio.md seções
+3/5): `PaymentMethod` ganhou `BOLETO = 'boleto'` em `sell-model.ts`, com
+label `'Boleto'` em `PAYMENT_METHOD_LABELS`. Boleto se comporta como
+Cartão/Cheque — aceita parcelas normalmente, sem a trava de "Pix é sempre à
+vista" (`requiresInstallments`/`finalizeOrder` não foram tocados, a lógica
+já era genérica por `!== PaymentMethod.PIX`). Opção adicionada em 3
+selects: modal "Finalizar Pedido" (`order.html`), filtro do Relatório de
+Vendas e filtro do Histórico Geral (ambos em `product-inventory.html`).
+`levi` implementou, `style` aprovou sem ressalvas na primeira rodada.
+
+**Edição de quantidade no carrinho**: a lista "Itens do Pedido" (dentro do
+overlay Nova Encomenda/Editar Pedido) trocou de chips inline
+(`.cart-tag`, removido) para linhas (`.cart-row`) com controle `- [input] +`
+por item — mesmo padrão já usado no PDV. Aditivo: o clique de adicionar
++1 na grade de produtos (`addToCart`) continua idêntico. Quantidade mínima
+é 1 pelo controle editável; cair para 0 ou menos remove a linha
+(`decreaseQuantity`/`onQuantityInputChange` reaproveitam `removeFromCart`).
+Não é regra crítica (não persiste nada sozinho, só edita o carrinho antes
+de `saveOrder`) — `hanzo` implementou, revisão inline do Kira.
+
+Commits: `a03ea16` (Boleto), merge de `docs/bills.md` vindo do origin,
+`c584365` (quantidade no carrinho) — push confirmado em `2882f55`.
