@@ -4,14 +4,16 @@ export enum PaymentMethod {
     DINHEIRO = 'dinheiro',
     PIX = 'pix',
     CARTAO = 'cartao',
-    CHEQUE = 'cheque'
+    CHEQUE = 'cheque',
+    BOLETO = 'boleto'
 }
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
     [PaymentMethod.DINHEIRO]: 'Dinheiro',
     [PaymentMethod.PIX]: 'Pix',
     [PaymentMethod.CARTAO]: 'Cartão',
-    [PaymentMethod.CHEQUE]: 'Cheque'
+    [PaymentMethod.CHEQUE]: 'Cheque',
+    [PaymentMethod.BOLETO]: 'Boleto'
 };
 
 export interface SaleItem {
