@@ -202,7 +202,7 @@
 
     .cart-summary {
         max-width: 100%;
-        flex-direction: column;
+        max-height: 180px;
         gap: 5px;
         padding-bottom: 0;
     }
@@ -216,9 +216,14 @@
 
     .cart-items-list {
         display: flex;
-        gap: 5px;
-        overflow-x: auto;
+        flex-direction: column;
+        gap: 6px;
         padding-bottom: 5px;
+    }
+
+    .qty-btn {
+        width: 30px;
+        height: 30px;
     }
 
     .footer-actions {

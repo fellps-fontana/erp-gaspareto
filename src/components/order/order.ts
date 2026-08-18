@@ -291,6 +291,29 @@ export class OrdersComponent implements OnInit, OnDestroy {
     if (idx > -1) this.cart.splice(idx, 1);
   }
 
+  /** Edição direta da quantidade já no carrinho — não altera o clique de adicionar na grade de produtos. */
+  increaseQuantity(item: OrderItem) {
+    item.quantity++;
+  }
+
+  decreaseQuantity(item: OrderItem) {
+    if (item.quantity > 1) {
+      item.quantity--;
+    } else {
+      this.removeFromCart(item);
+    }
+  }
+
+  /** Handler do input numérico da linha do carrinho: normaliza e remove a linha se cair abaixo de 1. */
+  onQuantityInputChange(item: OrderItem, value: number | string) {
+    const qty = Math.floor(Number(value));
+    if (!qty || qty < 1) {
+      this.removeFromCart(item);
+      return;
+    }
+    item.quantity = qty;
+  }
+
   get itemsTotal(): number {
     return this.cart.reduce((acc, i) => acc + i.priceAtSale * i.quantity, 0);
   }

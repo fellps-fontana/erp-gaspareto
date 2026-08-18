@@ -295,10 +295,16 @@
         <div class="cart-summary">
           <h4>Itens do Pedido:</h4>
           <div class="cart-items-list">
-            <span *ngFor="let item of cart" class="cart-tag">
-              {{ item.quantity }}x {{ item.productName }}
-              <a (click)="removeFromCart(item)" class="remove-btn">x</a>
-            </span>
+            <div *ngFor="let item of cart" class="cart-row">
+              <span class="cart-row-name" title="{{ item.productName }}">{{ item.productName }}</span>
+              <div class="cart-qty-control">
+                <button type="button" class="qty-btn" (click)="decreaseQuantity(item)" title="Diminuir quantidade">-</button>
+                <input type="number" class="qty-input" [ngModel]="item.quantity"
+                  (ngModelChange)="onQuantityInputChange(item, $event)" min="1" aria-label="Quantidade">
+                <button type="button" class="qty-btn" (click)="increaseQuantity(item)" title="Aumentar quantidade">+</button>
+              </div>
+              <a (click)="removeFromCart(item)" class="remove-btn" title="Remover item">x</a>
+            </div>
           </div>
           <span *ngIf="cart.length === 0" class="empty-msg">Nenhum item adicionado</span>
         </div>
