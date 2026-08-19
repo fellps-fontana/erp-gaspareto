@@ -51,8 +51,10 @@ service cloud.firestore {
         (userCompanyId() == companyId && userRole() in ['owner', 'admin'])
       );
       allow update, delete: if isSignedIn()
-        && userCompanyId() == companyId
-        && userRole() in ['owner', 'admin'];
+        && (
+          (userCompanyId() == companyId && userRole() in ['owner', 'admin'])
+          || isSuperAdminUser()
+        );
     }
 
     match /{collection}/{docId} {
