@@ -305,4 +305,291 @@ describe('VendedorService.calculateComissaoVendedor - Calculo de comissao a paga
       }));
     });
   });
+
+  describe('Regra: Agregacao por produto - campo itens (CRITICA)', () => {
+    it('Caso 14: Um pedido com um item - itens deve ter uma entrada com quantidade e totais corretos', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const item = createOrderItem('prod-A', 2, 100); // quantidade=2, totalVendido=200, comissao=20
+      const order = createOrder('v1', 'finished', [item], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.itens).toBeDefined();
+      expect(result.itens.length).toBe(1, 'um produto deve gerar uma entrada em itens');
+      expect(result.itens[0]).toEqual({
+        idProduct: 'prod-A',
+        productName: 'Product prod-A',
+        quantidade: 2,
+        totalVendido: 200,
+        totalComissao: 20,
+        percentual: 10
+      });
+    });
+
+    it('Caso 15: Mesmo produto em dois pedidos finished qualificados - agrupado numa unica entrada em itens com somas', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      // Pedido 1: prod-A 1 unidade * 100 = 100 vendido
+      const item1 = createOrderItem('prod-A', 1, 100);
+      const order1 = createOrder('v1', 'finished', [item1], 0);
+
+      // Pedido 2: prod-A 2 unidades * 50 = 100 vendido
+      const item2 = createOrderItem('prod-A', 2, 50);
+      const order2 = createOrder('v1', 'finished', [item2], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([order1, order2], vendedor);
+
+      expect(result.itens.length).toBe(1, 'mesmo produto em pedidos diferentes = uma unica entrada');
+      expect(result.itens[0]).toEqual({
+        idProduct: 'prod-A',
+        productName: 'Product prod-A',
+        quantidade: 3, // 1 + 2
+        totalVendido: 200, // 100 + 100
+        totalComissao: 20, // 200 * 10 / 100
+        percentual: 10
+      });
+    });
+
+    it('Caso 16: Multiplos produtos em um pedido - cada um gera entrada em itens', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 },
+        { idProduct: 'prod-B', percentual: 20 }
+      ]);
+
+      const itemA = createOrderItem('prod-A', 1, 100);
+      const itemB = createOrderItem('prod-B', 1, 50);
+      const order = createOrder('v1', 'finished', [itemA, itemB], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.itens.length).toBe(2, 'dois produtos diferentes = duas entradas em itens');
+      const prodAEntry = result.itens.find(i => i.idProduct === 'prod-A');
+      const prodBEntry = result.itens.find(i => i.idProduct === 'prod-B');
+
+      expect(prodAEntry).toEqual({
+        idProduct: 'prod-A',
+        productName: 'Product prod-A',
+        quantidade: 1,
+        totalVendido: 100,
+        totalComissao: 10,
+        percentual: 10
+      });
+
+      expect(prodBEntry).toEqual({
+        idProduct: 'prod-B',
+        productName: 'Product prod-B',
+        quantidade: 1,
+        totalVendido: 50,
+        totalComissao: 10,
+        percentual: 20
+      });
+    });
+
+    it('Caso 17: Produto SEM comissao cadastrada - deve entrar em itens com percentual 0 e totalComissao 0', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-B', percentual: 5 } // prod-A nao tem comissao
+      ]);
+
+      const item = createOrderItem('prod-A', 2, 50); // produto sem comissao
+      const order = createOrder('v1', 'finished', [item], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.itens.length).toBe(1, 'produto sem comissao ainda aparece em itens');
+      expect(result.itens[0]).toEqual({
+        idProduct: 'prod-A',
+        productName: 'Product prod-A',
+        quantidade: 2,
+        totalVendido: 100,
+        totalComissao: 0,
+        percentual: 0
+      });
+    });
+
+    it('Caso 18: Pedido nao-finished nao aparece em itens (pending)', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const item = createOrderItem('prod-A', 1, 100);
+      const orderPending = createOrder('v1', 'pending', [item], 0);
+      const orderFinished = createOrder('v1', 'finished', [item], 0);
+
+      const result = VendedorService.calculateComissaoVendedor(
+        [orderPending, orderFinished],
+        vendedor
+      );
+
+      expect(result.itens.length).toBe(1, 'apenas pedido finished conta');
+      expect(result.itens[0].quantidade).toBe(1, 'apenas 1 unidade (do pedido finished)');
+    });
+
+    it('Caso 19: Pedido de outro vendedor nao aparece em itens', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const item1 = createOrderItem('prod-A', 1, 100);
+      const item2 = createOrderItem('prod-A', 2, 100);
+      const orderV1 = createOrder('v1', 'finished', [item1], 0);
+      const orderV2 = createOrder('v2', 'finished', [item2], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([orderV1, orderV2], vendedor);
+
+      expect(result.itens.length).toBe(1, 'apenas itens de v1 contam');
+      expect(result.itens[0].quantidade).toBe(1, 'apenas 1 unidade (do pedido v1)');
+    });
+
+    it('Caso 20: Lista vazia de orders - itens deve ser array vazio', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const result = VendedorService.calculateComissaoVendedor([], vendedor);
+
+      expect(result.itens).toBeDefined();
+      expect(result.itens.length).toBe(0, 'lista vazia de orders = itens vazio');
+    });
+
+    it('Caso 21: Nenhum pedido qualificado (todos pending ou outro vendedor) - itens vazio', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const item1 = createOrderItem('prod-A', 1, 100);
+      const item2 = createOrderItem('prod-A', 1, 100);
+      const orderPending = createOrder('v1', 'pending', [item1], 0);
+      const orderOtherVendedor = createOrder('v2', 'finished', [item2], 0);
+
+      const result = VendedorService.calculateComissaoVendedor(
+        [orderPending, orderOtherVendedor],
+        vendedor
+      );
+
+      expect(result.itens.length).toBe(0, 'nenhum pedido qualificado = itens vazio');
+    });
+
+    it('Caso 22: Ordenacao de itens por totalVendido descendente', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 },
+        { idProduct: 'prod-B', percentual: 10 },
+        { idProduct: 'prod-C', percentual: 10 }
+      ]);
+
+      // prod-A: 1 * 50 = 50
+      // prod-B: 3 * 100 = 300 (maior)
+      // prod-C: 2 * 75 = 150
+      const itemA = createOrderItem('prod-A', 1, 50);
+      const itemB = createOrderItem('prod-B', 3, 100);
+      const itemC = createOrderItem('prod-C', 2, 75);
+      const order = createOrder('v1', 'finished', [itemA, itemB, itemC], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.itens.length).toBe(3);
+      expect(result.itens[0].idProduct).toBe('prod-B', 'primeiro = maior totalVendido (300)');
+      expect(result.itens[1].idProduct).toBe('prod-C', 'segundo = medio totalVendido (150)');
+      expect(result.itens[2].idProduct).toBe('prod-A', 'terceiro = menor totalVendido (50)');
+    });
+
+    it('Caso 23: Ordenacao por productName (localeCompare pt-BR) quando totalVendido e empate', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-zebra', percentual: 10 },
+        { idProduct: 'prod-apple', percentual: 10 },
+        { idProduct: 'prod-banana', percentual: 10 }
+      ]);
+
+      // Todos com mesmo totalVendido (100), devem ordenar por productName
+      // productName é "Product prod-{id}"
+      // "Product prod-apple" < "Product prod-banana" < "Product prod-zebra"
+      const itemZ = createOrderItem('prod-zebra', 1, 100);
+      const itemA = createOrderItem('prod-apple', 1, 100);
+      const itemB = createOrderItem('prod-banana', 1, 100);
+      const order = createOrder('v1', 'finished', [itemZ, itemA, itemB], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.itens.length).toBe(3);
+      expect(result.itens[0].idProduct).toBe('prod-apple', 'alphabeticamente primeiro');
+      expect(result.itens[1].idProduct).toBe('prod-banana', 'alphabeticamente segundo');
+      expect(result.itens[2].idProduct).toBe('prod-zebra', 'alphabeticamente terceiro');
+    });
+
+    it('Caso 24: Mesmo produto em multiplos pedidos com ordem alternada - productName vem da primeira ocorrencia encontrada', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      // Cria dois OrderItems diferentes, com productName diferente (nao usual na pratica, mas testa o requisito)
+      const customItem1: OrderItem = {
+        idProduct: 'prod-A',
+        productName: 'Custom Name 1',
+        quantity: 1,
+        priceAtSale: 100,
+        priceAtCost: 10
+      };
+
+      const customItem2: OrderItem = {
+        idProduct: 'prod-A',
+        productName: 'Custom Name 2',
+        quantity: 1,
+        priceAtSale: 100,
+        priceAtCost: 10
+      };
+
+      const order1 = createOrder('v1', 'finished', [customItem1], 0);
+      const order2 = createOrder('v1', 'finished', [customItem2], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([order1, order2], vendedor);
+
+      expect(result.itens.length).toBe(1);
+      expect(result.itens[0].productName).toBe('Custom Name 1', 'productName vem da primeira ocorrencia');
+    });
+
+    it('Caso 25: Calculo correto de comissao por item: quantidade soma, percentual e totalComissao calculam direito', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 15 } // 15% de comissao
+      ]);
+
+      // Pedido 1: 2 unidades * 100 = 200 (comissao: 200 * 15% = 30)
+      // Pedido 2: 3 unidades * 200 = 600 (comissao: 600 * 15% = 90)
+      // Total esperado: 5 unidades, 800 vendido, 120 comissao
+      const item1 = createOrderItem('prod-A', 2, 100);
+      const item2 = createOrderItem('prod-A', 3, 200);
+      const order1 = createOrder('v1', 'finished', [item1], 0);
+      const order2 = createOrder('v1', 'finished', [item2], 0);
+
+      const result = VendedorService.calculateComissaoVendedor([order1, order2], vendedor);
+
+      expect(result.itens.length).toBe(1);
+      expect(result.itens[0]).toEqual({
+        idProduct: 'prod-A',
+        productName: 'Product prod-A',
+        quantidade: 5,
+        totalVendido: 800,
+        totalComissao: 120,
+        percentual: 15
+      });
+    });
+
+    it('Caso 26: Frete nao afeta itens - shippingCost ignorado na agregacao', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const item = createOrderItem('prod-A', 2, 100);
+      const order = createOrder('v1', 'finished', [item], 50); // shippingCost = 50
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.itens.length).toBe(1);
+      expect(result.itens[0].totalVendido).toBe(200, 'frete nao entra em totalVendido do item');
+      expect(result.itens[0].totalComissao).toBe(20, 'comissao calculada sobre 200, nao 250');
+    });
+  });
 });

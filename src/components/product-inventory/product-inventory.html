@@ -344,14 +344,41 @@
             Nenhum vendedor cadastrado. Cadastre em "Vendedores" na barra lateral.
           </div>
 
-          <div class="bill-card-rel" *ngFor="let c of comissoesPorVendedorCalculadas">
-            <div class="bill-info-rel">
-              <span class="bill-name-rel">{{ c.vendedorName }}</span>
-              <div class="bill-meta-rel">
-                <span class="meta-chip-rel">💰 Vendido: R$ {{ c.totalVendido | number:'1.2-2' }}</span>
+          <div class="vendedor-comissao-card" *ngFor="let c of comissoesPorVendedorCalculadas">
+            <div
+              class="bill-card-rel"
+              [class.clickable]="c.itens.length > 0"
+              (click)="c.itens.length > 0 && alternarItensVendedor(c.vendedorId)"
+            >
+              <div class="bill-info-rel">
+                <span class="bill-name-rel">{{ c.vendedorName }}</span>
+                <div class="bill-meta-rel">
+                  <span class="meta-chip-rel">💰 Vendido: R$ {{ c.totalVendido | number:'1.2-2' }}</span>
+                  <span class="meta-chip-rel" *ngIf="c.itens.length > 0">📦 {{ c.itens.length }} produto(s)</span>
+                </div>
               </div>
+              <span class="bill-valor-rel" style="color: var(--color-success);">R$ {{ c.totalComissao | number:'1.2-2' }}</span>
+              <button
+                type="button"
+                class="btn-expandir-vendedor"
+                *ngIf="c.itens.length > 0"
+                (click)="$event.stopPropagation(); alternarItensVendedor(c.vendedorId)"
+                [attr.aria-expanded]="vendedorItensExpandido(c.vendedorId)"
+              >
+                {{ vendedorItensExpandido(c.vendedorId) ? '▲ Ocultar' : '▼ Ver itens' }}
+              </button>
             </div>
-            <span class="bill-valor-rel" style="color: var(--color-success);">R$ {{ c.totalComissao | number:'1.2-2' }}</span>
+
+            <ul class="pedido-historico-itens vendedor-itens-lista" *ngIf="c.itens.length > 0 && vendedorItensExpandido(c.vendedorId)">
+              <li class="vendedor-item-linha" *ngFor="let item of c.itens">
+                <span class="vendedor-item-nome">{{ item.quantidade }}x {{ item.productName }}</span>
+                <span class="vendedor-item-valores">
+                  <span class="meta-chip-rel">R$ {{ item.totalVendido | number:'1.2-2' }} vendido</span>
+                  <span class="meta-chip-rel">{{ item.percentual | number:'1.0-2' }}%</span>
+                  <span class="meta-chip-rel" style="color: var(--color-success);">R$ {{ item.totalComissao | number:'1.2-2' }} comissão</span>
+                </span>
+              </li>
+            </ul>
           </div>
         </div>
       </div><!-- /reportTab vendedores -->
