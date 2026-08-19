@@ -33,6 +33,7 @@ export class ConfigComponent {
     { key: 'rotas', label: 'Rotas', description: 'Entregas e navegação' },
     { key: 'contas', label: 'Contas', description: 'Contas a pagar' },
     { key: 'compras', label: 'Compras', description: 'Entrada de estoque (sub-módulo do Gestão)', sub: true },
+    { key: 'vendedores', label: 'Vendedores', description: 'Comissão por vendedor (sub-módulo do Gestão)', sub: true },
   ];
 
   async toggleModule(key: keyof ModuleConfig) {

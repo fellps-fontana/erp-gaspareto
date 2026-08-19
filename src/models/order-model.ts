@@ -46,4 +46,7 @@ export interface Order {
   customerId?: string;
   addressLat?: number;
   addressLng?: number;
+
+  vendedorId?: string;   // Opcional — pedido pode ficar sem vendedor (regra-de-negocio.md seção 5.2)
+  vendedorName?: string; // Snapshot do nome no momento do vínculo
 }

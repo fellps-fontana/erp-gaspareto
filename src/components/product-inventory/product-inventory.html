@@ -19,6 +19,9 @@
       <button *ngIf="config.modules().compras" [class.active]="activeTab === 'compras'" (click)="activeTab = 'compras'">
         🛒 Compras
       </button>
+      <button *ngIf="config.modules().vendedores" [class.active]="activeTab === 'vendedores'" (click)="activeTab = 'vendedores'">
+        🧑‍💼 Vendedores
+      </button>
       <button [class.active]="activeTab === 'historico'" (click)="activeTab = 'historico'">
         🧾 Histórico
       </button>
@@ -41,6 +44,7 @@
         <button [class.active]="reportTab === 'vendas'" (click)="reportTab = 'vendas'">📊 Vendas</button>
         <button [class.active]="reportTab === 'contas'" (click)="reportTab = 'contas'">💸 Contas a Pagar</button>
         <button [class.active]="reportTab === 'balanco'" (click)="reportTab = 'balanco'">⚖️ Balanço</button>
+        <button *ngIf="config.modules().vendedores" [class.active]="reportTab === 'vendedores'" (click)="reportTab = 'vendedores'; atualizarComissoesVendedores()">🧑‍💼 Vendedores</button>
       </div>
 
       <!-- ===================== ABA VENDAS ===================== -->
@@ -307,6 +311,77 @@
         </div>
 
       </div><!-- /reportTab balanco -->
+
+      <!-- ===================== ABA VENDEDORES (COMISSÃO) ===================== -->
+      <div *ngIf="reportTab === 'vendedores' && config.modules().vendedores" class="tab-vendedores">
+
+        <!-- Filtro de período (mini) -->
+        <div class="filtros-dashboard card-base">
+          <div class="filter-row main-filters">
+            <div class="date-presets">
+              <button class="btn-preset" (click)="setPreset('hoje')">Hoje</button>
+              <button class="btn-preset" (click)="setPreset('7dias')">7 Dias</button>
+              <button class="btn-preset" (click)="setPreset('mes')">Este Mês</button>
+              <button class="btn-preset" (click)="setPreset('mesAnterior')">Mês Passado</button>
+            </div>
+            <div class="custom-dates">
+              <input type="date" [(ngModel)]="filtroDataInicio" (change)="atualizarComissoesVendedores()">
+              <span>até</span>
+              <input type="date" [(ngModel)]="filtroDataFim" (change)="atualizarComissoesVendedores()">
+            </div>
+            <div class="filter-actions">
+              <button class="btn-dashboard-action primary" (click)="atualizarComissoesVendedores()">
+                <span>🔍</span> FILTRAR
+              </button>
+              <button class="btn-dashboard-action secondary" (click)="limparFiltros()">LIMPAR</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LISTA DE COMISSÕES POR VENDEDOR -->
+        <div class="compra-produtos-lista">
+          <div class="clientes-vazio" *ngIf="vendedores.length === 0">
+            Nenhum vendedor cadastrado. Cadastre em "Vendedores" na barra lateral.
+          </div>
+
+          <div class="vendedor-comissao-card" *ngFor="let c of comissoesPorVendedorCalculadas">
+            <div
+              class="bill-card-rel"
+              [class.clickable]="c.itens.length > 0"
+              (click)="c.itens.length > 0 && alternarItensVendedor(c.vendedorId)"
+            >
+              <div class="bill-info-rel">
+                <span class="bill-name-rel">{{ c.vendedorName }}</span>
+                <div class="bill-meta-rel">
+                  <span class="meta-chip-rel">💰 Vendido: R$ {{ c.totalVendido | number:'1.2-2' }}</span>
+                  <span class="meta-chip-rel" *ngIf="c.itens.length > 0">📦 {{ c.itens.length }} produto(s)</span>
+                </div>
+              </div>
+              <span class="bill-valor-rel" style="color: var(--color-success);">R$ {{ c.totalComissao | number:'1.2-2' }}</span>
+              <button
+                type="button"
+                class="btn-expandir-vendedor"
+                *ngIf="c.itens.length > 0"
+                (click)="$event.stopPropagation(); alternarItensVendedor(c.vendedorId)"
+                [attr.aria-expanded]="vendedorItensExpandido(c.vendedorId)"
+              >
+                {{ vendedorItensExpandido(c.vendedorId) ? '▲ Ocultar' : '▼ Ver itens' }}
+              </button>
+            </div>
+
+            <ul class="pedido-historico-itens vendedor-itens-lista" *ngIf="c.itens.length > 0 && vendedorItensExpandido(c.vendedorId)">
+              <li class="vendedor-item-linha" *ngFor="let item of c.itens">
+                <span class="vendedor-item-nome">{{ item.quantidade }}x {{ item.productName }}</span>
+                <span class="vendedor-item-valores">
+                  <span class="meta-chip-rel">R$ {{ item.totalVendido | number:'1.2-2' }} vendido</span>
+                  <span class="meta-chip-rel">{{ item.percentual | number:'1.0-2' }}%</span>
+                  <span class="meta-chip-rel" style="color: var(--color-success);">R$ {{ item.totalComissao | number:'1.2-2' }} comissão</span>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div><!-- /reportTab vendedores -->
 
     </section>
 
@@ -607,6 +682,70 @@
 
     </section>
 
+    <!-- ABA VENDEDORES -->
+    <section *ngIf="activeTab === 'vendedores'" class="painel-estoque">
+
+      <div class="header-estoque">
+        <h1>Vendedores</h1>
+        <button class="btn-novo" (click)="abrirNovoVendedor()" *ngIf="!exibirFormularioVendedor">+ Novo Vendedor</button>
+      </div>
+
+      <!-- FORMULÁRIO -->
+      <div class="form-box modal-inline" *ngIf="exibirFormularioVendedor">
+        <button class="btn-cancelar" (click)="fecharFormularioVendedor()">⬅ Voltar para a lista</button>
+        <h2>{{ vendedorEmEdicao ? 'Editar Vendedor' : 'Novo Vendedor' }}</h2>
+
+        <div class="row">
+          <div class="form-group" style="flex: 2;">
+            <label>Nome *</label>
+            <input type="text" [(ngModel)]="novoVendedor.name" placeholder="Nome completo">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Comissão por Produto (%)</label>
+          <div class="vendedor-comissoes-lista">
+            <div class="clientes-vazio" *ngIf="products.length === 0">Nenhum produto cadastrado.</div>
+            <div class="vendedor-comissao-row" *ngFor="let p of products">
+              <span class="vendedor-comissao-produto">{{ p.title }}</span>
+              <div class="vendedor-comissao-input">
+                <input type="number" min="0" max="100" step="0.1"
+                  [ngModel]="getPercentualProduto(p.id!)"
+                  (ngModelChange)="setPercentualProduto(p.id!, $event)">
+                <span>%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-salvar" (click)="salvarVendedor()">✅ SALVAR</button>
+      </div>
+
+      <!-- LISTA -->
+      <div class="clientes-grid" *ngIf="!exibirFormularioVendedor">
+        <div *ngIf="vendedores.length === 0" class="clientes-vazio">
+          Nenhum vendedor cadastrado.
+        </div>
+
+        <div class="cliente-card" *ngFor="let v of vendedores">
+          <div class="cliente-avatar">{{ v.name.charAt(0).toUpperCase() }}</div>
+
+          <div class="cliente-info">
+            <span class="cliente-nome">{{ v.name }}</span>
+            <div class="cliente-meta">
+              <span class="meta-badge">🏷️ {{ v.comissoes.length }} produto(s) com comissão</span>
+            </div>
+          </div>
+
+          <div class="cliente-acoes">
+            <button class="btn-acao edit" (click)="abrirEdicaoVendedor(v)" title="Editar">✏️</button>
+            <button class="btn-acao delete" (click)="openDeleteVendedorModal(v)" title="Excluir">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
     <!-- ===================== ABA HISTÓRICO GERAL ===================== -->
     <section *ngIf="activeTab === 'historico'" class="painel-relatorio">
 
@@ -734,6 +873,23 @@
       <div class="checkout-actions">
         <button class="btn-cancel" (click)="closeDeleteClienteModal()">CANCELAR</button>
         <button class="btn-confirm danger" (click)="confirmDeleteCliente()">SIM, EXCLUIR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE EXCLUSÃO DE VENDEDOR -->
+  <div class="checkout-overlay" *ngIf="isDeleteVendedorModalOpen" (click)="closeDeleteVendedorModal()">
+    <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <div class="modal-icon-header warning">⚠️</div>
+      <h2>Excluir Vendedor?</h2>
+      <div class="delete-info" *ngIf="vendedorToDelete">
+        <p>Você está prestes a excluir:</p>
+        <strong>{{ vendedorToDelete.name }}</strong>
+        <p class="warning-text">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="checkout-actions">
+        <button class="btn-cancel" (click)="closeDeleteVendedorModal()">CANCELAR</button>
+        <button class="btn-confirm danger" (click)="confirmDeleteVendedor()">SIM, EXCLUIR</button>
       </div>
     </div>
   </div>

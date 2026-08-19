@@ -554,6 +554,70 @@ h1 {
   white-space: nowrap;
 }
 
+/* Card de comissão por vendedor (sub-aba Vendedores) — envelope do .bill-card-rel
+   existente + lista expansível dos itens vendidos naquele período. */
+.vendedor-comissao-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.bill-card-rel.clickable {
+  cursor: pointer;
+}
+
+.btn-expandir-vendedor {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: 0.2s;
+  white-space: nowrap;
+}
+
+.btn-expandir-vendedor:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.vendedor-itens-lista {
+  margin: -1px 0 0;
+  padding: 0.6rem 18px 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+.vendedor-item-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.3rem 0;
+}
+
+.vendedor-item-linha:not(:last-child) {
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.vendedor-item-nome {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.vendedor-item-valores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
 .status-chip-rel {
   display: inline-flex;
   align-items: center;
@@ -1487,6 +1551,56 @@ input[type="color"] {
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin-bottom: 1rem;
+}
+
+/* --- VENDEDORES: tabela de comissão por produto no formulário --- */
+.vendedor-comissoes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: var(--bg-muted);
+}
+
+.vendedor-comissao-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.vendedor-comissao-produto {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vendedor-comissao-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vendedor-comissao-input input {
+  width: 72px;
+  padding: 6px 8px;
+  text-align: right;
+}
+
+.vendedor-comissao-input span {
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 /* ==========================================================

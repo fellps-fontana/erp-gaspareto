@@ -71,6 +71,7 @@
 
       <div class="card-body-styled">
         <h3 class="customer-name">{{ order.customerName }}</h3>
+        <span class="vendedor-tag" *ngIf="order.vendedorName">🧑‍💼 {{ order.vendedorName }}</span>
 
         <div class="scheduled-date-badge" *ngIf="order.scheduledDate && order.status !== 'delivered' && order.status !== 'finished'">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -272,6 +273,14 @@
             </button>
           </div>
 
+          <div class="freight-row" *ngIf="config.modules().vendedores">
+            <label>Vendedor:</label>
+            <select [(ngModel)]="selectedVendedorId">
+              <option [ngValue]="null">Nenhum (opcional)</option>
+              <option *ngFor="let v of vendedores" [ngValue]="v.id">{{ v.name }}</option>
+            </select>
+          </div>
+
           <div class="obs-row">
             <textarea [(ngModel)]="observations" placeholder="Observações (Opcional)" rows="2"></textarea>
           </div>
@@ -390,6 +399,7 @@
         <div class="detail-header-section">
           <div class="customer-info">
             <h2>{{ selectedOrderDetails.customerName }}</h2>
+            <span class="vendedor-tag" *ngIf="selectedOrderDetails.vendedorName">🧑‍💼 {{ selectedOrderDetails.vendedorName }}</span>
             <div class="phone-row" *ngIf="selectedOrderDetails.customerPhone">
               <span class="phone">{{ selectedOrderDetails.customerPhone }}</span>
               <button class="btn-whatsapp" (click)="openWhatsApp(selectedOrderDetails.customerPhone!)"

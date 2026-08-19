@@ -536,4 +536,92 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
       });
     });
   });
+
+  describe('Cobertura de colecao vendedores - operacional multi-tenant', () => {
+    describe('Leitura cross-tenant vendedores (deve ser NEGADA)', () => {
+      it('usuario de company A nao pode ler doc de company B em vendedores', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const docRef = doc(contextCompanyB.firestore(), 'vendedores', 'vendedor-001');
+        await setDoc(docRef, {
+          name: 'Vendedor B',
+          companyId: 'company-b',
+          comissoes: [],
+        });
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const readRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-001');
+        await assertFails(getDoc(readRef));
+      });
+    });
+
+    describe('Escrita cross-tenant vendedores (deve ser NEGADA)', () => {
+      it('usuario de company A nao pode escrever doc com companyId diferente em vendedores', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const docRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-cross');
+        await assertFails(
+          setDoc(docRef, {
+            name: 'Vendedor Cross',
+            companyId: 'company-b',
+            comissoes: [],
+          })
+        );
+      });
+    });
+
+    describe('Leitura same-tenant vendedores (deve ser PERMITIDA)', () => {
+      it('usuario de company A pode ler doc de company A em vendedores', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const docRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-001');
+        await assertSucceeds(
+          setDoc(docRef, {
+            name: 'Vendedor A',
+            companyId: 'company-a',
+            comissoes: [],
+          })
+        );
+
+        const readRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-001');
+        const result = await assertSucceeds(getDoc(readRef));
+        expect(result.exists()).toBe(true);
+      });
+    });
+
+    describe('Escrita same-tenant vendedores (deve ser PERMITIDA)', () => {
+      it('usuario de company A pode criar doc em vendedores com seu companyId', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const docRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-001');
+        await assertSucceeds(
+          setDoc(docRef, {
+            name: 'Vendedor A',
+            companyId: 'company-a',
+            comissoes: [],
+          })
+        );
+      });
+
+      it('usuario de company A pode atualizar doc de company A em vendedores', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const docRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-001');
+        await setDoc(docRef, {
+          name: 'Vendedor A',
+          companyId: 'company-a',
+          comissoes: [],
+        });
+
+        const updateRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-001');
+        await assertSucceeds(updateDoc(updateRef, { name: 'Vendedor A Atualizado' }));
+      });
+    });
+  });
 });
