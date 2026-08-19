@@ -44,7 +44,7 @@
         <button [class.active]="reportTab === 'vendas'" (click)="reportTab = 'vendas'">📊 Vendas</button>
         <button [class.active]="reportTab === 'contas'" (click)="reportTab = 'contas'">💸 Contas a Pagar</button>
         <button [class.active]="reportTab === 'balanco'" (click)="reportTab = 'balanco'">⚖️ Balanço</button>
-        <button *ngIf="config.modules().vendedores" [class.active]="reportTab === 'vendedores'" (click)="reportTab = 'vendedores'">🧑‍💼 Vendedores</button>
+        <button *ngIf="config.modules().vendedores" [class.active]="reportTab === 'vendedores'" (click)="reportTab = 'vendedores'; atualizarComissoesVendedores()">🧑‍💼 Vendedores</button>
       </div>
 
       <!-- ===================== ABA VENDAS ===================== -->
@@ -325,11 +325,14 @@
               <button class="btn-preset" (click)="setPreset('mesAnterior')">Mês Passado</button>
             </div>
             <div class="custom-dates">
-              <input type="date" [(ngModel)]="filtroDataInicio">
+              <input type="date" [(ngModel)]="filtroDataInicio" (change)="atualizarComissoesVendedores()">
               <span>até</span>
-              <input type="date" [(ngModel)]="filtroDataFim">
+              <input type="date" [(ngModel)]="filtroDataFim" (change)="atualizarComissoesVendedores()">
             </div>
             <div class="filter-actions">
+              <button class="btn-dashboard-action primary" (click)="atualizarComissoesVendedores()">
+                <span>🔍</span> FILTRAR
+              </button>
               <button class="btn-dashboard-action secondary" (click)="limparFiltros()">LIMPAR</button>
             </div>
           </div>
@@ -341,7 +344,7 @@
             Nenhum vendedor cadastrado. Cadastre em "Vendedores" na barra lateral.
           </div>
 
-          <div class="bill-card-rel" *ngFor="let c of comissoesPorVendedor">
+          <div class="bill-card-rel" *ngFor="let c of comissoesPorVendedorCalculadas">
             <div class="bill-info-rel">
               <span class="bill-name-rel">{{ c.vendedorName }}</span>
               <div class="bill-meta-rel">
