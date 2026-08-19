@@ -15,7 +15,7 @@ Table companies {
   document      string    [null]
   plan          string    [note: 'trial | basic | pro']
   status        string    [note: 'active | suspended | canceled']
-  modules       json      [note: 'ModuleConfig: pdv, pedidos, gestao, rotas, contas, clientes, compras (booleans) — substitui o doc único config/company']
+  modules       json      [note: 'ModuleConfig: pdv, pedidos, gestao, rotas, contas, clientes, compras, vendedores (booleans) — substitui o doc único config/company']
   createdAt     timestamp
 }
 
@@ -55,6 +55,13 @@ Table customers {
   lng           number    [null]
 }
 
+Table vendedores {
+  id            string    [pk, note: 'doc id gerado pelo Firestore']
+  companyId     string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
+  name          string
+  comissoes     json      [note: 'array de VendedorComissaoItem embutido: idProduct, percentual (0-100) — produto do catálogo sem entrada aqui = 0% de comissão']
+}
+
 Table sales {
   id             string    [pk]
   companyId      string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
@@ -74,6 +81,8 @@ Table orders {
   customerName          string
   customerPhone         string    [null]
   customerId            string    [null, ref: > customers.id]
+  vendedorId            string    [null, ref: > vendedores.id, note: 'opcional — pedido pode ser criado/editado/finalizado sem vendedor']
+  vendedorName          string    [null, note: 'snapshot do nome do vendedor no momento do vínculo']
   items                 json      [note: 'array de OrderItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
   itemsTotal            number
   shippingCost          number

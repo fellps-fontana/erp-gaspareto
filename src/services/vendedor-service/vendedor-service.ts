@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc, query, where, orderBy
+  collection, doc, addDoc, updateDoc, deleteDoc, query, where
 } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -31,10 +31,7 @@ export class VendedorService extends FirestoreBaseService {
   async addVendedor(vendedor: Omit<Vendedor, 'id' | 'companyId'>) {
     const companyId = this.tenantService.companyId();
     if (!companyId) {
-      throw new Error(
-        'Não é possível adicionar vendedor sem uma empresa (companyId) ' +
-        'associada à sessão atual.'
-      );
+      throw new Error('Não é possível adicionar vendedor sem empresa associada à sessão.');
     }
     return addDoc(collection(this.firestore, this.COLLECTION), {
       ...vendedor,
@@ -50,34 +47,45 @@ export class VendedorService extends FirestoreBaseService {
     return deleteDoc(doc(this.firestore, `${this.COLLECTION}/${id}`));
   }
 
-  static calculateComissaoVendedor(orders: Order[], vendedor: Vendedor): ComissaoVendedorResultado {
+  static calculateComissaoVendedor(
+    orders: Order[],
+    vendedor: Vendedor
+  ): ComissaoVendedorResultado {
+    // Guard: se o vendedor não tem ID, retorna zerado — nunca processa orders
+    if (!vendedor.id) {
+      return {
+        vendedorId: vendedor.id ?? '',
+        vendedorName: vendedor.name,
+        totalVendido: 0,
+        totalComissao: 0
+      };
+    }
+
     let totalVendido = 0;
     let totalComissao = 0;
 
-    for (const order of orders) {
-      // Filtra: status DEVE ser 'finished' E vendedorId DEVE ser o do vendedor
+    orders.forEach(order => {
       if (order.status !== 'finished' || order.vendedorId !== vendedor.id) {
-        continue;
+        return;
       }
 
-      // Processa cada item do pedido qualificado
-      for (const item of order.items) {
-        // vendidoItem = priceAtSale * quantity
+      order.items.forEach(item => {
         const vendidoItem = item.priceAtSale * item.quantity;
+        const configComissao = vendedor.comissoes.find(
+          c => c.idProduct === item.idProduct
+        );
+
         totalVendido += vendidoItem;
 
-        // Busca percentual cadastrado para o produto ou 0 se ausente
-        const comissaoItem = vendedor.comissoes.find(c => c.idProduct === item.idProduct);
-        const percentual = comissaoItem ? comissaoItem.percentual : 0;
-
-        // comissaoItem = vendidoItem * percentual / 100
-        const comissao = vendidoItem * percentual / 100;
-        totalComissao += comissao;
-      }
-    }
+        if (configComissao) {
+          const comissaoItem = (vendidoItem * configComissao.percentual) / 100;
+          totalComissao += comissaoItem;
+        }
+      });
+    });
 
     return {
-      vendedorId: vendedor.id!,
+      vendedorId: vendedor.id,
       vendedorName: vendedor.name,
       totalVendido,
       totalComissao

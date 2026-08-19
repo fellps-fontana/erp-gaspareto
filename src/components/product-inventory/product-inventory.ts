@@ -13,6 +13,7 @@ import { Customer } from '../../models/customer-model';
 import { Bill } from '../../models/bill-model';
 import { PurchaseProduct } from '../../models/purchase-product-model';
 import { Order } from '../../models/order-model';
+import { Vendedor, ComissaoVendedorResultado } from '../../models/vendedor-model';
 import { PaymentMethod, PAYMENT_METHOD_LABELS } from '../../models/sell-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
@@ -23,6 +24,7 @@ import { PurchaseProductService } from '../../services/purchase-product-service/
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { ConfigService } from '../../services/config/config.service';
 import { OrderService } from '../../services/order-service/order-service';
+import { VendedorService } from '../../services/vendedor-service/vendedor-service';
 import { ComandaService } from '../../services/comanda-service/comanda-service';
 import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
 import { MapPickerComponent } from '../map-picker/map-picker';
@@ -56,8 +58,8 @@ export class ProductInventoryComponent implements OnInit {
   private geocodingService = inject(GeocodingService);
 
   // Controle das Abas
-  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' = 'relatorio';
-  reportTab: 'vendas' | 'contas' | 'balanco' = 'vendas';
+  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' | 'vendedores' = 'relatorio';
+  reportTab: 'vendas' | 'contas' | 'balanco' | 'vendedores' = 'vendas';
 
   // Controle de Visualização do Formulário
   exibirFormularioNovo: boolean = false;
@@ -142,6 +144,15 @@ export class ProductInventoryComponent implements OnInit {
   clienteHistorico: Customer | null = null;
   pedidosCliente$: Observable<Order[]> = of([]);
 
+  // --- VENDEDORES (CRUD + comissão) ---
+  vendedores: Vendedor[] = [];
+  orders: Order[] = []; // usado pelo cálculo de comissão da sub-aba Vendedores (Dashboard)
+  vendedorEmEdicao: Vendedor | null = null;
+  exibirFormularioVendedor: boolean = false;
+  novoVendedor: Omit<Vendedor, 'id' | 'companyId'> = { name: '', comissoes: [] };
+  isDeleteVendedorModalOpen: boolean = false;
+  vendedorToDelete: Vendedor | null = null;
+
   // --- HISTÓRICO GERAL (aba própria em Gestão) ---
   historicoItems: HistoricoItem[] = [];
   historicoCarregando = true;
@@ -187,15 +198,20 @@ export class ProductInventoryComponent implements OnInit {
     private purchaseProductService: PurchaseProductService,
     private orderService: OrderService,
     private comandaService: ComandaService,
+    private vendedorService: VendedorService,
     private notif: NotificationService
   ) { }
 
   ngOnInit() {
-    // 0. Se a aba ativa for de um módulo desativado, volta para o relatório
+    // 0. Se a aba/sub-aba ativa for de um módulo desativado, volta para o relatório
     this.config.modules$.subscribe(m => {
       if ((this.activeTab === 'clientes' && !m.clientes) ||
-          (this.activeTab === 'compras' && !m.compras)) {
+          (this.activeTab === 'compras' && !m.compras) ||
+          (this.activeTab === 'vendedores' && !m.vendedores)) {
         this.activeTab = 'relatorio';
+      }
+      if (this.reportTab === 'vendedores' && !m.vendedores) {
+        this.reportTab = 'vendas';
       }
     });
 
@@ -236,6 +252,16 @@ export class ProductInventoryComponent implements OnInit {
     ]).subscribe(([vendas, pedidos, comandas]) => {
       this.historicoItems = this.montarHistorico(vendas, pedidos, comandas);
       this.historicoCarregando = false;
+    });
+
+    // 8. Carrega vendedores em tempo real
+    this.vendedorService.getVendedores().subscribe(data => {
+      this.vendedores = data;
+    });
+
+    // 9. Carrega pedidos em tempo real (usado no cálculo de comissão por vendedor)
+    this.orderService.getOrders().subscribe(data => {
+      this.orders = data;
     });
   }
 
@@ -1071,6 +1097,108 @@ export class ProductInventoryComponent implements OnInit {
 
   recurrenceLabel(period?: 'weekly' | 'monthly'): string {
     return period === 'weekly' ? 'Semanal' : period === 'monthly' ? 'Mensal' : '';
+  }
+
+  // ==========================================================
+  // ABA VENDEDORES (cadastro + sub-aba de comissão no relatório)
+  // ==========================================================
+
+  abrirNovoVendedor() {
+    this.vendedorEmEdicao = null;
+    this.novoVendedor = { name: '', comissoes: [] };
+    this.exibirFormularioVendedor = true;
+  }
+
+  abrirEdicaoVendedor(v: Vendedor) {
+    this.vendedorEmEdicao = v;
+    this.novoVendedor = { name: v.name, comissoes: v.comissoes.map(c => ({ ...c })) };
+    this.exibirFormularioVendedor = true;
+  }
+
+  fecharFormularioVendedor() {
+    this.exibirFormularioVendedor = false;
+    this.vendedorEmEdicao = null;
+  }
+
+  /** Percentual cadastrado para um produto no vendedor em edição — 0 se ausente da lista. */
+  getPercentualProduto(idProduct: string): number {
+    const item = this.novoVendedor.comissoes.find(c => c.idProduct === idProduct);
+    return item ? item.percentual : 0;
+  }
+
+  /** Grava/remove o percentual de um produto no formulário de vendedor em edição. */
+  setPercentualProduto(idProduct: string, value: number | string) {
+    const percentual = Math.min(100, Math.max(0, Number(value) || 0));
+    const idx = this.novoVendedor.comissoes.findIndex(c => c.idProduct === idProduct);
+    if (percentual === 0) {
+      if (idx > -1) this.novoVendedor.comissoes.splice(idx, 1);
+    } else if (idx > -1) {
+      this.novoVendedor.comissoes[idx].percentual = percentual;
+    } else {
+      this.novoVendedor.comissoes.push({ idProduct, percentual });
+    }
+  }
+
+  async salvarVendedor() {
+    if (!this.novoVendedor.name?.trim()) {
+      this.notif.warning('O nome do vendedor é obrigatório! ⚠️');
+      return;
+    }
+    const data: Omit<Vendedor, 'id' | 'companyId'> = {
+      name: this.novoVendedor.name.trim(),
+      comissoes: this.novoVendedor.comissoes
+    };
+    try {
+      if (this.vendedorEmEdicao?.id) {
+        await this.vendedorService.updateVendedor(this.vendedorEmEdicao.id, data);
+        this.notif.success('Vendedor atualizado! ✅');
+      } else {
+        await this.vendedorService.addVendedor(data);
+        this.notif.success('Vendedor cadastrado! ✨');
+      }
+      this.fecharFormularioVendedor();
+    } catch {
+      this.notif.error('Erro ao salvar vendedor. ❌');
+    }
+  }
+
+  openDeleteVendedorModal(v: Vendedor) {
+    this.vendedorToDelete = v;
+    this.isDeleteVendedorModalOpen = true;
+  }
+
+  closeDeleteVendedorModal() {
+    this.isDeleteVendedorModalOpen = false;
+    this.vendedorToDelete = null;
+  }
+
+  async confirmDeleteVendedor() {
+    if (!this.vendedorToDelete?.id) return;
+    try {
+      await this.vendedorService.deleteVendedor(this.vendedorToDelete.id);
+      this.notif.success('Vendedor removido! 🗑️');
+      this.closeDeleteVendedorModal();
+    } catch {
+      this.notif.error('Erro ao excluir vendedor. ❌');
+    }
+  }
+
+  /** Pedidos finalizados (status 'finished') cujo fechamento caiu dentro do período filtrado — mesmo par de datas usado nas outras sub-abas do relatório. */
+  get pedidosFinalizadosNoPeriodo(): Order[] {
+    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
+    const fim = new Date(this.filtroDataFim + 'T23:59:59');
+    return this.orders
+      .filter(o => o.status === 'finished' && o.closingDate)
+      .filter(o => {
+        const d = (o.closingDate as any)?.toDate ? (o.closingDate as any).toDate() : new Date(o.closingDate as any);
+        return d >= inicio && d <= fim;
+      });
+  }
+
+  /** Total vendido/comissão a pagar por vendedor no período — delega o cálculo ao método estático já testado do VendedorService. */
+  get comissoesPorVendedor(): ComissaoVendedorResultado[] {
+    const pedidos = this.pedidosFinalizadosNoPeriodo;
+    return this.vendedores.map(v => VendedorService.calculateComissaoVendedor(pedidos, v));
   }
 
   // No seu ProductInventoryComponent
