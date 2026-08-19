@@ -144,6 +144,43 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   itens de PDV/Comanda simplesmente não aparecem, mesmo que sejam do mesmo
   cliente na prática (comanda guarda só `customerName` livre, sem `id`).
 
+## 5.2 Vendedores (`vendedores`) — [CRÍTICA]
+
+- **Model `Vendedor`**: `{ id?, companyId, name, comissoes: VendedorComissaoItem[] }`,
+  onde `VendedorComissaoItem = { idProduct, percentual }` (`percentual` entre
+  0 e 100). Produto do catálogo sem entrada correspondente em `comissoes` =
+  0%/sem comissão nesse produto. Sem campo de status/ativo — segue o
+  precedente de `Product` (seção 2): exclusão é real via `deleteDoc`, não
+  soft-delete.
+- **Vínculo no pedido**: `Order.vendedorId?` e `Order.vendedorName?`
+  (snapshot do nome no momento do vínculo), ambos **opcionais** — um pedido
+  pode ser criado, editado e finalizado sem vendedor associado.
+- **Módulo `vendedores` em `ModuleConfig`** (seção 11): sub-módulo de
+  `gestao`, no mesmo nível de `compras`/`clientes` quanto à ligação/
+  desligamento — mas **não obrigatório** (ao contrário de `clientes`), pode
+  ser desativado livremente em Configurações, mesmo padrão de `compras`.
+  Quando desligado: a aba de cadastro de Vendedores some do Gestão, a
+  sub-aba Vendedores some do Dashboard/Relatório, e o campo de seleção de
+  vendedor **some** da tela de Pedido (não fica só desabilitado — não deve
+  renderizar).
+- **Cálculo de comissão a pagar**
+  (`VendedorService.calculateComissaoVendedor(orders: Order[], vendedor:
+  Vendedor): ComissaoVendedorResultado`, método estático): filtra
+  internamente por `order.status === 'finished'` **e** `order.vendedorId
+  === vendedor.id` — não confia que o caller já filtrou, por ser cálculo de
+  dinheiro a pagar. Por item qualificado: `vendidoItem = item.priceAtSale *
+  item.quantity`; `percentualItem` = percentual cadastrado para
+  `item.idProduct` no vendedor, ou `0` se ausente; `comissaoItem =
+  vendidoItem * percentualItem / 100`. `totalVendido` = soma de
+  `vendidoItem` de todos os itens qualificados — **exclui `shippingCost`**
+  (frete nunca entra na base de cálculo de comissão, decisão fechada com o
+  usuário). `totalComissao` = soma de `comissaoItem`.
+- **UI**: cadastro de vendedor e sub-aba "Vendedores" vivem dentro de
+  `product-inventory.ts`/`.html` (mesmo componente de Gestão, não um
+  componente novo) — uma aba de CRUD (`activeTab`) e uma sub-aba de
+  relatório (`reportTab`) exibindo `totalVendido`/`totalComissao` por
+  vendedor no período filtrado.
+
 ## 6. Rotas de entrega
 
 - Consome pedidos pendentes/ativos (`OrderService.getPendingOrders`, status em

@@ -7,11 +7,14 @@ import { Observable, map, catchError, of, Subscription } from 'rxjs';
 import { Product } from '../../models/product-model';
 import { Order, OrderItem } from '../../models/order-model';
 import { Customer } from '../../models/customer-model';
+import { Vendedor } from '../../models/vendedor-model';
 import { PaymentMethod } from '../../models/sell-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { OrderService } from '../../services/order-service/order-service';
 import { CustomerService } from '../../services/customer-service/customer-service';
+import { VendedorService } from '../../services/vendedor-service/vendedor-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
+import { ConfigService } from '../../services/config/config.service';
 import { Timestamp } from 'firebase/firestore';
 
 @Component({
@@ -25,8 +28,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
   private productService  = inject(ProductService);
   private orderService    = inject(OrderService);
   private customerService = inject(CustomerService);
+  private vendedorService = inject(VendedorService);
   private router          = inject(Router);
   private notif           = inject(NotificationService);
+  readonly config         = inject(ConfigService);
 
   // ── STREAMS ──────────────────────────────────────────────────────
   products$!: Observable<Product[]>;
@@ -74,6 +79,15 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   private allCustomers: Customer[] = [];
   private customerSub?: Subscription;
+
+  // ── VENDEDOR (opcional — regra-de-negocio.md seção 5.2) ────────────
+  vendedores: Vendedor[] = [];
+  selectedVendedorId: string | null = null;
+  private vendedorSub?: Subscription;
+
+  get selectedVendedorName(): string {
+    return this.vendedores.find(v => v.id === this.selectedVendedorId)?.name ?? '';
+  }
 
   get matchingCustomers(): Customer[] {
     const term = this.customerSearch.trim().toLowerCase();
@@ -126,10 +140,14 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.customerSub = this.customerService.getCustomers().subscribe(
       customers => this.allCustomers = customers
     );
+    this.vendedorSub = this.vendedorService.getVendedores().subscribe(
+      vendedores => this.vendedores = vendedores
+    );
   }
 
   ngOnDestroy() {
     this.customerSub?.unsubscribe();
+    this.vendedorSub?.unsubscribe();
   }
 
   loadData() {
@@ -265,6 +283,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.shippingCost         = order.shippingCost ?? 0;
     this.observations         = order.observations ?? '';
     this.scheduledDate        = this.toDateInputValue(order.scheduledDate);
+    this.selectedVendedorId   = order.vendedorId ?? null;
     this.cart                 = [...order.items];
     this.isNewOrderOpen       = true;
   }
@@ -353,7 +372,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
           : {}),
         ...(this.selectedCustomerId ? { customerId: this.selectedCustomerId } : {}),
         ...(this.addressLat != null ? { addressLat: this.addressLat } : {}),
-        ...(this.addressLng != null ? { addressLng: this.addressLng } : {})
+        ...(this.addressLng != null ? { addressLng: this.addressLng } : {}),
+        ...(this.selectedVendedorId
+          ? { vendedorId: this.selectedVendedorId, vendedorName: this.selectedVendedorName }
+          : {})
       };
 
       if (this.editingOrderId) {
@@ -390,6 +412,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.deliveryType         = 'pickup';
     this.observations         = '';
     this.scheduledDate        = '';
+    this.selectedVendedorId   = null;
     this.editingOrderId       = null;
   }
 

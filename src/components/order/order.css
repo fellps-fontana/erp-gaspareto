@@ -755,6 +755,22 @@ textarea:focus {
   outline: none;
 }
 
+.freight-row select {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  width: 100%;
+  padding: 8px 10px;
+}
+
+.freight-row select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
 .schedule-row {
   display: flex;
   align-items: center;

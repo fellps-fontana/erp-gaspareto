@@ -272,6 +272,14 @@
             </button>
           </div>
 
+          <div class="freight-row" *ngIf="config.modules().vendedores">
+            <label>Vendedor:</label>
+            <select [(ngModel)]="selectedVendedorId">
+              <option [ngValue]="null">Nenhum (opcional)</option>
+              <option *ngFor="let v of vendedores" [ngValue]="v.id">{{ v.name }}</option>
+            </select>
+          </div>
+
           <div class="obs-row">
             <textarea [(ngModel)]="observations" placeholder="Observações (Opcional)" rows="2"></textarea>
           </div>
