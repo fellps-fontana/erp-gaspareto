@@ -92,3 +92,14 @@ Resumo:
   já tinha a versão final corrigida antes de commitar de novo. Trabalho
   fechado numa branch `feature/vendedores` dedicada, criada a partir do
   estado final, para não deixar o incidente no histórico de `main`.
+- **Bug pós-deploy corrigido em 2026-08-19**: usuário reportou travamento
+  total do sistema ao clicar em Vendedores. Causa: `comissoesPorVendedor`
+  era um getter ligado direto no `*ngFor` do template, recalculado a cada
+  ciclo de change detection do Angular — filtrava todos os pedidos
+  carregados e rodava `calculateComissaoVendedor` por vendedor a cada tick,
+  travando a thread de renderização com volume real de dados. Corrigido
+  alinhando ao padrão já usado por vendas/contas/balanço: cálculo sob
+  demanda (`atualizarComissoesVendedores()`), guardado em campo do
+  componente, recalculado ao entrar na sub-aba ou mudar o filtro de data.
+  Lógica de cálculo em si (`VendedorService.calculateComissaoVendedor`) não
+  foi alterada — bug era de arquitetura de UI, não de regra de negócio.
