@@ -75,6 +75,20 @@ Resumo:
   Firestore de verdade). Ambos corrigidos e revalidados antes da aprovação
   final.
 
+## Extensão: quebra por produto no relatório (2026-08-19)
+
+Usuário pediu pra ver, no relatório de comissão, também o que cada
+vendedor vendeu — não só o total agregado. `ComissaoVendedorResultado`
+ganhou o campo `itens: VendedorItemVendidoResultado[]` (produto, quantidade,
+valor vendido, comissão e percentual daquele item), agregado por
+`idProduct` a partir dos mesmos pedidos já qualificados pelo cálculo
+existente (mesma passada, sem duplicar lógica de filtro entre o total geral
+e a quebra por item — ponto que `style` verificou explicitamente por ser
+risco clássico de divergência). Ordenado por valor vendido desc. UI: card
+de vendedor no Dashboard ganhou lista expansível dos itens (estado de UI
+puro, sem recálculo de domínio no template — mesmo cuidado que motivou o
+fix de travamento acima).
+
 ## Lacunas conhecidas / pendências
 
 - Nenhuma pendência de escopo conhecida. Sem seletor de "vendedor ativo/
