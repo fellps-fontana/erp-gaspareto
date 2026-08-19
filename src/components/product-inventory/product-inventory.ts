@@ -147,6 +147,8 @@ export class ProductInventoryComponent implements OnInit {
   // --- VENDEDORES (CRUD + comissão) ---
   vendedores: Vendedor[] = [];
   orders: Order[] = []; // usado pelo cálculo de comissão da sub-aba Vendedores (Dashboard)
+  /** Resultado calculado sob demanda (não getter de template) — ver atualizarComissoesVendedores(). */
+  comissoesPorVendedorCalculadas: ComissaoVendedorResultado[] = [];
   vendedorEmEdicao: Vendedor | null = null;
   exibirFormularioVendedor: boolean = false;
   novoVendedor: Omit<Vendedor, 'id' | 'companyId'> = { name: '', comissoes: [] };
@@ -526,6 +528,9 @@ export class ProductInventoryComponent implements OnInit {
       // Atualiza os gráficos com os dados filtrados
       this.renderCharts(vendas);
     });
+
+    // Atualiza o painel de comissões da sub-aba Vendedores (mesmo período filtrado).
+    this.atualizarComissoesVendedores();
   }
 
   // --- PRESETS DE DATA ---
@@ -1183,8 +1188,8 @@ export class ProductInventoryComponent implements OnInit {
     }
   }
 
-  /** Pedidos finalizados (status 'finished') cujo fechamento caiu dentro do período filtrado — mesmo par de datas usado nas outras sub-abas do relatório. */
-  get pedidosFinalizadosNoPeriodo(): Order[] {
+  /** Pedidos finalizados (status 'finished') cujo fechamento caiu dentro do período filtrado — mesmo par de datas usado nas outras sub-abas do relatório. Helper interno, não mais getter de template (evita recálculo a cada ciclo de change detection). */
+  private pedidosFinalizadosNoPeriodo(): Order[] {
     const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
     const fim = new Date(this.filtroDataFim + 'T23:59:59');
     return this.orders
@@ -1195,10 +1200,17 @@ export class ProductInventoryComponent implements OnInit {
       });
   }
 
-  /** Total vendido/comissão a pagar por vendedor no período — delega o cálculo ao método estático já testado do VendedorService. */
-  get comissoesPorVendedor(): ComissaoVendedorResultado[] {
-    const pedidos = this.pedidosFinalizadosNoPeriodo;
-    return this.vendedores.map(v => VendedorService.calculateComissaoVendedor(pedidos, v));
+  /**
+   * Recalcula o total vendido/comissão a pagar por vendedor no período filtrado e guarda em
+   * `comissoesPorVendedorCalculadas` — calculado sob demanda (entrada na sub-aba, mudança de
+   * filtro de data), nunca como getter ligado direto no template. Delega o cálculo ao método
+   * estático já testado do VendedorService.
+   */
+  atualizarComissoesVendedores() {
+    const pedidos = this.pedidosFinalizadosNoPeriodo();
+    this.comissoesPorVendedorCalculadas = this.vendedores.map(v =>
+      VendedorService.calculateComissaoVendedor(pedidos, v)
+    );
   }
 
   // No seu ProductInventoryComponent
