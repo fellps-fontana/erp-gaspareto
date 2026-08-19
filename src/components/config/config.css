@@ -193,6 +193,16 @@
 }
 
 /* --- RESPONSIVO --- */
+@media (max-width: 768px) {
+  .config-container {
+    padding: 28px 16px;
+  }
+
+  .config-card {
+    padding: 24px 20px;
+  }
+}
+
 @media (max-width: 480px) {
   .config-container {
     padding: 20px 12px;
@@ -206,7 +216,26 @@
     flex-direction: column;
   }
 
+  .module-item {
+    padding: 12px;
+    gap: 10px;
+  }
+
   .module-item--sub {
     margin-left: 12px;
+  }
+
+  .switch {
+    width: 42px;
+    height: 24px;
+  }
+
+  .slider::before {
+    height: 18px;
+    width: 18px;
+  }
+
+  .switch input:checked + .slider::before {
+    transform: translateX(18px);
   }
 }

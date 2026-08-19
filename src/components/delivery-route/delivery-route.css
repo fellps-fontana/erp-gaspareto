@@ -21,6 +21,7 @@
 
 .header-title {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
@@ -248,11 +249,27 @@
 .btn-route-cta:hover { background: #15803d; }
 
 /* ── RESPONSIVE ──────────────────────────── */
+@media (max-width: 768px) {
+  .page-header { padding: 0.85rem 1.25rem; }
+
+  .bottom-cta {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .cta-info { flex: 1 1 100%; }
+
+  .btn-route-cta { width: 100%; }
+}
+
 @media (max-width: 480px) {
   .page-header { padding: 0.75rem 1rem; }
+  .header-title h1 { font-size: 1.05rem; }
   .order-row   { padding: 0.875rem 1rem; }
   .select-bar  { padding: 0.6rem 1rem; }
   .btn-route span { display: none; }
+  .btn-route { padding: 0.5rem 0.75rem; }
+  .bottom-cta { padding: 0.85rem 1rem; }
 }
 
 .loading-slow {

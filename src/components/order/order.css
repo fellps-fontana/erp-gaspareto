@@ -519,6 +519,8 @@
 .item-line {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
 }
 
 .item-qty {
@@ -529,6 +531,7 @@
 
 .item-name {
   flex: 1;
+  min-width: 0;
   color: var(--text-secondary);
 }
 
@@ -1153,4 +1156,79 @@ textarea:focus {
   }
 
   /* Regra de .filters para mobile centralizada em order_mobile.css
-     (evita duas fontes conflitantes de flex-wrap/gap na mesma media query) */}
+     (evita duas fontes conflitantes de flex-wrap/gap na mesma media query) */
+}
+
+/* Celulares pequenos (320–480px) — refinamentos que order_mobile.css
+   (768px) não cobre: modais de pagamento/confirmação, linha de frete/
+   agendamento e grid de produtos do carrinho. */
+@media (max-width: 480px) {
+  .modal-content {
+    padding: 20px;
+  }
+
+  .modal-header h3 {
+    font-size: 1.05rem;
+  }
+
+  .detail-value.big {
+    font-size: 1.15rem;
+  }
+
+  /* Formulário de pagamento (forma + parcelas) e ações do modal —
+     empilhados para caber com folga em telas de 320–375px. */
+  .payment-options {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .payment-form {
+    gap: 12px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+
+  /* Frete e agendamento: label + input + botão não cabem lado a lado
+     em telas muito estreitas — empilha em coluna. */
+  .freight-row,
+  .schedule-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .freight-row input,
+  .schedule-date-input {
+    width: 100%;
+  }
+
+  .schedule-row .btn-calendar {
+    align-self: flex-end;
+  }
+
+  /* Grid de produtos do carrinho: colunas menores para manter 2 por
+     linha em vez de 1 coluna larga e vazia. */
+  .mini-product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+  }
+
+  .mini-card {
+    padding: 10px;
+    height: 85px;
+  }
+
+  .panel-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .qty-input {
+    width: 36px;
+  }
+}

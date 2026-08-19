@@ -227,7 +227,7 @@
 }
 
 /* --- RESPONSIVO --- */
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .super-admin-page {
     padding: 20px 12px;
   }
@@ -242,5 +242,44 @@
 
   .super-admin-header {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .super-admin-page {
+    padding: 16px 8px;
+  }
+
+  .super-admin-card {
+    padding: var(--sp-sm);
+  }
+
+  .super-admin-header h1 {
+    font-size: 1.3rem;
+  }
+
+  .users-table {
+    font-size: 0.78rem;
+  }
+
+  .users-table th,
+  .users-table td {
+    padding: 8px 10px;
+  }
+
+  .role-badge {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+  }
+
+  .btn-sm {
+    padding: 5px 12px;
+    font-size: 0.8rem;
+  }
+
+  .reset-form {
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 100%;
   }
 }

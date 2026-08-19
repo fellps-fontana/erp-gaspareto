@@ -167,6 +167,15 @@
     min-width: 0;
     width: 100%;
   }
+
+  /* Texto do link é longo ("Administrador da plataforma") e usa
+     white-space: nowrap no layout padrão (linha única, cabe ao lado dos
+     outros itens). Em coluna, permite quebrar para não forçar scroll
+     horizontal do body. */
+  .super-admin-banner__link {
+    white-space: normal;
+    text-align: center;
+  }
 }
 
 /* Cabeçalho */
@@ -475,9 +484,11 @@
 }
 
 /* --- RESPONSIVIDADE --- */
+/* Breakpoints padronizados do projeto: 768px (tablet/mobile grande) e
+   480px (celular) — ver identidade-visual.md / stack.md. */
 
 /* Tablet em pé e Celular */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .grid-menu {
     flex-direction: column;
     align-items: center;

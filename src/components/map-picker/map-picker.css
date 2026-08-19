@@ -1,7 +1,16 @@
+:host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
 .map-picker {
   display: flex;
   flex-direction: column;
   gap: var(--sp-sm);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .map-picker-search {
@@ -11,6 +20,9 @@
 
 .map-picker-search input {
   flex: 1;
+  /* min-width: 0 permite que o input encolha dentro do flex em telas
+     estreitas, em vez de forçar o container a estourar a largura. */
+  min-width: 0;
   padding: 0.6rem 0.875rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -19,6 +31,7 @@
   color: var(--text-primary);
   outline: none;
   transition: border-color 0.2s;
+  box-sizing: border-box;
 }
 
 .map-picker-search input:focus {
@@ -48,4 +61,30 @@
   margin: 0;
   font-size: 0.78rem;
   color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .map-picker-canvas {
+    height: 240px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Busca empilha: input em cima, botão embaixo ocupando a largura total —
+     evita que o botão "Buscando..." force o input a espremer/estourar. */
+  .map-picker-search {
+    flex-direction: column;
+  }
+
+  .map-picker-search .btn {
+    width: 100%;
+  }
+
+  .map-picker-canvas {
+    height: 200px;
+  }
+
+  .map-picker-hint {
+    font-size: 0.74rem;
+  }
 }

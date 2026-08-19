@@ -810,8 +810,10 @@
 
 /* ==========================================================
    MOBILE REFINEMENTS (ONLY PHONES)
+   Breakpoints padronizados do projeto: 768px (tablet/mobile grande) e
+   480px (celular) — ver identidade-visual.md / stack.md.
    ========================================================== */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .cart-popup.open {
     max-height: 55vh;
   }
@@ -832,5 +834,45 @@
   .btn-checkout {
     padding: 12px;
     font-size: 1rem;
+  }
+}
+
+/* Celular pequeno (360-480px): o modal de checkout tem padding fixo
+   (overlay 20px + modal 30px) que em telas estreitas espreme demais o
+   grid de 2 colunas das formas de pagamento e o teclado numérico do
+   troco. Reduz padding e garante altura própria com scroll interno para
+   nunca cortar conteúdo nem ultrapassar a viewport. */
+@media (max-width: 480px) {
+  .checkout-overlay {
+    padding: 12px;
+  }
+
+  .checkout-modal {
+    padding: 20px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+
+  .checkout-modal h2 {
+    font-size: 1.2rem;
+  }
+
+  .payment-options {
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .payment-options button {
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+
+  .total-destaque {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+  }
+
+  .comanda-selector-list {
+    max-height: 200px;
   }
 }

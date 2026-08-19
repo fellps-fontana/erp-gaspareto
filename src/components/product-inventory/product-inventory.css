@@ -874,6 +874,13 @@ h1 {
   flex: 1;
 }
 
+/* Campo estreito de largura fixa (ex.: Número do endereço) — fluido no
+   mobile em vez de manter 110px fixos quando a linha empilha em coluna. */
+.form-group-compact {
+  width: 110px;
+  flex-shrink: 0;
+}
+
 input,
 select {
   padding: 12px;
@@ -1641,6 +1648,37 @@ input[type="color"] {
     width: 2.2rem;
     height: 2.2rem;
   }
+
+  .form-group-compact {
+    width: 100%;
+  }
+
+  /* Sub-abas do relatório e filtro de status de contas: grupos de botão
+     em linha única sem quebra — em vez de estourar a largura da tela,
+     ganham scroll horizontal próprio (mesmo padrão já usado em
+     .menu-botoes/.date-presets). */
+  .report-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .status-filter-inline {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .status-filter-inline button {
+    flex-shrink: 0;
+  }
+
+  /* Card de conta (relatório > Contas a Pagar): nome + valor + status
+     não têm ellipsis suficiente para não vazar em telas estreitas —
+     permite quebrar em duas linhas em vez de forçar scroll horizontal. */
+  .bill-card-rel {
+    flex-wrap: wrap;
+  }
 }
 
 /* Telas muito pequenas (< 480px) */
@@ -1670,5 +1708,34 @@ input[type="color"] {
     width: 100%;
     justify-content: flex-end;
     margin-left: 0;
+  }
+
+  /* Modais de confirmação/exclusão/histórico: menos padding para sobrar
+     espaço de conteúdo em telas de 320–375px. */
+  .checkout-overlay {
+    padding: 12px;
+  }
+
+  .checkout-modal {
+    padding: 20px;
+    border-radius: 16px;
+  }
+
+  /* Card de cliente e de produto de compra: mesmo padrão do produto-card
+     (flex-wrap + ações em linha própria) para não espremer nome/telefone
+     contra os botões de ação. */
+  .cliente-card,
+  .compra-card {
+    flex-wrap: wrap;
+  }
+
+  .cliente-acoes,
+  .compra-acoes {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
   }
 }
