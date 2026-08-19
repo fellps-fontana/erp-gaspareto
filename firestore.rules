@@ -50,7 +50,12 @@ service cloud.firestore {
         companyId == request.auth.uid ||
         (userCompanyId() == companyId && userRole() in ['owner', 'admin'])
       );
-      allow update, delete: if isSignedIn()
+      allow update: if isSignedIn()
+        && (
+          (userCompanyId() == companyId && userRole() in ['owner', 'admin'])
+          || isSuperAdminUser()
+        );
+      allow delete: if isSignedIn()
         && userCompanyId() == companyId
         && userRole() in ['owner', 'admin'];
     }

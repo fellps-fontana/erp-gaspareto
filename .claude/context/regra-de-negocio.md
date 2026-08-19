@@ -421,10 +421,20 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   listar todos os usuários da plataforma direto via listener Firestore —
   decisão confirmada: sem Cloud Function dedicada de listagem, o bypass de
   `read`/`list` em `users/{uid}` cobre a tela Administrador) e de
-  `companies/{companyId}` (permite ver qualquer empresa no seletor). Pra
-  usuário sem `isSuperAdmin`, o `OR` colapsa pra exatamente a mesma condição
-  de hoje — o bypass é estritamente aditivo, avaliado a cada request contra
-  o Firestore, não forjável client-side.
+  `companies/{companyId}` em `read` e `update` (permite ver qualquer empresa
+  no seletor e, via `ConfigService.updateModules`, ligar/desligar módulos da
+  empresa selecionada mesmo sem pertencer a ela). Decisão confirmada com o
+  usuário em 2026-08-19: o bypass em `companies/{companyId}` passa a cobrir
+  `update` pelo mesmo motivo do override das coleções operacionais
+  (parágrafo acima) — super-admin opera a empresa selecionada como se fosse
+  dela, agora também pra configuração de módulos, não só leitura. `delete`
+  continua **de fora**, deliberadamente — não existe hoje nenhuma
+  tela/fluxo que apague uma empresa, então liberar delete seria superfície
+  de risco sem uso real; se essa necessidade aparecer no futuro, é decisão
+  nova, não extensão automática deste bypass. Pra usuário sem
+  `isSuperAdmin`, o `OR` colapsa pra exatamente a mesma condição de hoje —
+  o bypass é estritamente aditivo, avaliado a cada request contra o
+  Firestore, não forjável client-side.
 - **Cloud Functions** (`functions/`, primeira infra de Functions do projeto,
   região `us-central1`, plano Blaze): duas `onCall`, ambas exigem
   `request.auth` e revalidam `isSuperAdmin` do chamador direto no Firestore
