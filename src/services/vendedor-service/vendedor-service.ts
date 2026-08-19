@@ -57,9 +57,19 @@ export class VendedorService extends FirestoreBaseService {
         vendedorId: vendedor.id ?? '',
         vendedorName: vendedor.name,
         totalVendido: 0,
-        totalComissao: 0
+        totalComissao: 0,
+        itens: []
       };
     }
+
+    // Mapa para agregar itens por produto
+    const itemsByProduct = new Map<string, {
+      productName: string;
+      quantidade: number;
+      totalVendido: number;
+      percentual: number;
+      totalComissao: number;
+    }>();
 
     let totalVendido = 0;
     let totalComissao = 0;
@@ -74,21 +84,51 @@ export class VendedorService extends FirestoreBaseService {
         const configComissao = vendedor.comissoes.find(
           c => c.idProduct === item.idProduct
         );
+        const percentual = configComissao?.percentual ?? 0;
+        const comissaoItem = (vendidoItem * percentual) / 100;
 
         totalVendido += vendidoItem;
+        totalComissao += comissaoItem;
 
-        if (configComissao) {
-          const comissaoItem = (vendidoItem * configComissao.percentual) / 100;
-          totalComissao += comissaoItem;
+        // Agregar por produto
+        if (itemsByProduct.has(item.idProduct)) {
+          const existing = itemsByProduct.get(item.idProduct)!;
+          existing.quantidade += item.quantity;
+          existing.totalVendido += vendidoItem;
+          existing.totalComissao += comissaoItem;
+        } else {
+          itemsByProduct.set(item.idProduct, {
+            productName: item.productName,
+            quantidade: item.quantity,
+            totalVendido: vendidoItem,
+            percentual,
+            totalComissao: comissaoItem
+          });
         }
       });
     });
+
+    // Converter mapa em array e ordenar
+    const itens = Array.from(itemsByProduct.entries())
+      .map(([idProduct, data]) => ({
+        idProduct,
+        ...data
+      }))
+      .sort((a, b) => {
+        // Ordenar por totalVendido desc
+        if (a.totalVendido !== b.totalVendido) {
+          return b.totalVendido - a.totalVendido;
+        }
+        // Empate: ordenar por productName asc (pt-BR)
+        return a.productName.localeCompare(b.productName, 'pt-BR');
+      });
 
     return {
       vendedorId: vendedor.id,
       vendedorName: vendedor.name,
       totalVendido,
-      totalComissao
+      totalComissao,
+      itens
     };
   }
 }

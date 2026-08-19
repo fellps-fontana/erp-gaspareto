@@ -10,9 +10,19 @@ export interface Vendedor {
   comissoes: VendedorComissaoItem[];
 }
 
+export interface VendedorItemVendidoResultado {
+  idProduct: string;
+  productName: string;
+  quantidade: number;
+  totalVendido: number;
+  totalComissao: number;
+  percentual: number;
+}
+
 export interface ComissaoVendedorResultado {
   vendedorId: string;
   vendedorName: string;
   totalVendido: number;
   totalComissao: number;
+  itens: VendedorItemVendidoResultado[];
 }

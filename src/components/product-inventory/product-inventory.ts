@@ -154,6 +154,9 @@ export class ProductInventoryComponent implements OnInit {
   novoVendedor: Omit<Vendedor, 'id' | 'companyId'> = { name: '', comissoes: [] };
   isDeleteVendedorModalOpen: boolean = false;
   vendedorToDelete: Vendedor | null = null;
+  /** Estado puro de UI (expand/collapse) — não é cálculo de domínio, só controla exibição da
+   * lista de itens vendidos já pronta em `ComissaoVendedorResultado.itens`. */
+  vendedoresItensExpandidos: Set<string> = new Set();
 
   // --- HISTÓRICO GERAL (aba própria em Gestão) ---
   historicoItems: HistoricoItem[] = [];
@@ -1211,6 +1214,19 @@ export class ProductInventoryComponent implements OnInit {
     this.comissoesPorVendedorCalculadas = this.vendedores.map(v =>
       VendedorService.calculateComissaoVendedor(pedidos, v)
     );
+  }
+
+  /** Alterna a exibição da lista de produtos vendidos de um vendedor no card de comissão. */
+  alternarItensVendedor(vendedorId: string) {
+    if (this.vendedoresItensExpandidos.has(vendedorId)) {
+      this.vendedoresItensExpandidos.delete(vendedorId);
+    } else {
+      this.vendedoresItensExpandidos.add(vendedorId);
+    }
+  }
+
+  vendedorItensExpandido(vendedorId: string): boolean {
+    return this.vendedoresItensExpandidos.has(vendedorId);
   }
 
   // No seu ProductInventoryComponent
