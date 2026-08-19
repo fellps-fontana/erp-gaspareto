@@ -535,6 +535,60 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
         await assertFails(getDoc(readRef));
       });
     });
+
+    describe('Atualizacao (update) companies/{companyId} cross-empresa', () => {
+      it('super-admin pode atualizar companies/{companyId} de outra empresa', async () => {
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const companyBRef = doc(contextCompanyB.firestore(), 'companies', 'company-b');
+        await setDoc(companyBRef, {
+          id: 'company-b',
+          name: 'Company B',
+          plan: 'trial',
+          status: 'active',
+        });
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const updateRef = doc(contextSuperAdmin.firestore(), 'companies', 'company-b');
+        await assertSucceeds(updateDoc(updateRef, { plan: 'pro' }));
+      });
+
+      it('usuario comum continua negado ao atualizar companies/{companyId} de outra empresa', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+
+        const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+        const companyBRef = doc(contextCompanyB.firestore(), 'companies', 'company-b');
+        await setDoc(companyBRef, {
+          id: 'company-b',
+          name: 'Company B',
+          plan: 'trial',
+          status: 'active',
+        });
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const updateRef = doc(contextCompanyA.firestore(), 'companies', 'company-b');
+        await assertFails(updateDoc(updateRef, { plan: 'pro' }));
+      });
+
+      it('owner/admin da propria empresa consegue atualizar sua propria companies/{companyId}', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const companyARef = doc(contextCompanyA.firestore(), 'companies', 'company-a');
+        await setDoc(companyARef, {
+          id: 'company-a',
+          name: 'Company A',
+          plan: 'trial',
+          status: 'active',
+        });
+
+        const updateRef = doc(contextCompanyA.firestore(), 'companies', 'company-a');
+        await assertSucceeds(updateDoc(updateRef, { plan: 'pro' }));
+      });
+    });
   });
 
   describe('Cobertura de colecao vendedores - operacional multi-tenant', () => {
