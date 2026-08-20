@@ -6,15 +6,23 @@
 
 ## 🔴 Segurança (prioridade alta)
 
-- [ ] **Firestore totalmente aberto.** `firestore.rules` tem `allow read, write: if true;` — qualquer pessoa com a URL do projeto consegue ler e escrever em qualquer coleção (produtos, vendas, clientes, contas), sem login. Isso vale tanto para uso normal quanto para adulteração maliciosa de estoque/preço/vendas.
-  - *Ação sugerida:* decidir se o sistema vai ganhar autenticação (item abaixo) antes de travar as regras, ou travar as regras já com uma chave/PIN simples como paliativo.
+> Auditoria de segurança completa realizada em 2026-08-20 — ver histórico da conversa/PR
+> correspondente. Os 3 primeiros itens abaixo (Firestore aberto, login ausente, controle
+> de acesso só visual) **já foram corrigidos** desde que este checklist foi escrito:
+> `firestore.rules` hoje exige autenticação + isolamento por `companyId` em toda coleção
+> operacional, com bypass de super-admin revalidado a cada request; `AuthService` +
+> `AuthGuard` implementam login real; papéis (`owner/admin/employee`) e `isSuperAdmin`
+> são reforçados na regra, não só na UI. Mantidos aqui riscados só como registro histórico.
 
-- [ ] **Login configurado mas não implementado.** `provideAuth`/`getAuth()` estão registrados em `app.config.ts`, mas nenhum componente ou guard usa autenticação. Não existe tela de login.
-  - *Ação sugerida:* confirmar se autenticação é requisito real (ex.: diferenciar operador de caixa x dono) ou se o sistema é para ficar sempre "aberto" num tablet fixo do estabelecimento.
+- [x] ~~Firestore totalmente aberto~~ — resolvido, ver `firestore.rules` e `regra-de-negocio.md` seções 10 e 13.
+- [x] ~~Login configurado mas não implementado~~ — resolvido, ver `src/services/auth-service/`.
+- [x] ~~Controle de acesso hoje é só visual~~ — resolvido, autorização real está em `firestore.rules`.
 
-- [ ] **Controle de acesso hoje é só visual.** Módulos habilitados/desabilitados via `ConfigService` (tela de Configurações) escondem telas, mas não impedem acesso direto às coleções do Firestore por fora do app.
+- [ ] **Chave da Google Maps Places API exposta sem restrição visível** em `index.html`. Confirmar no Google Cloud Console se essa chave tem restrição por domínio/referrer — senão pode ser usada por terceiros e gerar custo. **Ainda em aberto — requer ação no console, fora do escopo de código.**
 
-- [ ] **Chave da Google Maps Places API exposta sem restrição visível** em `index.html`. Confirmar no Google Cloud Console se essa chave tem restrição por domínio/referrer — senão pode ser usada por terceiros e gerar custo.
+- [ ] **Rotacionar chave de Service Account do Admin SDK.** Foi encontrado (2026-08-20) o arquivo `projetosfelipe-9e458-firebase-adminsdk-fbsvc-a95e38cc29.json` na raiz do repo, com uma chave real de produção em texto puro (nunca commitada, mas presente em disco). Revogar no console do Firebase/GCP (IAM) e apagar o arquivo local. **Ação exclusiva do dono do projeto — precisa de acesso ao console.**
+
+- [ ] **Sem App Check / CAPTCHA no signup self-service.** Nada impede criação automatizada em massa de contas/empresas trial além das proteções nativas do Firebase Auth. Avaliar Firebase App Check (reCAPTCHA) se o cadastro público continuar aberto.
 
 ---
 

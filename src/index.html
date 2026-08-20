@@ -10,13 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
-  <script>
-    try {
-      if (localStorage.getItem('erp-gaspareto-theme') === 'dark') {
-        document.body.classList.add('dark-theme');
-      }
-    } catch (_) {}
-  </script>
+  <script src="theme-init.js"></script>
   <!-- Google Maps Places API — substitua CHAVE_AQUI pela sua chave -->
   <script defer
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCJMIapBN02DCWyOtlUZ7mddTfNgKiWL98&libraries=places">

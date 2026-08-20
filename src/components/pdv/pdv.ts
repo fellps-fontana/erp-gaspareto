@@ -68,13 +68,8 @@ export class PdvComponent implements OnInit {
     this.productService.getProducts().subscribe({ next: () => { this.isLoadingProducts = false; this.cdr.markForCheck(); } });
 
     // Carrega comandas abertas
-    console.log('PdvComponent: Subscrita inicial em getOpenComandas()');
     this.comandaSub = this.comandaService.getOpenComandas().subscribe({
       next: (comandas) => {
-        console.log(`PdvComponent: [RECEBIDO] ${comandas.length} comandas do serviço.`);
-        if (comandas.length > 0) {
-          console.log('PdvComponent: [DADOS] Exemplo:', comandas[0]);
-        }
         this.openComandas = comandas;
         this.cdr.markForCheck(); // Notifica o Angular que os dados mudaram
       },
