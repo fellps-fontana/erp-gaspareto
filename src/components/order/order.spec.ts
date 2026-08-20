@@ -4,6 +4,8 @@ import { ProductService } from '../../services/product-service/product-service';
 import { OrderService } from '../../services/order-service/order-service';
 import { CustomerService } from '../../services/customer-service/customer-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
+import { VendedorService } from '../../services/vendedor-service/vendedor-service';
+import { ConfigService } from '../../services/config/config.service';
 import { Router } from '@angular/router';
 import { PaymentMethod } from '../../models/sell-model';
 import { of } from 'rxjs';
@@ -35,6 +37,15 @@ describe('OrdersComponent', () => {
     navigate: jasmine.createSpy('navigate')
   };
 
+  const mockVendedorService = {
+    getVendedores: () => of([])
+  };
+
+  const mockConfigService = {
+    modules: () => ({}),
+    modules$: of({})
+  };
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [OrdersComponent],
@@ -43,6 +54,8 @@ describe('OrdersComponent', () => {
         { provide: OrderService, useValue: mockOrderService },
         { provide: CustomerService, useValue: mockCustomerService },
         { provide: NotificationService, useValue: mockNotificationService },
+        { provide: VendedorService, useValue: mockVendedorService },
+        { provide: ConfigService, useValue: mockConfigService },
         { provide: Router, useValue: mockRouter }
       ]
     }).compileComponents();

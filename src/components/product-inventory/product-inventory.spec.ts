@@ -11,6 +11,7 @@ import { ComandaService } from '../../services/comanda-service/comanda-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { ConfigService } from '../../services/config/config.service';
 import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
+import { VendedorService } from '../../services/vendedor-service/vendedor-service';
 import { ActivatedRoute } from '@angular/router';
 import { PaymentMethod, PAYMENT_METHOD_LABELS } from '../../models/sell-model';
 import { of } from 'rxjs';
@@ -37,7 +38,13 @@ describe('ProductInventoryComponent', () => {
     config: {
       modules$: of({ gestao: true, clientes: true, compras: true })
     },
-    geocodingService: { reverseGeocode: () => of(null) }
+    geocodingService: { reverseGeocode: () => of(null) },
+    vendedorService: {
+      getVendedores: () => of([]),
+      addVendedor: () => Promise.resolve(),
+      updateVendedor: () => Promise.resolve(),
+      deleteVendedor: () => Promise.resolve()
+    }
   };
 
   beforeEach(async () => {
@@ -61,6 +68,7 @@ describe('ProductInventoryComponent', () => {
         { provide: OrderService, useValue: mockServices.orderService },
         { provide: ComandaService, useValue: mockServices.comandaService },
         { provide: GeocodingService, useValue: mockServices.geocodingService },
+        { provide: VendedorService, useValue: mockServices.vendedorService },
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
