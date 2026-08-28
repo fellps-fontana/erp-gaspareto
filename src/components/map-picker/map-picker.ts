@@ -22,6 +22,11 @@ import { GoogleMapsLoaderService } from '../../services/google-maps-loader-servi
 const BRAZIL_FALLBACK_CENTER: google.maps.LatLngLiteral = { lat: -14.235, lng: -51.9253 };
 const BRAZIL_FALLBACK_ZOOM = 4;
 
+// Aceita "lat, lng" (com ou sem espaço, ponto decimal) digitado direto na
+// busca — ex: "-26.978381662252843, -52.72869855561712" — pra centralizar
+// sem depender do geocoder, que não resolve coordenadas cruas.
+const LAT_LNG_PATTERN = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
+
 @Component({
   selector: 'app-map-picker',
   standalone: true,
@@ -103,6 +108,16 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
   async onSearch() {
     const term = this.searchTerm.trim();
     if (!term || !this.map) return;
+
+    const coords = term.match(LAT_LNG_PATTERN);
+    if (coords) {
+      const searchedLat = parseFloat(coords[1]);
+      const searchedLng = parseFloat(coords[2]);
+      this.centerMap(searchedLat, searchedLng);
+      this.setMarker(searchedLat, searchedLng);
+      this.positionChange.emit({ lat: searchedLat, lng: searchedLng });
+      return;
+    }
 
     this.searchLoading = true;
     this.searchError = '';
