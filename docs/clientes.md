@@ -160,3 +160,42 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   `projetosfelipe-9e458`) com sucesso. Merge limpo (fast-forward),
   confirmado por análise pós-merge sem divergência. Branch apagada após o
   merge.
+- **PR #11** — melhoria: cliente sem endereço identificado pela
+  geocodificação reversa (área rural, ponto sem cadastro no provedor de
+  mapas) mostrava os campos readonly Rua/Bairro/Cidade vazios e
+  acinzentados, parecendo formulário quebrado — `salvarCliente()` já
+  aceitava gravar só com `lat`/`lng` (só `name` é obrigatório), o problema
+  era puramente visual. Novo getter `clienteEnderecoDisponivel` esconde o
+  bloco de endereço quando nada foi resolvido, mostrando em vez disso um
+  campo opcional de "Referência" (reaproveita `clienteComplemento`, já
+  persistido) + aviso de que dá pra salvar assim mesmo. Card da lista de
+  clientes passou a indicar "📍 Localização no mapa" quando há `lat`/`lng`
+  sem `cidade`/`address` (antes não mostrava nada nesse caso). Review
+  (skill `code-review`) encontrou 3 achados reais na primeira versão —
+  todos com a mesma causa raiz (estado não limpo na falha do reverse
+  geocode): `clienteNumero`/`clienteComplemento` órfãos persistidos ao
+  mover o pin de uma posição resolvida pra uma sem endereço, e endereço
+  parcial (só rua, sem bairro/cidade) ainda reproduzindo o bug original
+  num subconjunto de casos — todos corrigidos antes do merge. Testado:
+  build limpo, `product-inventory.spec.ts` isolado 12/12 GREEN (achado à
+  parte, não deste PR: `order.spec.ts` tem um teste `[RED]`
+  pré-existente — `requiresInstallments`, nunca implementado em
+  `OrdersComponent` — que deixa a suíte completa flaky no build
+  incremental do karma). Merge limpo, branch apagada.
+- **PR #12** — correção: CSP (header de segurança introduzido em
+  20/08/2026, hardening geral) só liberava `script-src` pra
+  `https://maps.googleapis.com`; o loader do Google Maps JS API busca
+  chunks adicionais de `maps.gstatic.com` (desde ~v3.44), faltando essa
+  origem. Adicionado `maps.gstatic.com` a `script-src`/`connect-src` e
+  `worker-src 'self' blob:` em `firebase.json`. **Não era a causa raiz**
+  do "Esta página não carregou o Google Maps corretamente" relatado pelo
+  usuário — diagnosticado via teste isolado da API key com Chrome
+  headless (fora da aplicação, sem os headers CSP do app): erro real era
+  `BillingNotEnabledMapError`, projeto `projetosfelipe-9e458` sem conta de
+  faturamento vinculada no Google Cloud, resolvido pelo usuário
+  diretamente no Cloud Console (fora do escopo do repo). O fix de CSP
+  ficou de qualquer forma — é a recomendação oficial do Google e uma
+  correção real, só não era o bug relatado. Confirmado corrigido nos dois
+  lados: usuário reportou funcionando, reteste isolado da chave retornou
+  `MAP_INIT_OK` sem erro. Header CSP conferido via `curl -I` em staging e
+  produção após deploy. Merge limpo, branch apagada.
