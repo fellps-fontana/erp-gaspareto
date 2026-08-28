@@ -538,7 +538,7 @@
 
         <ng-container *ngIf="clienteLat != null">
           <ng-container *ngIf="clienteEnderecoDisponivel; else clienteSemEndereco">
-            <div class="form-group">
+            <div class="form-group" *ngIf="clienteRua">
               <label>Rua</label>
               <input type="text" [(ngModel)]="clienteRua" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
             </div>
@@ -554,12 +554,12 @@
               </div>
             </div>
 
-            <div class="row">
-              <div class="form-group" style="flex:1;">
+            <div class="row" *ngIf="clienteBairro || clienteCidade">
+              <div class="form-group" style="flex:1;" *ngIf="clienteBairro">
                 <label>Bairro</label>
                 <input type="text" [(ngModel)]="clienteBairro" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
               </div>
-              <div class="form-group" style="flex:1;">
+              <div class="form-group" style="flex:1;" *ngIf="clienteCidade">
                 <label>Cidade</label>
                 <input type="text" [value]="clienteCidade + (clienteUf ? ' - ' + clienteUf : '')" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
               </div>

@@ -912,11 +912,18 @@ export class ProductInventoryComponent implements OnInit {
           this.clienteNumero = result.numero;
         }
       } else {
-        this.clienteRua    = '';
-        this.clienteBairro = '';
-        this.clienteCidade = '';
-        this.clienteUf     = '';
-        this.resolvedCep   = '';
+        this.clienteRua        = '';
+        this.clienteBairro     = '';
+        this.clienteCidade     = '';
+        this.clienteUf         = '';
+        this.resolvedCep       = '';
+        // Limpa numero/complemento tambem -- sem isso um numero de casa ou
+        // complemento resolvido/digitado numa posicao anterior ficava orfao
+        // (sem rua/bairro/cidade) e era salvo do mesmo jeito, e o campo de
+        // referencia (que reaproveita clienteComplemento) nascia pre-cheio
+        // com um valor de outro significado (ex: "Apto 302, Bloco B").
+        this.clienteNumero     = '';
+        this.clienteComplemento = '';
         this.geocodeError = 'Não foi possível identificar o endereço desta posição. '
           + 'Você pode salvar assim mesmo — a localização será usada para calcular a rota de entrega.';
       }
