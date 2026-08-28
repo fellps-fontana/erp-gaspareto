@@ -194,6 +194,15 @@ export class ProductInventoryComponent implements OnInit {
     return !!this.clienteRua && !!this.clienteNumero.trim() && !!this.clienteBairro && !!this.clienteCidade;
   }
 
+  /** Rua/bairro/cidade vieram de algum lugar (geocodificação reversa ou registro
+   * já salvo) — controla se os campos readonly de endereço aparecem no formulário.
+   * Sem isso, um cliente sem endereço identificado (área rural, ponto sem
+   * cadastro no provedor de mapas) mostrava os três campos vazios e acinzentados,
+   * parecendo formulário quebrado em vez de "sem endereço, e tudo bem". */
+  get clienteEnderecoDisponivel(): boolean {
+    return !!this.clienteRua || !!this.clienteBairro || !!this.clienteCidade;
+  }
+
   constructor(
     private productService: ProductService,
     private purchaseService: PurchaseService,

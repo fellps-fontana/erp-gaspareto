@@ -45,9 +45,12 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   (marker clássico, não `AdvancedMarkerElement` — esse exigiria Map ID
   configurado no Google Cloud Console). `@Input lat/lng/zoom`,
   `@Output positionChange`. Busca por texto no topo recentraliza o mapa
-  (via `GeocodingService.geocode`, Nominatim) sem criar/mover o pin
-  sozinho. Sem fallback de centro dedicado: tenta geolocalização do
-  navegador, senão abre num centro fixo genérico do Brasil (zoom baixo).
+  (via `GeocodingService.geocode`, Nominatim); se o texto digitado casar
+  com o padrão `lat, lng` (ex: `-26.978381662252843, -52.72869855561712`),
+  centraliza direto na coordenada e move o pin, sem passar pelo geocoder
+  (Nominatim `/search` só resolve endereço em texto, não coordenada crua).
+  Sem fallback de centro dedicado: tenta geolocalização do navegador,
+  senão abre num centro fixo genérico do Brasil (zoom baixo).
 - **`GoogleMapsLoaderService`** (`src/services/google-maps-loader-service/`)
   — Promise cacheada que aguarda o script do Google Maps (carregado
   globalmente via `<script defer>` em `index.html`) ficar pronto, sem
@@ -146,3 +149,14 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
 - Todos os três PRs tiveram merge limpo (fast-forward, sem conflito),
   confirmado por análise pós-merge sem divergência entre revisado e
   mergeado. Branches locais e remotas apagadas após cada merge.
+- **PR #10** — correção: busca no `MapPickerComponent` não reconhecia
+  coordenada `lat, lng` digitada direto (só endereço em texto via
+  Nominatim), então centralizar num ponto específico via busca não
+  funcionava. Adicionado reconhecimento por regex antes de cair no
+  geocoder. Sem mudança de regra de negócio. Testado: `tsc --noEmit`,
+  `build:staging`, suíte completa (105/105) contra emulador Firestore/Auth.
+  Publicado em staging antes do merge; merge em `main` disparou o deploy
+  automático de produção (`firebase-hosting-merge.yml`, projeto
+  `projetosfelipe-9e458`) com sucesso. Merge limpo (fast-forward),
+  confirmado por análise pós-merge sem divergência. Branch apagada após o
+  merge.

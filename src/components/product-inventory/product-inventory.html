@@ -537,37 +537,49 @@
         </div>
 
         <ng-container *ngIf="clienteLat != null">
-          <div class="form-group">
-            <label>Rua</label>
-            <input type="text" [(ngModel)]="clienteRua" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
-          </div>
+          <ng-container *ngIf="clienteEnderecoDisponivel; else clienteSemEndereco">
+            <div class="form-group">
+              <label>Rua</label>
+              <input type="text" [(ngModel)]="clienteRua" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
+            </div>
 
-          <div class="row">
-            <div class="form-group form-group-compact">
-              <label>Número *</label>
-              <input type="text" [(ngModel)]="clienteNumero" placeholder="Nº" inputmode="numeric">
+            <div class="row">
+              <div class="form-group form-group-compact">
+                <label>Número</label>
+                <input type="text" [(ngModel)]="clienteNumero" placeholder="Nº" inputmode="numeric">
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>Complemento</label>
+                <input type="text" [(ngModel)]="clienteComplemento" placeholder="Apto, Bloco...">
+              </div>
             </div>
-            <div class="form-group" style="flex:1;">
-              <label>Complemento</label>
-              <input type="text" [(ngModel)]="clienteComplemento" placeholder="Apto, Bloco...">
-            </div>
-          </div>
 
-          <div class="row">
-            <div class="form-group" style="flex:1;">
-              <label>Bairro</label>
-              <input type="text" [(ngModel)]="clienteBairro" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
+            <div class="row">
+              <div class="form-group" style="flex:1;">
+                <label>Bairro</label>
+                <input type="text" [(ngModel)]="clienteBairro" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>Cidade</label>
+                <input type="text" [value]="clienteCidade + (clienteUf ? ' - ' + clienteUf : '')" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
+              </div>
             </div>
-            <div class="form-group" style="flex:1;">
-              <label>Cidade</label>
-              <input type="text" [value]="clienteCidade + (clienteUf ? ' - ' + clienteUf : '')" readonly style="background:var(--bg-muted);color:var(--text-secondary);">
-            </div>
-          </div>
 
-          <div *ngIf="clienteAddressReady"
-            style="display:flex;align-items:flex-start;gap:0.4rem;padding:0.6rem 0.875rem;background:rgba(79,70,229,0.08);border:1px solid rgba(79,70,229,0.25);border-radius:8px;font-size:0.85rem;">
-            📍 {{ clienteFormattedAddress }}
-          </div>
+            <div *ngIf="clienteAddressReady"
+              style="display:flex;align-items:flex-start;gap:0.4rem;padding:0.6rem 0.875rem;background:rgba(79,70,229,0.08);border:1px solid rgba(79,70,229,0.25);border-radius:8px;font-size:0.85rem;">
+              📍 {{ clienteFormattedAddress }}
+            </div>
+          </ng-container>
+
+          <ng-template #clienteSemEndereco>
+            <div class="form-group">
+              <label>Referência (opcional)</label>
+              <input type="text" [(ngModel)]="clienteComplemento" placeholder="Ex: Sítio próximo à ponte, km 5">
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:0.4rem;padding:0.6rem 0.875rem;background:rgba(79,70,229,0.08);border:1px solid rgba(79,70,229,0.25);border-radius:8px;font-size:0.85rem;">
+              📍 Sem endereço identificado nesta posição — pode salvar assim mesmo, a localização marcada no mapa já é suficiente para calcular a rota de entrega.
+            </div>
+          </ng-template>
         </ng-container>
 
         <button class="btn-salvar" (click)="salvarCliente()" [disabled]="isLoading">{{ isLoading ? '⏳ Sincronizando...' : '✅ SALVAR' }}</button>
@@ -586,9 +598,12 @@
             <span class="cliente-nome">{{ c.name }}</span>
             <div class="cliente-meta">
               <span class="meta-badge" *ngIf="c.phone">📞 {{ c.phone }}</span>
-              <span class="meta-badge location" *ngIf="c.cidade || c.address">
+              <span class="meta-badge location" *ngIf="c.cidade || c.address; else clienteLocalizacaoSemEndereco">
                 📍 {{ c.cidade ? c.cidade + (c.uf ? ' - ' + c.uf : '') : c.address }}
               </span>
+              <ng-template #clienteLocalizacaoSemEndereco>
+                <span class="meta-badge location" *ngIf="c.lat != null && c.lng != null">📍 Localização no mapa</span>
+              </ng-template>
             </div>
             <span class="cliente-endereco" *ngIf="c.rua">
               {{ c.rua }}, {{ c.numero }}{{ c.complemento ? ', ' + c.complemento : '' }}
