@@ -3,8 +3,9 @@
 ## Visão geral
 
 Ao finalizar um pedido (`OrderService.finalizeOrder`), o operador agora
-escolhe a forma de pagamento entre Dinheiro, Pix, Cartão ou Cheque, com
-número de parcelas quando aplicável (Pix é sempre à vista). Esse dado passa
+escolhe a forma de pagamento entre Dinheiro, Pix, Cartão, Cheque ou Boleto,
+com número de parcelas quando aplicável — inclusive Pix, que deixou de ser
+sempre à vista (ver "Atualização 2026-08-28" abaixo). Esse dado passa
 a ser filtrável na aba Histórico Geral e na aba Relatório/Dash (ambas dentro
 de Gestão, `product-inventory.ts`). Escopo desta entrega é só a finalização
 de Pedidos — PDV e Comandas não mudaram.
@@ -22,13 +23,11 @@ Resumo:
   ou ausente = à vista, `N` = parcelado. Não existe controle de parcela
   individual (datas de vencimento) nem integração com Contas a Receber —
   decisão confirmada com o usuário (2026-08-15), fora de escopo.
-- **Pix é sempre à vista, garantido na camada de serviço**: `finalizeOrder`
-  normaliza `installments` (`Number(...)`, mínimo 1) e força `installments
-  = 1` sempre que `paymentMethod === PaymentMethod.PIX`, independente do
-  valor recebido — não depende da UI esconder o campo de parcelas. Achado
-  do `style` na primeira rodada de revisão: a UI sozinha (campo condicional
-  que some pra Pix) deixava vazar um `selectedInstallments` desatualizado se
-  o usuário trocasse de forma de pagamento depois de digitar parcelas.
+- ~~Pix é sempre à vista, garantido na camada de serviço~~ — **revertido em
+  2026-08-28** (ver "Atualização" abaixo): Pix passou a aceitar parcelas
+  igual Cartão/Cheque/Boleto. `finalizeOrder` normaliza `installments`
+  (`Number(...)`, mínimo 1) igual pra qualquer forma de pagamento, sem
+  exceção de Pix.
 - `finalizeOrder` grava `paymentMethod`+`installments` **nos dois lugares**:
   no `Sale` criado (`sale_type: 'order'`, alimenta o Relatório/Dash) e no
   próprio `Order` (junto do `status: 'finished'`/`paymentDate`/
@@ -148,3 +147,55 @@ de `saveOrder`) — `hanzo` implementou, revisão inline do Kira.
 
 Commits: `a03ea16` (Boleto), merge de `docs/bills.md` vindo do origin,
 `c584365` (quantidade no carrinho) — push confirmado em `2882f55`.
+
+## Atualização 2026-08-28 — Bug de quantidade no carrinho + Pix parcelado
+
+Duas correções relatadas pelo usuário na mesma sessão, publicadas juntas via
+PR #13 (`main`), validadas antes em staging (hologaerp).
+
+**Bug: quantidade some ao editar no carrinho.** A implementação de
+2026-08-18 (`onQuantityInputChange` reaproveitando `removeFromCart` "cair
+para 0 ou menos remove a linha") tinha um efeito colateral não previsto: o
+input usa `(ngModelChange)`, que dispara a cada tecla — ao apagar o "1" pra
+digitar outro número, o campo passa por um estado vazio transitório,
+`Number('') = 0`, e o handler removia o item da lista antes do usuário
+terminar de digitar. Corrigido para: valor transitório inválido (vazio, "0",
+negativo) não faz mais nada — não atualiza `item.quantity`, não remove o
+item; só um valor final válido (inteiro ≥ 1) atualiza a quantidade. Novo
+handler `onQuantityInputBlur` restaura o input pro último valor válido se o
+campo for deixado inválido ao perder o foco. Remoção do item continua só via
+ação explícita (botão "-" em quantity=1, botão "x") — comportamento dos
+botões não mudou. `hanzo` implementou, `style` aprovou.
+
+**Regra: "Pix é sempre à vista" removida.** Pedido explícito do usuário —
+Pix passa a aceitar N parcelas igual Cartão/Cheque/Boleto. Trava removida em
+2 pontos: `OrderService.finalizeOrder` (bloco que forçava
+`installments = 1` quando `paymentMethod === PaymentMethod.PIX`) e
+`OrdersComponent` (getter/setter customizado de `selectedPaymentMethod` que
+resetava `selectedInstallments` pra 1 ao trocar pra Pix, e getter
+`requiresInstallments` que escondia o campo Parcelas — ambos removidos,
+viraram propriedades diretas; o campo Parcelas renderiza sempre). `killua`
+arquitetou, `mike` reescreveu os testes RED, `levi` implementou GREEN,
+`style` aprovou após uma rodada de correção (achado: `Order.installments`
+tinha ficado forçado a 1 enquanto `Sale.installments` preservava o valor
+real — inconsistência corrigida antes do merge).
+
+**Pendência:** `.claude/context/regra-de-negocio/03-vendas.md` e
+`05-pedidos.md` (formato modular, em migração não commitada em outra sessão
+no momento desta entrega) ainda documentam a regra antiga "Pix não parcela"
+— precisa sincronizar separadamente quando a modularização fechar.
+
+**Nota operacional — colisão entre sessões:** durante esta entrega, duas
+sessões Kira rodaram na mesma working directory sem isolamento (esta sessão
+não usa worktree por padrão). Um commit desta entrega acabou preso no meio
+do histórico da branch de outra sessão (`fix/cliente-endereco-opcional`) por
+um checkout concorrente, e um subagent (`levi`) reverteu silenciosamente
+arquivos de teste de outro subagent ao tentar respeitar a instrução "não
+edite specs", deixando o build quebrado sem perceber (relatou "GREEN" que
+não existia). Recuperado migrando pra um worktree isolado (`git worktree`)
+e reconstruindo os testes manualmente, com verificação direta (não confiada
+a relatório de subagent) antes do commit final. Ver memória de sessão
+"parallel subagent git risk" para o padrão geral.
+
+Commits: `c0e7e92`/`c8b36c1` (mesmo conteúdo, commits distintos em
+`main`/`homologacao`) — PR #13.
