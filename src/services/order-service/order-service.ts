@@ -197,10 +197,6 @@ export class OrderService extends FirestoreBaseService {
     if (normalizedInstallments < 1) {
       normalizedInstallments = 1;
     }
-    // PIX is always 1x (à vista) — enforce regardless of input
-    if (paymentMethod === PaymentMethod.PIX) {
-      normalizedInstallments = 1;
-    }
 
     try {
       const saleData: Omit<Sale, 'id' | 'companyId'> = {
@@ -221,11 +217,14 @@ export class OrderService extends FirestoreBaseService {
 
       await this.saleService.processSale(saleData, false);
 
+      // For Order, normalize PIX to 1 installment (à vista) regardless of Sale's value
+      const orderInstallments = paymentMethod === PaymentMethod.PIX ? 1 : normalizedInstallments;
+
       const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${order.id}`);
       await updateDoc(orderRef, {
         status: 'finished',
         paymentMethod: paymentMethod,
-        installments: normalizedInstallments,
+        installments: orderInstallments,
         paymentDate: serverTimestamp(),
         closingDate: serverTimestamp()
       });
