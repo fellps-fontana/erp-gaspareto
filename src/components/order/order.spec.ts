@@ -6,6 +6,7 @@ import { CustomerService } from '../../services/customer-service/customer-servic
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { Router } from '@angular/router';
 import { PaymentMethod } from '../../models/sell-model';
+import { OrderItem } from '../../models/order-model';
 import { of } from 'rxjs';
 
 describe('OrdersComponent', () => {
@@ -51,96 +52,81 @@ describe('OrdersComponent', () => {
     component = fixture.componentInstance;
   });
 
-  describe('[RED] requiresInstallments getter', () => {
-    it('[RED] should return true for DINHEIRO (cash payment)', () => {
-      component.selectedPaymentMethod = PaymentMethod.DINHEIRO;
-      const result = component.requiresInstallments;
-      expect(result).toBe(true, 'Cash (DINHEIRO) should require installments selector');
-    });
-
-    it('[RED] should return true for CARTAO (card payment)', () => {
-      component.selectedPaymentMethod = PaymentMethod.CARTAO;
-      const result = component.requiresInstallments;
-      expect(result).toBe(true, 'Card (CARTAO) should require installments selector');
-    });
-
-    it('[RED] should return true for CHEQUE (check payment)', () => {
-      component.selectedPaymentMethod = PaymentMethod.CHEQUE;
-      const result = component.requiresInstallments;
-      expect(result).toBe(true, 'Check (CHEQUE) should require installments selector');
-    });
-
-    it('[RED] should return false for PIX (instant payment, always cash)', () => {
-      component.selectedPaymentMethod = PaymentMethod.PIX;
-      const result = component.requiresInstallments;
-      expect(result).toBe(false, 'PIX is always instant (1x), no installments selector');
-    });
-
-    it('[RED] should respect selectedPaymentMethod changes', () => {
-      component.selectedPaymentMethod = PaymentMethod.DINHEIRO;
-      expect(component.requiresInstallments).toBe(true, 'Should be true for DINHEIRO');
-
-      component.selectedPaymentMethod = PaymentMethod.PIX;
-      expect(component.requiresInstallments).toBe(false, 'Should be false for PIX');
-
-      component.selectedPaymentMethod = PaymentMethod.CARTAO;
-      expect(component.requiresInstallments).toBe(true, 'Should be true for CARTAO');
-    });
-  });
-
-  describe('[RED] selectedPaymentMethod setter — reset installments on PIX', () => {
-    it('[RED] should reset selectedInstallments to 1 when switching to PIX from card payment', () => {
-      // Start with CARTAO and 5 installments
+  describe('selectedPaymentMethod — Pix agora parcela (nao reseta installments)', () => {
+    it('should preserve selectedInstallments when switching from CARTAO to PIX', () => {
       component.selectedPaymentMethod = PaymentMethod.CARTAO;
       component.selectedInstallments = 5;
 
-      expect(component.selectedInstallments).toBe(5, 'Setup: should have 5 installments for CARTAO');
-
-      // Switch to PIX — should reset to 1
       component.selectedPaymentMethod = PaymentMethod.PIX;
 
-      expect(component.selectedInstallments).toBe(1, 'Switching to PIX should reset installments to 1');
+      expect(component.selectedInstallments).toBe(5, 'Trocar pra PIX nao deve mais resetar installments');
     });
 
-    it('[RED] should reset selectedInstallments to 1 when switching to PIX from cash payment', () => {
-      // Start with DINHEIRO and 3 installments
+    it('should preserve selectedInstallments when switching from DINHEIRO to PIX', () => {
       component.selectedPaymentMethod = PaymentMethod.DINHEIRO;
       component.selectedInstallments = 3;
 
-      expect(component.selectedInstallments).toBe(3, 'Setup: should have 3 installments for DINHEIRO');
-
-      // Switch to PIX — should reset to 1
       component.selectedPaymentMethod = PaymentMethod.PIX;
 
-      expect(component.selectedInstallments).toBe(1, 'Switching to PIX should reset installments to 1');
+      expect(component.selectedInstallments).toBe(3, 'Trocar pra PIX nao deve mais resetar installments');
+    });
+  });
+
+  describe('onQuantityInputChange — bug: apagar quantidade nao pode remover o item', () => {
+    it('should not remove or change quantity when value is transiently empty', () => {
+      const item: OrderItem = { idProduct: 'p1', productName: 'Produto', quantity: 1, priceAtSale: 10, priceAtCost: 5 };
+      component.cart = [item];
+
+      component.onQuantityInputChange(item, '');
+
+      expect(component.cart.length).toBe(1, 'Item nao pode ser removido por valor vazio transitorio');
+      expect(item.quantity).toBe(1, 'Quantidade nao muda enquanto o valor for invalido');
     });
 
-    it('[RED] should keep selectedInstallments unchanged when switching between non-PIX methods', () => {
-      // Start with CARTAO and 4 installments
-      component.selectedPaymentMethod = PaymentMethod.CARTAO;
-      component.selectedInstallments = 4;
+    it('should not remove the item when value is "0" or negative', () => {
+      const item: OrderItem = { idProduct: 'p1', productName: 'Produto', quantity: 2, priceAtSale: 10, priceAtCost: 5 };
+      component.cart = [item];
 
-      // Switch to DINHEIRO — should NOT reset (both allow multiple installments)
-      component.selectedPaymentMethod = PaymentMethod.DINHEIRO;
+      component.onQuantityInputChange(item, '0');
+      component.onQuantityInputChange(item, -3);
 
-      expect(component.selectedInstallments).toBe(4, 'Switching CARTAO→DINHEIRO should not reset installments');
+      expect(component.cart.length).toBe(1, 'Item nao pode ser removido por valor 0/negativo digitado no meio da edicao');
+      expect(item.quantity).toBe(2, 'Quantidade permanece a ultima valida');
     });
 
-    it('[RED] should reset to 1 when switching back to PIX from any method', () => {
-      // Start with PIX and 1 installment
-      component.selectedPaymentMethod = PaymentMethod.PIX;
-      component.selectedInstallments = 1;
+    it('should update quantity when the final typed value is a valid integer', () => {
+      const item: OrderItem = { idProduct: 'p1', productName: 'Produto', quantity: 1, priceAtSale: 10, priceAtCost: 5 };
+      component.cart = [item];
 
-      expect(component.selectedInstallments).toBe(1, 'PIX starts with 1 installment');
+      component.onQuantityInputChange(item, '3');
 
-      // Switch to CARTAO with 6 installments
-      component.selectedPaymentMethod = PaymentMethod.CARTAO;
-      component.selectedInstallments = 6;
+      expect(item.quantity).toBe(3, 'Valor final valido deve atualizar a quantidade');
+      expect(component.cart.length).toBe(1);
+    });
+  });
 
-      // Switch back to PIX — should reset to 1
-      component.selectedPaymentMethod = PaymentMethod.PIX;
+  describe('onQuantityInputBlur — restaura valor valido ao sair do campo em estado invalido', () => {
+    it('should restore the input to the last valid quantity when left empty on blur', () => {
+      const item: OrderItem = { idProduct: 'p1', productName: 'Produto', quantity: 4, priceAtSale: 10, priceAtCost: 5 };
+      component.cart = [item];
+      const input = document.createElement('input');
+      input.value = '';
 
-      expect(component.selectedInstallments).toBe(1, 'Switching back to PIX should reset installments to 1 again');
+      component.onQuantityInputBlur(item, input);
+
+      expect(input.value).toBe('4', 'Input deve voltar pro ultimo valor valido de item.quantity');
+      expect(component.cart.length).toBe(1, 'Item nao pode ser removido no blur');
+    });
+
+    it('should not touch the input when its value is already valid on blur', () => {
+      const item: OrderItem = { idProduct: 'p1', productName: 'Produto', quantity: 4, priceAtSale: 10, priceAtCost: 5 };
+      component.cart = [item];
+      const input = document.createElement('input');
+      input.value = '7';
+
+      component.onQuantityInputBlur(item, input);
+
+      expect(input.value).toBe('7', 'Valor final valido nao deve ser sobrescrito no blur');
     });
   });
 });
