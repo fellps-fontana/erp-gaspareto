@@ -308,8 +308,9 @@
               <span class="cart-row-name" title="{{ item.productName }}">{{ item.productName }}</span>
               <div class="cart-qty-control">
                 <button type="button" class="qty-btn" (click)="decreaseQuantity(item)" title="Diminuir quantidade">-</button>
-                <input type="number" class="qty-input" [ngModel]="item.quantity"
-                  (ngModelChange)="onQuantityInputChange(item, $event)" min="1" aria-label="Quantidade">
+                <input type="number" class="qty-input" #qtyInput [ngModel]="item.quantity"
+                  (ngModelChange)="onQuantityInputChange(item, $event)"
+                  (blur)="onQuantityInputBlur(item, qtyInput)" min="1" aria-label="Quantidade">
                 <button type="button" class="qty-btn" (click)="increaseQuantity(item)" title="Aumentar quantidade">+</button>
               </div>
               <a (click)="removeFromCart(item)" class="remove-btn" title="Remover item">x</a>
@@ -349,7 +350,7 @@
           </select>
         </div>
 
-        <div class="form-field" *ngIf="requiresInstallments">
+        <div class="form-field">
           <label for="installmentsInput">Parcelas</label>
           <input id="installmentsInput" type="number" min="1" [(ngModel)]="selectedInstallments">
         </div>

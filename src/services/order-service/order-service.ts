@@ -197,10 +197,6 @@ export class OrderService extends FirestoreBaseService {
     if (normalizedInstallments < 1) {
       normalizedInstallments = 1;
     }
-    // PIX is always 1x (à vista) — enforce regardless of input
-    if (paymentMethod === PaymentMethod.PIX) {
-      normalizedInstallments = 1;
-    }
 
     try {
       const saleData: Omit<Sale, 'id' | 'companyId'> = {

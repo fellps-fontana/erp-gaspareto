@@ -300,17 +300,17 @@ describe('OrderService - Multi-tenant (companyId isolation)', () => {
         expect(orderSnapAfter.data()?.['status']).toBe('finished', 'Order should be finished');
       });
 
-      it('[RED] should normalize installments to 1 when PIX is selected with installments > 1', async () => {
+      it('[RED] should allow PIX with installments > 1 (Pix agora parcela)', async () => {
         const now = new Date() as any;
         const { PaymentMethod } = await import('../../models/sell-model');
 
         // Seed: create Order directly with status 'delivered'
-        const orderId = `order-${Date.now()}-pix-normalize`;
+        const orderId = `order-${Date.now()}-pix-parcelado`;
         const order: Order = {
           id: orderId,
           companyId: setup.mockCompanyId as string,
           orderNumber: 10,
-          customerName: 'PIX with wrong installments',
+          customerName: 'PIX parcelado',
           items: [
             {
               idProduct: 'prod-pix-1',
@@ -332,14 +332,14 @@ describe('OrderService - Multi-tenant (companyId isolation)', () => {
 
         await setDoc(doc(setup.firestore, `orders/${orderId}`), order);
 
-        // Attempt to finalize with PIX but installments=5 (should be normalized to 1)
+        // Finalize with PIX and installments=5 (Pix não é mais forçado a 1x)
         await service.finalizeOrder(
           order,
           PaymentMethod.PIX,
           5
         );
 
-        // Verify Sale was created with installments normalized to 1
+        // Verify Sale was created with installments=5, sem normalização
         const salesRef = collection(setup.firestore, 'sales');
         const salesSnapshot = await firstValueFrom(
           service['collectionDataObservable']<any>(
@@ -348,14 +348,14 @@ describe('OrderService - Multi-tenant (companyId isolation)', () => {
         );
 
         const lastSale = salesSnapshot[salesSnapshot.length - 1];
-        expect(lastSale['installments']).toBe(1, 'PIX should always have installments=1, not 5');
+        expect(lastSale['installments']).toBe(5, 'PIX pode ter installments=5, igual Cartao');
         expect(lastSale['paymentMethod']).toBe(PaymentMethod.PIX, 'Sale should have paymentMethod=PIX');
 
-        // Verify Order also has installments normalized to 1
+        // Verify Order also has installments=5, consistente com a Sale
         const orderRefAfter = doc(setup.firestore, `orders/${orderId}`);
         const orderSnapAfter = await getDoc(orderRefAfter);
 
-        expect(orderSnapAfter.data()?.['installments']).toBe(1, 'Order PIX should have installments=1, not 5');
+        expect(orderSnapAfter.data()?.['installments']).toBe(5, 'Order PIX deve refletir installments=5, igual a Sale');
       });
 
       it('[RED] should normalize installments to minimum 1 when installments <= 0', async () => {

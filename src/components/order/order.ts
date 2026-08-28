@@ -103,24 +103,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   // ── PAGAMENTO ─────────────────────────────────────────────────────
   isPaymentModalOpen       = false;
   selectedOrderToFinalize: Order | null = null;
-  private _selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
+  selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
   selectedInstallments: number = 1;
-
-  get selectedPaymentMethod(): PaymentMethod {
-    return this._selectedPaymentMethod;
-  }
-
-  set selectedPaymentMethod(value: PaymentMethod) {
-    this._selectedPaymentMethod = value;
-    // Reset installments to 1 when switching to PIX (always à vista)
-    if (value === PaymentMethod.PIX) {
-      this.selectedInstallments = 1;
-    }
-  }
-
-  get requiresInstallments(): boolean {
-    return this._selectedPaymentMethod !== PaymentMethod.PIX;
-  }
 
   // ── EDIÇÃO ────────────────────────────────────────────────────────
   editingOrderId: string | null = null;
@@ -323,14 +307,29 @@ export class OrdersComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Handler do input numérico da linha do carrinho: normaliza e remove a linha se cair abaixo de 1. */
+  /**
+   * Handler do input numérico da linha do carrinho: só grava a quantidade quando o
+   * valor digitado já é um inteiro válido (>=1). Enquanto o campo está em estado
+   * transitório (vazio, "0", negativo — comum no meio da digitação, ex.: apagar o
+   * "1" pra trocar por outro número) NÃO mexe em `item.quantity` nem remove o item;
+   * a linha do carrinho só é removida por ação explícita (botão "-" em quantity=1
+   * ou botão "x").
+   */
   onQuantityInputChange(item: OrderItem, value: number | string) {
     const qty = Math.floor(Number(value));
-    if (!qty || qty < 1) {
-      this.removeFromCart(item);
-      return;
-    }
+    if (!qty || qty < 1) return;
     item.quantity = qty;
+  }
+
+  /**
+   * Ao perder o foco: se o campo ficou vazio/inválido, reescreve o input com o
+   * último valor válido de `item.quantity` (nunca remove o item por causa disso).
+   */
+  onQuantityInputBlur(item: OrderItem, input: HTMLInputElement) {
+    const qty = Math.floor(Number(input.value));
+    if (!qty || qty < 1) {
+      input.value = String(item.quantity);
+    }
   }
 
   get itemsTotal(): number {
