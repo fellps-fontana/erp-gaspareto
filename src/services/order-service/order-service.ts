@@ -11,6 +11,7 @@ import { SaleService } from '../sale-service/sale-service';
 import { PaymentMethod, Sale } from '../../models/sell-model';
 import { FirestoreBaseService } from '../firestore-base.service';
 import { TenantService } from '../tenant-service/tenant-service';
+import { calcularTotalItemPorPeso } from '../product-service/product-weight-rules';
 
 @Injectable({
   providedIn: 'root',
@@ -128,7 +129,12 @@ export class OrderService extends FirestoreBaseService {
     const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
     const data = { ...orderData };
     if (data.items) {
-      data.itemsTotal = data.items.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
+      data.itemsTotal = data.items.reduce((acc, item) => {
+        const itemTotal = item.soldByWeight
+          ? calcularTotalItemPorPeso(item.priceAtSale, item.quantity)
+          : item.priceAtSale * item.quantity;
+        return acc + itemTotal;
+      }, 0);
       data.total = Number(data.itemsTotal) + Number(data.shippingCost || 0);
     }
     return updateDoc(orderRef, data);
@@ -205,7 +211,8 @@ export class OrderService extends FirestoreBaseService {
           productName: item.productName,
           quantity: Number(item.quantity),
           priceAtSale: Number(item.priceAtSale),
-          priceAtCost: Number(item.priceAtCost)
+          priceAtCost: Number(item.priceAtCost),
+          soldByWeight: item.soldByWeight ?? false
         })),
         total: Number(order.total),
         sale_type: 'order',

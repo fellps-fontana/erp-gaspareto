@@ -9,6 +9,12 @@ import { ComandaService } from '../../services/comanda-service/comanda-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { PaymentMethod, SaleItem } from '../../models/sell-model';
 import { Comanda } from '../../models/comanda-model';
+import {
+  bloqueiaAdicaoPorPeso,
+  calcularTotalItemPorPeso,
+  normalizarPeso,
+  validarPeso
+} from '../../services/product-service/product-weight-rules';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -145,6 +151,13 @@ export class PdvComponent implements OnInit {
     return item ? item.quantity : 0;
   }
 
+  /** Rótulo do badge no card do produto: peso mostra "kg", unidade mostra a contagem. */
+  badgeQuantidade(p: Product): string {
+    const item = this.cart.find(i => i.idProduct === p.id);
+    if (!item) return '';
+    return item.soldByWeight ? 'kg' : String(item.quantity);
+  }
+
   addToCart(p: Product) {
     if (!p.id) return;
 
@@ -156,7 +169,21 @@ export class PdvComponent implements OnInit {
 
     const existingItem = this.cart.find(item => item.idProduct === p.id);
 
-    if (existingItem) {
+    if (p.soldByWeight) {
+      // Produto vendido por peso: linha única por venda — não soma nem duplica.
+      if (bloqueiaAdicaoPorPeso(this.cart, p.id, true)) {
+        this.notif.warning('⚠️ Produto vendido por peso já está no carrinho. Ajuste o peso na lista.');
+        return;
+      }
+      this.cart.push({
+        idProduct: p.id,
+        productName: p.title || 'Produto',
+        quantity: 1, // semente: 1,000 kg, editável na lista
+        priceAtSale: p.sellPrice || 0,
+        priceAtCost: p.buyPrice || 0,
+        soldByWeight: true
+      });
+    } else if (existingItem) {
       // Verifica se a quantidade no carrinho não excede o estoque real
       if (existingItem.quantity >= p.stock) {
         this.notif.warning('⚠️ Estoque insuficiente! Não é possível vender este item.');
@@ -182,8 +209,14 @@ export class PdvComponent implements OnInit {
   }
 
   decreaseItemById(idProduct: string, index: number) {
-    if (this.cart[index].quantity > 1) {
-      this.cart[index].quantity -= 1;
+    const item = this.cart[index];
+    if (item?.soldByWeight) {
+      // Peso não decrementa: o botão vira "remover" na linha.
+      this.removeCartItem(index);
+      return;
+    }
+    if (item.quantity > 1) {
+      item.quantity -= 1;
     } else {
       this.cart.splice(index, 1);
       if (this.cart.length === 0) this.isCartOpen = false;
@@ -192,20 +225,70 @@ export class PdvComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
+  removeCartItem(index: number) {
+    this.cart.splice(index, 1);
+    if (this.cart.length === 0) this.isCartOpen = false;
+    this.atualizarTotal();
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Handler do input de peso (kg) para item vendido por peso.
+   * Validação delegada a `validarPeso` (product-weight-rules); valor inválido só avisa.
+   */
+  onPesoInputChange(item: SaleItem, value: number | string) {
+    const peso = normalizarPeso(value);
+    const resultado = validarPeso(peso);
+    if (!resultado.valido) {
+      this.notif.warning('⚠️ ' + resultado.erro);
+      return;
+    }
+    item.quantity = peso;
+    this.atualizarTotal();
+    this.cdr.markForCheck();
+  }
+
+  /** Total em dinheiro de uma linha — delega o cálculo por peso à regra pura. */
+  totalLinha(item: SaleItem): number {
+    return item.soldByWeight
+      ? calcularTotalItemPorPeso(item.priceAtSale, item.quantity)
+      : item.priceAtSale * item.quantity;
+  }
+
+  /** Rótulo de quantidade conforme locale: "1,25 kg" para peso, "2x" para unidade. */
+  qtyLabel(item: SaleItem): string {
+    if (item.soldByWeight) {
+      return `${item.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} kg`;
+    }
+    return `${item.quantity}x`;
+  }
+
+  /** true se algum item de peso do carrinho está com peso inválido — avisa e bloqueia o checkout. */
+  private carrinhoComPesoInvalido(): boolean {
+    const invalida = this.cart.find(i => i.soldByWeight && !validarPeso(i.quantity).valido);
+    if (invalida) {
+      this.notif.warning('⚠️ ' + validarPeso(invalida.quantity).erro);
+      return true;
+    }
+    return false;
+  }
+
   atualizarTotal() {
-    this.total = this.cart.reduce((acc, item) => acc + (item.priceAtSale * item.quantity), 0);
+    this.total = this.cart.reduce((acc, item) => acc + this.totalLinha(item), 0);
     this.cdr.markForCheck();
   }
 
   async finalizarCheckout() {
     try {
       if (this.checkoutStep === 'payment-method') {
+        if (!this.comandaBeingPaid && this.carrinhoComPesoInvalido()) return;
         const itens = this.comandaBeingPaid ? this.comandaBeingPaid.items : this.cart.map(i => ({
           idProduct: i.idProduct,
           productName: i.productName,
           quantity: Number(i.quantity),
           priceAtSale: Number(i.priceAtSale),
-          priceAtCost: Number(i.priceAtCost || 0)
+          priceAtCost: Number(i.priceAtCost || 0),
+          soldByWeight: !!i.soldByWeight
         }));
 
         const totalValue = this.comandaBeingPaid ? this.comandaBeingPaid.total : this.total;
@@ -233,6 +316,7 @@ export class PdvComponent implements OnInit {
           this.notif.warning('⚠️ Digite o nome da comanda!');
           return;
         }
+        if (this.carrinhoComPesoInvalido()) return;
         const newComanda = {
           customerName: this.comandaName,
           items: this.cart.map(i => ({
@@ -240,7 +324,8 @@ export class PdvComponent implements OnInit {
             productName: i.productName,
             quantity: Number(i.quantity),
             priceAtSale: Number(i.priceAtSale),
-            priceAtCost: Number(i.priceAtCost || 0)
+            priceAtCost: Number(i.priceAtCost || 0),
+            soldByWeight: !!i.soldByWeight
           })),
           total: Number(this.total)
         };
@@ -252,12 +337,26 @@ export class PdvComponent implements OnInit {
           this.notif.warning('⚠️ Selecione uma comanda!');
           return;
         }
+        if (this.carrinhoComPesoInvalido()) return;
+        // Pré-checagem de UX: produto por peso não soma em comanda existente
+        // (o service tem backstop que lança erro cru — aqui a mensagem é amigável).
+        const bloqueado = this.cart.find(i =>
+          bloqueiaAdicaoPorPeso(this.selectedComanda!.items, i.idProduct, !!i.soldByWeight)
+        );
+        if (bloqueado) {
+          this.notif.warning(
+            '⚠️ Produto vendido por peso já está nesta comanda e não pode ser somado. ' +
+            'Finalize esta comanda ou abra outra.'
+          );
+          return;
+        }
         const itemsToAdd = this.cart.map(i => ({
           idProduct: i.idProduct,
           productName: i.productName,
           quantity: Number(i.quantity),
           priceAtSale: Number(i.priceAtSale),
-          priceAtCost: Number(i.priceAtCost || 0)
+          priceAtCost: Number(i.priceAtCost || 0),
+          soldByWeight: !!i.soldByWeight
         }));
         await this.comandaService.addToExistingComanda(this.selectedComanda.id!, itemsToAdd, this.total);
         this.notif.success(`Adicionado à comanda de ${this.selectedComanda.customerName}! 📋`);

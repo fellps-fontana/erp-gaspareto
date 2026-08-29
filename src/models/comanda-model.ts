@@ -6,6 +6,7 @@ export interface ComandaItem {
     quantity: number;
     priceAtSale: number;
     priceAtCost: number;
+    soldByWeight?: boolean; // snapshot: true = quantity representa peso em kg
 }
 
 export interface Comanda {

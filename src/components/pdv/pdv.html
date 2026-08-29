@@ -8,7 +8,7 @@
         [style.background-image]="p.urlImage ? 'url(' + p.urlImage + ')' : 'none'" (click)="addToCart(p)">
 
         <div *ngIf="getQuantity(p) > 0" class="badge-qty">
-          {{ getQuantity(p) }}
+          {{ badgeQuantidade(p) }}
         </div>
 
         <div class="card-overlay"></div>
@@ -23,7 +23,7 @@
           </div>
 
           <h3>{{ p.title }}</h3>
-          <p>R$ {{ p.sellPrice | number:'1.2-2' }}</p>
+          <p>R$ {{ p.sellPrice | number:'1.2-2' }}{{ p.soldByWeight ? ' /kg' : '' }}</p>
         </div>
       </div>
     </div>
@@ -43,15 +43,25 @@
         </div>
 
         <div *ngFor="let item of cart; trackBy: trackByCartItem; let i = index" class="cart-item">
-          <button class="btn-remove" (click)="decreaseItemById(item.idProduct, i)">-</button>
+          <button class="btn-remove" (click)="decreaseItemById(item.idProduct, i)"
+            [title]="item.soldByWeight ? 'Remover item' : 'Diminuir quantidade'">
+            {{ item.soldByWeight ? '✕' : '-' }}
+          </button>
 
           <div class="item-info">
             <strong>{{ item.productName }}</strong>
-            <small>{{ item.quantity }} un. x R$ {{ item.priceAtSale | number:'1.2-2' }}</small>
+            <small *ngIf="!item.soldByWeight">{{ item.quantity }} un. x R$ {{ item.priceAtSale | number:'1.2-2' }}</small>
+            <small *ngIf="item.soldByWeight">R$ {{ item.priceAtSale | number:'1.2-2' }} /kg</small>
+            <div *ngIf="item.soldByWeight" class="peso-row">
+              <input type="number" class="peso-input" [ngModel]="item.quantity"
+                (ngModelChange)="onPesoInputChange(item, $event)" step="0.001" min="0.001"
+                aria-label="Peso em quilogramas">
+              <span class="peso-sufixo">kg</span>
+            </div>
           </div>
 
           <div class="item-total">
-            R$ {{ (item.priceAtSale * item.quantity) | number:'1.2-2' }}
+            R$ {{ totalLinha(item) | number:'1.2-2' }}
           </div>
         </div>
       </div>
@@ -201,8 +211,8 @@
           <!-- Itens da Comanda (Accordion) -->
           <div class="comanda-items-detail" *ngIf="expandedComandaId === c.id">
             <div *ngFor="let item of c.items" class="c-detail-row">
-              <span>{{ item.quantity }}x {{ item.productName }}</span>
-              <span>R$ {{ item.priceAtSale | number:'1.2-2' }}</span>
+              <span>{{ qtyLabel(item) }} {{ item.productName }}</span>
+              <span>R$ {{ item.priceAtSale | number:'1.2-2' }}{{ item.soldByWeight ? ' /kg' : '' }}</span>
             </div>
           </div>
         </div>

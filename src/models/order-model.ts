@@ -7,6 +7,7 @@ export interface OrderItem {
   quantity: number;
   priceAtSale: number;
   priceAtCost: number; // Importante pro lucro
+  soldByWeight?: boolean; // snapshot: true = quantity representa peso em kg
 }
 
 export interface Order {

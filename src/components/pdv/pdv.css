@@ -207,6 +207,29 @@
   font-size: 0.95rem;
 }
 
+/* Linha de produto vendido por peso (kg) no carrinho do PDV */
+.peso-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.peso-input {
+  width: 80px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.peso-sufixo {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
 .btn-remove {
   background: rgba(231, 76, 60, 0.1);
   color: var(--color-danger);

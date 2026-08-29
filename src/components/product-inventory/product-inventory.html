@@ -420,9 +420,16 @@
             </div>
           </div>
 
+          <div class="form-group compra-check-group">
+            <label class="compra-checkbox-label">
+              <input type="checkbox" [(ngModel)]="novoProduto.soldByWeight">
+              Vendido por peso (kg)
+            </label>
+          </div>
+
           <div class="row">
             <div class="form-group">
-              <label>Preço Venda (R$)</label>
+              <label>{{ novoProduto.soldByWeight ? 'Preço por kg (R$/kg)' : 'Preço Venda (R$)' }}</label>
               <input type="number" [(ngModel)]="novoProduto.sellPrice">
             </div>
             <div class="form-group">
@@ -430,7 +437,7 @@
               <input type="number" [(ngModel)]="novoProduto.buyPrice">
             </div>
             <div class="form-group">
-              <label>Estoque Atual</label>
+              <label>{{ novoProduto.soldByWeight ? 'Estoque (kg)' : 'Estoque Atual' }}</label>
               <input type="number" [(ngModel)]="novoProduto.stock">
             </div>
           </div>
@@ -481,8 +488,8 @@
           <div class="prod-info">
             <span class="prod-title">{{ p.title }}</span>
             <span class="prod-details">
-              Estoque: <strong>{{ p.stock }}</strong> |
-              Venda: R$ {{ p.sellPrice | number:'1.2-2' }}
+              Estoque: <strong>{{ p.stock }}{{ p.soldByWeight ? ' kg' : '' }}</strong> |
+              Venda: R$ {{ p.sellPrice | number:'1.2-2' }}{{ p.soldByWeight ? ' /kg' : '' }}
             </span>
           </div>
 

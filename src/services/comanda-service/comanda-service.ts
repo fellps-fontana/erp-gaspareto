@@ -9,6 +9,7 @@ import { map } from 'rxjs/operators';
 import { Comanda } from '../../models/comanda-model';
 import { FirestoreBaseService } from '../firestore-base.service';
 import { TenantService } from '../tenant-service/tenant-service';
+import { bloqueiaAdicaoPorPeso } from '../product-service/product-weight-rules';
 
 @Injectable({
   providedIn: 'root'
@@ -106,14 +107,24 @@ export class ComandaService extends FirestoreBaseService {
         if (!comandaSnap.exists()) throw new Error('Comanda não encontrada');
 
         const currentComanda = comandaSnap.data() as Comanda;
+
         const productsToUpdate: { ref: any; quantity: number }[] = [];
 
         for (const item of itemsToAdd) {
           const productRef = doc(this.firestore, `products/${item.idProduct}`);
           const productSnap = await transaction.get(productRef);
           if (!productSnap.exists()) throw new Error(`Produto não encontrado: ${item.idProduct}`);
+
           const currentStock = productSnap.data()['stock'] || 0;
           if (currentStock < item.quantity) throw new Error(`Estoque insuficiente para ${item.productName}`);
+
+          // Guarda de linha única para produtos por peso (via doc do produto, não do payload)
+          const produtoEhPorPeso = productSnap.data()['soldByWeight'] === true;
+          if (bloqueiaAdicaoPorPeso(currentComanda.items ?? [], item.idProduct, produtoEhPorPeso)) {
+            throw new Error(
+              'Produto vendido por peso não pode ser somado a uma comanda existente.'
+            );
+          }
 
           productsToUpdate.push({ ref: productRef, quantity: item.quantity });
         }
