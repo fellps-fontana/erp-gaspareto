@@ -30,7 +30,7 @@
       <span class="summary-title">Resumo de Produção:</span>
       <div class="summary-tags">
         <div *ngFor="let item of summary" class="summary-tag">
-          <span class="tag-qty">{{ item.totalQuantity }}x</span>
+          <span class="tag-qty">{{ item.soldByWeight ? (item.totalQuantity | number:'1.0-3') + ' kg' : item.totalQuantity + 'x' }}</span>
           <span class="tag-name">{{ item.productName }}</span>
         </div>
       </div>
@@ -119,7 +119,7 @@
 
         <ul class="items-list-styled">
           <li *ngFor="let item of order.items.slice(0, 3)">
-            <span class="qty">{{ item.quantity }}x</span>
+            <span class="qty">{{ qtyLabel(item) }}</span>
             <span class="prod-name">{{ item.productName }}</span>
           </li>
           <li *ngIf="order.items.length > 3" class="more-items">
@@ -291,7 +291,7 @@
           <div class="mini-product-grid">
             <div *ngFor="let p of products$ | async" class="mini-card" (click)="addToCart(p)">
               <span>{{ p.title }}</span>
-              <div class="price">R$ {{ p.sellPrice }}</div>
+              <div class="price">R$ {{ p.sellPrice }}{{ p.soldByWeight ? ' /kg' : '' }}</div>
             </div>
             <div *ngIf="(products$ | async)?.length === 0" class="no-products">
               Carregando produtos...
@@ -306,13 +306,23 @@
           <div class="cart-items-list">
             <div *ngFor="let item of cart" class="cart-row">
               <span class="cart-row-name" title="{{ item.productName }}">{{ item.productName }}</span>
-              <div class="cart-qty-control">
+
+              <div class="cart-qty-control" *ngIf="!item.soldByWeight">
                 <button type="button" class="qty-btn" (click)="decreaseQuantity(item)" title="Diminuir quantidade">-</button>
                 <input type="number" class="qty-input" #qtyInput [ngModel]="item.quantity"
                   (ngModelChange)="onQuantityInputChange(item, $event)"
                   (blur)="onQuantityInputBlur(item, qtyInput)" min="1" aria-label="Quantidade">
                 <button type="button" class="qty-btn" (click)="increaseQuantity(item)" title="Aumentar quantidade">+</button>
               </div>
+
+              <div class="cart-qty-control" *ngIf="item.soldByWeight">
+                <input type="number" class="qty-input peso-input" [ngModel]="item.quantity"
+                  (ngModelChange)="onPesoInputChange(item, $event)" step="0.001" min="0.001"
+                  aria-label="Peso em quilogramas">
+                <span class="peso-sufixo">kg</span>
+              </div>
+
+              <span class="linha-total">R$ {{ totalLinha(item) | number:'1.2-2' }}</span>
               <a (click)="removeFromCart(item)" class="remove-btn" title="Remover item">x</a>
             </div>
           </div>
@@ -442,9 +452,9 @@
           <ul class="detail-items-list">
             <li *ngFor="let item of selectedOrderDetails.items">
               <div class="item-line">
-                <span class="item-qty">{{ item.quantity }}x</span>
+                <span class="item-qty">{{ qtyLabel(item) }}</span>
                 <span class="item-name">{{ item.productName }}</span>
-                <span class="item-price">R$ {{ (item.priceAtSale * item.quantity) | number:'1.2-2' }}</span>
+                <span class="item-price">R$ {{ totalLinha(item) | number:'1.2-2' }}</span>
               </div>
             </li>
           </ul>

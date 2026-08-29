@@ -999,6 +999,23 @@ textarea:focus {
   margin: 0;
 }
 
+/* Linha de produto vendido por peso (kg) no carrinho do pedido */
+.cart-qty-control .peso-input {
+  width: 64px;
+}
+
+.peso-sufixo {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.linha-total {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .remove-btn {
   flex-shrink: 0;
   padding: 0 2px;

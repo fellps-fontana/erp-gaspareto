@@ -24,14 +24,24 @@ export interface ResultadoValidacaoPeso {
   erro?: string;
 }
 
-/** Máximo de casas decimais aceitas para o peso (aceita também 1 e 2 casas). */
+/** Maximo de casas decimais aceitas para o peso (aceita tambem 1 e 2 casas). */
 export const MAX_CASAS_DECIMAIS_PESO = 3;
 
 /**
+ * Epsilon para compensar ruido de representacao em ponto flutuante.
+ * Na magnitude de centavos (0-100), o ruido FP e ~1e-13. Este epsilon de 1e-9
+ * e suficiente para que halfway exatos (ex: 19.99 * 2.5 = 49.975) arredondem
+ * para cima (regra "tie goes up"), e pequeno demais para promover um valor
+ * que esteja de fato abaixo do meio-centavo (ex: 9.99 * 1.501 = 14.99499 fica
+ * 14.99, nao 15.00).
+ */
+const FLOATING_POINT_EPSILON = 1e-9;
+
+/**
  * Total em dinheiro de uma linha vendida por peso: precoPorKg * pesoKg,
- * arredondado a 2 casas (centavos), à prova de erro de ponto flutuante
- * (ex.: 19.99 * 1.5 deve dar 29.99, não 29.98 por ruído de FP).
- * Entradas não numéricas ou <= 0 => 0.
+ * arredondado a 2 casas (centavos), a prova de erro de ponto flutuante
+ * (ex.: 19.99 * 1.5 deve dar 29.99, nao 29.98 por ruido de FP).
+ * Entradas nao numericas ou <= 0 => 0.
  */
 export function calcularTotalItemPorPeso(precoPorKg: number, pesoKg: number): number {
   if (!Number.isFinite(precoPorKg) || !Number.isFinite(pesoKg)) {
@@ -40,7 +50,7 @@ export function calcularTotalItemPorPeso(precoPorKg: number, pesoKg: number): nu
   if (precoPorKg <= 0 || pesoKg <= 0) {
     return 0;
   }
-  return Math.round((precoPorKg * pesoKg + Number.EPSILON) * 100) / 100;
+  return Math.round((precoPorKg * pesoKg + FLOATING_POINT_EPSILON) * 100) / 100;
 }
 
 /**
@@ -82,10 +92,10 @@ export function validarPeso(valor: number | string): ResultadoValidacaoPeso {
     };
   }
 
-  // Verifica se tem mais de 3 casas decimais
-  // Se num * 10^3 for inteiro, tem no máximo 3 casas decimais
-  const multiplicado = num * Math.pow(10, MAX_CASAS_DECIMAIS_PESO);
-  if (!Number.isInteger(multiplicado)) {
+  // Verifica se tem mais de 3 casas decimais (FP-safe):
+  // compara contra o numero normalizado a 3 casas
+  const normalizado = Number(num.toFixed(3));
+  if (Math.abs(num - normalizado) > 1e-9) {
     return {
       valido: false,
       erro: `Peso pode ter no máximo ${MAX_CASAS_DECIMAIS_PESO} casas decimais.`

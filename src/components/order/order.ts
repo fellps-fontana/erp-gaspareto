@@ -15,6 +15,12 @@ import { CustomerService } from '../../services/customer-service/customer-servic
 import { VendedorService } from '../../services/vendedor-service/vendedor-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { ConfigService } from '../../services/config/config.service';
+import {
+  bloqueiaAdicaoPorPeso,
+  calcularTotalItemPorPeso,
+  normalizarPeso,
+  validarPeso
+} from '../../services/product-service/product-weight-rules';
 import { Timestamp } from 'firebase/firestore';
 
 @Component({
@@ -37,7 +43,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   products$!: Observable<Product[]>;
   orders$!: Observable<Order[]>;
   filteredOrders$!: Observable<Order[]>;
-  orderSummary$!: Observable<{ productName: string; totalQuantity: number }[]>;
+  orderSummary$!: Observable<{ productName: string; totalQuantity: number; soldByWeight: boolean }[]>;
 
   // ── FILTROS ───────────────────────────────────────────────────────
   private _filterStatus: 'all' | 'pending' | 'delivered' = 'all';
@@ -186,12 +192,14 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
     this.orderSummary$ = this.filteredOrders$.pipe(
       map(orders => {
-        const map: Record<string, number> = {};
+        const map: Record<string, { totalQuantity: number; soldByWeight: boolean }> = {};
         orders.forEach(o => o.items.forEach(i => {
-          map[i.productName] = (map[i.productName] || 0) + i.quantity;
+          const atual = map[i.productName] || { totalQuantity: 0, soldByWeight: !!i.soldByWeight };
+          atual.totalQuantity += i.quantity;
+          map[i.productName] = atual;
         }));
         return Object.entries(map)
-          .map(([productName, totalQuantity]) => ({ productName, totalQuantity }))
+          .map(([productName, { totalQuantity, soldByWeight }]) => ({ productName, totalQuantity, soldByWeight }))
           .sort((a, b) => b.totalQuantity - a.totalQuantity);
       })
     );
@@ -275,16 +283,24 @@ export class OrdersComponent implements OnInit, OnDestroy {
   closeNewOrder() { this.isNewOrderOpen = false; this.clearForm(); }
 
   addToCart(p: Product) {
+    // Produto vendido por peso: linha única por pedido — não soma nem duplica.
+    if (p.soldByWeight && bloqueiaAdicaoPorPeso(this.cart, p.id!, true)) {
+      this.notif.warning('Produto vendido por peso já está no pedido. Ajuste o peso na lista. ⚠️');
+      return;
+    }
+
     const existing = this.cart.find(i => i.idProduct === p.id);
     if (existing) {
+      if (existing.soldByWeight) return; // linha por peso não incrementa
       existing.quantity++;
     } else {
       this.cart.push({
         idProduct:   p.id!,
         productName: p.title || 'Produto sem nome',
-        quantity:    1,
+        quantity:    1, // semente: 1,000 kg quando soldByWeight, editável na lista
         priceAtSale: Number(p.sellPrice) || 0,
-        priceAtCost: Number(p.buyPrice)  || 0
+        priceAtCost: Number(p.buyPrice)  || 0,
+        ...(p.soldByWeight ? { soldByWeight: true } : {})
       });
     }
   }
@@ -296,15 +312,47 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   /** Edição direta da quantidade já no carrinho — não altera o clique de adicionar na grade de produtos. */
   increaseQuantity(item: OrderItem) {
+    if (item.soldByWeight) return; // peso não usa +/-
     item.quantity++;
   }
 
   decreaseQuantity(item: OrderItem) {
+    if (item.soldByWeight) return; // peso não usa +/-
     if (item.quantity > 1) {
       item.quantity--;
     } else {
       this.removeFromCart(item);
     }
+  }
+
+  /**
+   * Handler do input de peso (kg) da linha do carrinho para produto vendido por peso.
+   * Peso é validado por `validarPeso` (via `product-weight-rules`); valor inválido
+   * (0, negativo, mais de 3 casas, não numérico) só avisa e não aplica.
+   */
+  onPesoInputChange(item: OrderItem, value: number | string) {
+    const peso = normalizarPeso(value);
+    const resultado = validarPeso(peso);
+    if (!resultado.valido) {
+      this.notif.warning(resultado.erro!);
+      return;
+    }
+    item.quantity = peso;
+  }
+
+  /** Total em dinheiro de uma linha do carrinho — delega o cálculo por peso à regra pura. */
+  totalLinha(item: OrderItem): number {
+    return item.soldByWeight
+      ? calcularTotalItemPorPeso(item.priceAtSale, item.quantity)
+      : item.priceAtSale * item.quantity;
+  }
+
+  /** Rótulo de quantidade conforme locale: "1,25 kg" para peso, "2x" para unidade. */
+  qtyLabel(item: OrderItem): string {
+    if (item.soldByWeight) {
+      return `${item.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} kg`;
+    }
+    return `${item.quantity}x`;
   }
 
   /**
@@ -316,6 +364,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
    * ou botão "x").
    */
   onQuantityInputChange(item: OrderItem, value: number | string) {
+    if (item.soldByWeight) return; // peso nunca passa por Math.floor
     const qty = Math.floor(Number(value));
     if (!qty || qty < 1) return;
     item.quantity = qty;
@@ -326,6 +375,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
    * último valor válido de `item.quantity` (nunca remove o item por causa disso).
    */
   onQuantityInputBlur(item: OrderItem, input: HTMLInputElement) {
+    if (item.soldByWeight) return; // input de peso não é o input de unidade
     const qty = Math.floor(Number(input.value));
     if (!qty || qty < 1) {
       input.value = String(item.quantity);
@@ -333,7 +383,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   get itemsTotal(): number {
-    return this.cart.reduce((acc, i) => acc + i.priceAtSale * i.quantity, 0);
+    return this.cart.reduce((acc, i) => acc + this.totalLinha(i), 0);
   }
 
   get finalTotal(): number {
@@ -347,6 +397,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
     }
     if (this.cart.length === 0) {
       this.notif.warning('Adicione produtos ao pedido!');
+      return;
+    }
+    const linhaPesoInvalida = this.cart.find(i => i.soldByWeight && !validarPeso(i.quantity).valido);
+    if (linhaPesoInvalida) {
+      this.notif.warning(validarPeso(linhaPesoInvalida.quantity).erro!);
       return;
     }
     if (this.deliveryType === 'delivery' && !this.address.trim()) {
@@ -468,7 +523,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     const title = `${this.deliveryType === 'pickup' ? 'Retirada' : 'Entrega'} - ${this.customerName || 'Pedido'}`;
 
     const itemsDescription = this.cart.length
-      ? this.cart.map(i => `${i.quantity}x ${i.productName}`).join(', ')
+      ? this.cart.map(i => `${this.qtyLabel(i)} ${i.productName}`).join(', ')
       : '';
     const detailsParts = [
       itemsDescription ? `Itens: ${itemsDescription}` : '',

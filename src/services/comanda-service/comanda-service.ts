@@ -108,35 +108,23 @@ export class ComandaService extends FirestoreBaseService {
 
         const currentComanda = comandaSnap.data() as Comanda;
 
-        // Guarda de linha única para produtos por peso
-        // Regra: bloqueia se novo item é por peso E já existe EXATAMENTE o MESMO idProduct
-        for (const newItem of itemsToAdd) {
-          const newIsByWeight = newItem.soldByWeight ?? false;
-          if (!newIsByWeight) {
-            continue; // Produto por unidade: sem restrição
-          }
-
-          // Busca linha existente do MESMO produto
-          const existingItem = (currentComanda.items || []).find(
-            item => item && item.idProduct === newItem.idProduct
-          );
-
-          // Bloqueia apenas se ENCONTRA O MESMO PRODUTO
-          if (existingItem) {
-            throw new Error(
-              'Produto vendido por peso nao pode ser somado a uma comanda existente.'
-            );
-          }
-        }
-
         const productsToUpdate: { ref: any; quantity: number }[] = [];
 
         for (const item of itemsToAdd) {
           const productRef = doc(this.firestore, `products/${item.idProduct}`);
           const productSnap = await transaction.get(productRef);
           if (!productSnap.exists()) throw new Error(`Produto não encontrado: ${item.idProduct}`);
+
           const currentStock = productSnap.data()['stock'] || 0;
           if (currentStock < item.quantity) throw new Error(`Estoque insuficiente para ${item.productName}`);
+
+          // Guarda de linha única para produtos por peso (via doc do produto, não do payload)
+          const produtoEhPorPeso = productSnap.data()['soldByWeight'] === true;
+          if (bloqueiaAdicaoPorPeso(currentComanda.items ?? [], item.idProduct, produtoEhPorPeso)) {
+            throw new Error(
+              'Produto vendido por peso não pode ser somado a uma comanda existente.'
+            );
+          }
 
           productsToUpdate.push({ ref: productRef, quantity: item.quantity });
         }

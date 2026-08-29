@@ -102,7 +102,8 @@ export class ProductInventoryComponent implements OnInit {
     buyPrice: 0,
     stock: 0,
     urlImage: '',
-    color: '#f4c042' // Cor amarela padrão do Sistema
+    color: '#f4c042', // Cor amarela padrão do Sistema
+    soldByWeight: false // false = produto por unidade (comportamento atual)
   };
 
   // --- DADOS PARA COMPRA (ENTRADA) ---
@@ -751,7 +752,8 @@ export class ProductInventoryComponent implements OnInit {
       buyPrice: 0,
       stock: 0,
       urlImage: '',
-      color: '#f4c042'
+      color: '#f4c042',
+      soldByWeight: false
     };
     this.exibirFormularioNovo = true;
     this.produtoSelecionadoCompra = null;
@@ -763,7 +765,8 @@ export class ProductInventoryComponent implements OnInit {
     this.novoProduto = {
       ...p,
       urlImage: p.urlImage || '',
-      color: p.color || '#f4c042'
+      color: p.color || '#f4c042',
+      soldByWeight: !!p.soldByWeight // produto legado sem o campo => por unidade
     };
     this.exibirFormularioNovo = true;
     this.produtoSelecionadoCompra = null;
@@ -780,12 +783,18 @@ export class ProductInventoryComponent implements OnInit {
       return;
     }
 
+    // Firestore rejeita undefined — normaliza a boolean de "vendido por peso".
+    const payload: Omit<Product, 'companyId'> = {
+      ...this.novoProduto,
+      soldByWeight: !!this.novoProduto.soldByWeight
+    };
+
     try {
       if (this.produtoEmEdicao) {
-        await this.productService.updateProduct(this.produtoEmEdicao.id!, this.novoProduto);
+        await this.productService.updateProduct(this.produtoEmEdicao.id!, payload);
         this.notif.success('Produto atualizado com sucesso! ✅');
       } else {
-        await this.productService.addProduct(this.novoProduto);
+        await this.productService.addProduct(payload);
         this.notif.success('Produto cadastrado com sucesso! ✨');
       }
       this.fecharFormulario();

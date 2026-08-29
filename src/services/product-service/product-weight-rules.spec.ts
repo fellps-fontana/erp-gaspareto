@@ -23,6 +23,11 @@ describe('ProductWeightRules - Funcoes puras para "produto por kilo" [CRITICA]',
         expect(result).toBe(29.99);
       });
 
+      it('[RED] deve retornar 14.99 para preco 9.99 kg e peso 1.501 kg (logo abaixo do meio-centavo)', () => {
+        const result = calcularTotalItemPorPeso(9.99, 1.501);
+        expect(result).toBe(14.99);
+      });
+
       it('[RED] deve retornar 0.01 para preco 10 kg e peso 0.001 kg', () => {
         const result = calcularTotalItemPorPeso(10, 0.001);
         expect(result).toBe(0.01);
@@ -35,12 +40,22 @@ describe('ProductWeightRules - Funcoes puras para "produto por kilo" [CRITICA]',
 
       it('[RED] deve retornar arredondado para 2 casas: 19.99 * 2.5 = 49.975 => 49.98', () => {
         const result = calcularTotalItemPorPeso(19.99, 2.5);
-        expect(result).toBeCloseTo(49.975, 2);
+        expect(result).toBe(49.98);
       });
 
       it('[RED] deve retornar arredondado para 2 casas: 100 * 0.123 = 12.3 => 12.30', () => {
         const result = calcularTotalItemPorPeso(100, 0.123);
         expect(result).toBe(12.30);
+      });
+
+      it('[RED] deve retornar valor exato em halfway: 0.75 * 4.3 = 3.225 => 3.23', () => {
+        const result = calcularTotalItemPorPeso(0.75, 4.3);
+        expect(result).toBe(3.23);
+      });
+
+      it('[RED] deve retornar valor exato em halfway: 0.6 * 3.625 = 2.175 => 2.18', () => {
+        const result = calcularTotalItemPorPeso(0.6, 3.625);
+        expect(result).toBe(2.18);
       });
     });
 
@@ -167,6 +182,21 @@ describe('ProductWeightRules - Funcoes puras para "produto por kilo" [CRITICA]',
 
       it('[RED] deve retornar { valido: true } para peso string "2"', () => {
         const result = validarPeso('2');
+        expect(result.valido).toBe(true);
+      });
+
+      it('[RED] deve retornar { valido: true } para peso 1.003 (3 casas com ruido FP)', () => {
+        const result = validarPeso(1.003);
+        expect(result.valido).toBe(true);
+      });
+
+      it('[RED] deve retornar { valido: true } para peso 1.005 (3 casas com ruido FP)', () => {
+        const result = validarPeso(1.005);
+        expect(result.valido).toBe(true);
+      });
+
+      it('[RED] deve retornar { valido: true } para peso 2.01 (2 casas, subconjunto de 3)', () => {
+        const result = validarPeso(2.01);
         expect(result.valido).toBe(true);
       });
     });
