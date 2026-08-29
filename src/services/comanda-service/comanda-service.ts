@@ -9,6 +9,7 @@ import { map } from 'rxjs/operators';
 import { Comanda } from '../../models/comanda-model';
 import { FirestoreBaseService } from '../firestore-base.service';
 import { TenantService } from '../tenant-service/tenant-service';
+import { bloqueiaAdicaoPorPeso } from '../product-service/product-weight-rules';
 
 @Injectable({
   providedIn: 'root'
@@ -106,6 +107,28 @@ export class ComandaService extends FirestoreBaseService {
         if (!comandaSnap.exists()) throw new Error('Comanda não encontrada');
 
         const currentComanda = comandaSnap.data() as Comanda;
+
+        // Guarda de linha única para produtos por peso
+        // Regra: bloqueia se novo item é por peso E já existe EXATAMENTE o MESMO idProduct
+        for (const newItem of itemsToAdd) {
+          const newIsByWeight = newItem.soldByWeight ?? false;
+          if (!newIsByWeight) {
+            continue; // Produto por unidade: sem restrição
+          }
+
+          // Busca linha existente do MESMO produto
+          const existingItem = (currentComanda.items || []).find(
+            item => item && item.idProduct === newItem.idProduct
+          );
+
+          // Bloqueia apenas se ENCONTRA O MESMO PRODUTO
+          if (existingItem) {
+            throw new Error(
+              'Produto vendido por peso nao pode ser somado a uma comanda existente.'
+            );
+          }
+        }
+
         const productsToUpdate: { ref: any; quantity: number }[] = [];
 
         for (const item of itemsToAdd) {

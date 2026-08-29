@@ -69,7 +69,8 @@ export class SaleService extends FirestoreBaseService {
             productName: i.productName,
             quantity: Number(i.quantity),
             priceAtSale: Number(i.priceAtSale),
-            priceAtCost: Number(i.priceAtCost)
+            priceAtCost: Number(i.priceAtCost),
+            soldByWeight: i.soldByWeight ?? false
           })),
           total: Number(sale.total) || 0,
           date: serverTimestamp(),
