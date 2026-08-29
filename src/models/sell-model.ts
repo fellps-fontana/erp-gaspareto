@@ -22,6 +22,7 @@ export interface SaleItem {
     quantity: number;
     priceAtSale: number;
     priceAtCost: number; // Fundamental pro lucro!
+    soldByWeight?: boolean; // snapshot: true = quantity representa peso em kg
 }
 
 export interface Sale {

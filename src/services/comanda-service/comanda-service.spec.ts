@@ -4,7 +4,7 @@ import { TenantService } from '../tenant-service/tenant-service';
 import { Comanda, ComandaItem } from '../../models/comanda-model';
 import { Product } from '../../models/product-model';
 import { Firestore } from '@angular/fire/firestore';
-import { setDoc, doc, getDoc } from 'firebase/firestore';
+import { setDoc, doc, getDoc, getDocs, query, collection, where } from 'firebase/firestore';
 import { setupFirestoreEmulatorTest, EmulatorTestSetup, EmulatorTestContext, setupSecondUserContext } from '../test-helpers';
 import { firstValueFrom } from 'rxjs';
 
@@ -162,17 +162,15 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
 
         await service.addComanda(comandaData as any);
 
-        // Verificar que comanda foi criada - filtrar por customerName unique e pegar a mais recente
-        const comandas = await firstValueFrom(service.getOpenComandas());
-        const newComanda = comandas
-          .filter((c: any) => c.customerName === uniqueName)
-          .sort((a: any, b: any) => {
-            const dateA = (a.createdAt as any)?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
-            const dateB = (b.createdAt as any)?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
-            return dateB - dateA; // Newest first
-          })[0];
-        expect(newComanda).toBeDefined('Comanda must be created');
-        expect(newComanda?.items[0].quantity).toBe(2.5, 'Item quantity must be 2.5 kg');
+        // Lookup da comanda criada - buscar via customerName + companyId (filtro de seguranca) direto do servidor
+        const snap = await getDocs(query(
+          collection(setup.firestore, 'comandas'),
+          where('companyId', '==', setup.mockCompanyId),
+          where('customerName', '==', uniqueName)
+        ));
+        expect(snap.docs.length).toBeGreaterThan(0, 'Comanda must be created');
+        const newComanda = snap.docs[0].data() as Comanda;
+        expect(newComanda.items[0].quantity).toBe(2.5, 'Item quantity must be 2.5 kg');
 
         // Verificar que stock foi decrementado para 7.5 kg (nao para 10 - 2 = 8)
         const productDoc = await getDoc(doc(setup.firestore, `products/${productId}`));
@@ -201,19 +199,16 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
         };
         await service.addComanda(comandaData as any);
 
-        // Pegar ID da comanda - filtrar por customerName unico e pegar a mais recente
-        const comandas = await firstValueFrom(service.getOpenComandas());
-        const targetComanda = comandas
-          .filter((c: any) => c.customerName === uniqueName)
-          .sort((a: any, b: any) => {
-            const dateA = (a.createdAt as any)?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
-            const dateB = (b.createdAt as any)?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
-            return dateB - dateA; // Newest first
-          })[0];
-        const comandaId = targetComanda?.id;
-        if (!comandaId) {
+        // Pegar ID da comanda - buscar via customerName + companyId (filtro de seguranca) direto do servidor
+        const snap = await getDocs(query(
+          collection(setup.firestore, 'comandas'),
+          where('companyId', '==', setup.mockCompanyId),
+          where('customerName', '==', uniqueName)
+        ));
+        if (snap.docs.length === 0) {
           fail('Could not find created comanda');
         }
+        const comandaId = snap.docs[0].id;
 
         // Tentar adicionar o MESMO produto por peso novamente
         const itemsToAdd = [
@@ -228,7 +223,7 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
         ];
 
         try {
-          await service.addToExistingComanda(comandaId as string, itemsToAdd, 7.5); // 5 * 1.5 = 7.5
+          await service.addToExistingComanda(comandaId, itemsToAdd, 7.5); // 5 * 1.5 = 7.5
           fail('Expected addToExistingComanda to throw error when adding duplicate peso product');
         } catch (error: any) {
           expect(error.message).toBeDefined('Error should be thrown');
@@ -236,11 +231,11 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
           expect(error.message.toLowerCase()).toMatch(/peso|linha|duplicad|existe|unica/i);
         }
 
-        // Verificar que comanda nao mudou (items e stock intactos)
-        const comandasAfter = await firstValueFrom(service.getOpenComandas());
-        const comandaAfter = comandasAfter.find((c: any) => c.id === comandaId);
-        expect(comandaAfter?.items.length).toBe(1, 'Comanda must still have 1 item');
-        expect(comandaAfter?.items[0].quantity).toBe(2.5, 'Item quantity must still be 2.5 kg');
+        // Verificar que comanda nao mudou (items e stock intactos) - ler direto do servidor
+        const comandaAfterDoc = await getDoc(doc(setup.firestore, `comandas/${comandaId}`));
+        const comandaAfter = comandaAfterDoc.data() as Comanda;
+        expect(comandaAfter.items.length).toBe(1, 'Comanda must still have 1 item');
+        expect(comandaAfter.items[0].quantity).toBe(2.5, 'Item quantity must still be 2.5 kg');
 
         // Verificar que stock da comanda nao mudou
         const productDocAfter = await getDoc(doc(setup.firestore, `products/${productId}`));
@@ -282,19 +277,16 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
         };
         await service.addComanda(comandaData as any);
 
-        // Pegar ID da comanda - filtrar por customerName unico e pegar a mais recente
-        const comandas = await firstValueFrom(service.getOpenComandas());
-        const targetComanda = comandas
-          .filter((c: any) => c.customerName === uniqueName)
-          .sort((a: any, b: any) => {
-            const dateA = (a.createdAt as any)?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
-            const dateB = (b.createdAt as any)?.toMillis?.() || (b.createdAt as any)?.seconds * 1000 || 0;
-            return dateB - dateA; // Newest first
-          })[0];
-        const comandaId2 = targetComanda?.id;
-        if (!comandaId2) {
+        // Pegar ID da comanda - buscar via customerName + companyId (filtro de seguranca) direto do servidor
+        const snap = await getDocs(query(
+          collection(setup.firestore, 'comandas'),
+          where('companyId', '==', setup.mockCompanyId),
+          where('customerName', '==', uniqueName)
+        ));
+        if (snap.docs.length === 0) {
           fail('Could not find created comanda');
         }
+        const comandaId2 = snap.docs[0].id;
 
         // Adicionar OUTRO produto por peso (ausente da comanda)
         const itemsToAdd = [
@@ -309,16 +301,16 @@ describe('ComandaService - Multi-tenant (companyId isolation)', () => {
         ];
 
         // Deve permitir (nao lançar erro)
-        await service.addToExistingComanda(comandaId2 as string, itemsToAdd, 6); // 2 * 3 = 6
+        await service.addToExistingComanda(comandaId2, itemsToAdd, 6); // 2 * 3 = 6
         // Sem "fail()" aqui significa que o teste passou se nao lancou erro
 
-        // Verificar que comanda agora tem 2 linhas de produtos
-        const comandasAfter = await firstValueFrom(service.getOpenComandas());
-        const comandaAfter = comandasAfter.find((c: any) => c.id === comandaId2);
-        expect(comandaAfter?.items.length).toBe(2, 'Comanda must have 2 items (one per weight product)');
+        // Verificar que comanda agora tem 2 linhas de produtos - ler direto do servidor
+        const comandaAfterDoc = await getDoc(doc(setup.firestore, `comandas/${comandaId2}`));
+        const comandaAfter = comandaAfterDoc.data() as Comanda;
+        expect(comandaAfter.items.length).toBe(2, 'Comanda must have 2 items (one per weight product)');
 
         // Verificar que segunda linha foi adicionada (nao somada)
-        const item2 = comandaAfter?.items.find((i: ComandaItem) => i.idProduct === productId2);
+        const item2 = comandaAfter.items.find((i: ComandaItem) => i.idProduct === productId2);
         expect(item2).toBeDefined('Second product must be in items');
         expect(item2?.quantity).toBe(3, 'Second product quantity must be 3 kg');
 
