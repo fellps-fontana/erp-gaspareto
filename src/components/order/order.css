@@ -24,7 +24,15 @@
   letter-spacing: 1px;
 }
 
-/* FILTROS */
+/* FILTROS — barra única no header: status + cidade + ordenação, sempre
+   visível, quebra em várias linhas quando não couber. */
+.filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
 .filters button {
   background: transparent;
   border: 1px solid var(--border-strong);
@@ -50,8 +58,21 @@
   font-weight: bold;
 }
 
-.filters.sort-filters {
-  margin-top: 10px;
+/* Seletor de cidade — pílula, casa com os botões de status/ordenação ao lado.
+   Cores via tokens de input: dark/light automático. */
+.city-filter-select {
+  width: auto;
+  padding: 8px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.city-filter-select:focus {
+  border-color: var(--color-primary);
 }
 
 /* BOTÃO NOVO PEDIDO (DESTAQUE) */
@@ -1195,8 +1216,7 @@ textarea:focus {
     text-align: center;
   }
 
-  /* Regra de .filters para mobile centralizada em order_mobile.css
-     (evita duas fontes conflitantes de flex-wrap/gap na mesma media query) */
+  /* Regras de .filters-bar para mobile ficam em order_mobile.css */
 }
 
 /* Celulares pequenos (320–480px) — refinamentos que order_mobile.css

@@ -9,14 +9,20 @@
         </svg>
       </button>
       <h1>Pedidos & Encomendas</h1>
-      <div class="filters">
-        <button [class.active]="filterStatus === 'all'"       (click)="filterStatus = 'all'">Ativos</button>
-        <button [class.active]="filterStatus === 'pending'"   (click)="filterStatus = 'pending'">Pendente</button>
-        <button [class.active]="filterStatus === 'delivered'" (click)="filterStatus = 'delivered'">Entregues</button>
-      </div>
-      <div class="filters sort-filters">
-        <button [class.active]="sortOrder === 'recent'" (click)="sortOrder = 'recent'">Mais recente</button>
-        <button [class.active]="sortOrder === 'oldest'" (click)="sortOrder = 'oldest'">Mais antigo</button>
+      <div class="filters-bar">
+        <div class="filters filter-group" role="group">
+          <button [class.active]="filterStatus === 'all'"       (click)="filterStatus = 'all'">Ativos</button>
+          <button [class.active]="filterStatus === 'pending'"   (click)="filterStatus = 'pending'">Pendente</button>
+          <button [class.active]="filterStatus === 'delivered'" (click)="filterStatus = 'delivered'">Entregues</button>
+        </div>
+        <select class="city-filter-select" [(ngModel)]="filterCidade" aria-label="Filtrar por cidade">
+          <option value="">Todas as cidades</option>
+          <option *ngFor="let cidade of (cidadesDisponiveis$ | async)" [value]="cidade">{{ cidade }}</option>
+        </select>
+        <div class="filters filter-group sort-filters" role="group">
+          <button [class.active]="sortOrder === 'recent'" (click)="sortOrder = 'recent'">Mais recente</button>
+          <button [class.active]="sortOrder === 'oldest'" (click)="sortOrder = 'oldest'">Mais antigo</button>
+        </div>
       </div>
     </div>
     <button class="btn-new-order" (click)="openNewOrder()">

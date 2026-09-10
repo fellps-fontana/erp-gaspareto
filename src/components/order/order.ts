@@ -21,6 +21,7 @@ import {
   normalizarPeso,
   validarPeso
 } from '../../services/product-service/product-weight-rules';
+import { TODAS_AS_CIDADES, cidadesComPedido, filtrarPorCidade } from './order-filters';
 import { Timestamp } from 'firebase/firestore';
 
 @Component({
@@ -44,12 +45,19 @@ export class OrdersComponent implements OnInit, OnDestroy {
   orders$!: Observable<Order[]>;
   filteredOrders$!: Observable<Order[]>;
   orderSummary$!: Observable<{ productName: string; totalQuantity: number; soldByWeight: boolean }[]>;
+  cidadesDisponiveis$!: Observable<string[]>;
 
   // ── FILTROS ───────────────────────────────────────────────────────
   private _filterStatus: 'all' | 'pending' | 'delivered' = 'all';
 
   get filterStatus() { return this._filterStatus; }
   set filterStatus(v: 'all' | 'pending' | 'delivered') { this._filterStatus = v; this.updateFilter(); }
+
+  // ── FILTRO POR CIDADE (join client-side order.customerId -> customer.cidade) ──
+  private _filterCidade: string = TODAS_AS_CIDADES;
+
+  get filterCidade(): string { return this._filterCidade; }
+  set filterCidade(v: string) { this._filterCidade = v; this.updateFilter(); }
 
   // ── ORDENAÇÃO ─────────────────────────────────────────────────────
   private _sortOrder: 'recent' | 'oldest' = 'recent';
@@ -128,7 +136,12 @@ export class OrdersComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadData();
     this.customerSub = this.customerService.getCustomers().subscribe(
-      customers => this.allCustomers = customers
+      customers => {
+        this.allCustomers = customers;
+        // customers pode chegar depois de orders$ já ter emitido — re-piparia
+        // o filtro pra resolver o join order.customerId -> customer.cidade.
+        this.updateFilter();
+      }
     );
     this.vendedorSub = this.vendedorService.getVendedores().subscribe(
       vendedores => this.vendedores = vendedores
@@ -180,6 +193,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
           result = result.filter(o => o.status === 'delivered');
         }
 
+        // Passo 3: filtro por cidade (join client-side com this.allCustomers).
+        result = filtrarPorCidade(result, this.allCustomers, this._filterCidade);
+
         if (this._sortOrder === 'oldest') {
           result = [...result].sort(
             (a, b) => this.getTimestampMillis(a.createdAt) - this.getTimestampMillis(b.createdAt)
@@ -187,6 +203,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
         }
 
         return result;
+      })
+    );
+
+    // Opções do seletor de cidade: derivam de orders$ DIRETO (não de
+    // filteredOrders$), com só a exclusão finished/canceled aplicada antes —
+    // assim a lista de cidades NÃO encolhe quando o usuário escolhe um status
+    // ou uma cidade.
+    this.cidadesDisponiveis$ = this.orders$.pipe(
+      map(orders => {
+        if (!orders) return [];
+        const operacionais = orders.filter(o => !['finished', 'canceled'].includes(o.status));
+        return cidadesComPedido(operacionais, this.allCustomers);
       })
     );
 
