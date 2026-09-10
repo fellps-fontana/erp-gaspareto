@@ -25,6 +25,24 @@ export interface CustomerCidadeRef {
 
 export interface OrderCidadeRef {
   customerId?: string;
+  status?: string;
+}
+
+/**
+ * Status terminais do pedido: a tela de Pedidos os exclui SEMPRE, de qualquer
+ * filtro e do seletor de cidade (regra-de-negocio.md seção 5). Esse histórico
+ * vive só na aba Histórico Geral (seção 5.1).
+ */
+export const PEDIDO_STATUS_TERMINAL: readonly string[] = ['finished', 'canceled'];
+
+/**
+ * Remove da lista os pedidos em status terminal (regra da seção 5 — fonte
+ * única desta exclusão). Genérico em `T` para preservar o tipo `Order`.
+ */
+export function excluirPedidosTerminais<T extends OrderCidadeRef>(
+  orders: readonly T[]
+): T[] {
+  return orders.filter(order => !PEDIDO_STATUS_TERMINAL.includes(order.status ?? ''));
 }
 
 /**
@@ -48,15 +66,16 @@ export function normalizarCidade(cidade: string | null | undefined): string {
  * - dedupe pela chave `normalizarCidade`; rótulo = primeira grafia encontrada
  *   (só com trim — preserva acento e caixa original);
  * - ordenado por `localeCompare(b, 'pt-BR')`;
- * - ignora: pedido sem `customerId`, `customerId` sem customer correspondente,
- *   customer com cidade vazia/ausente;
+ * - ignora: pedido em status terminal, pedido sem `customerId`, `customerId`
+ *   sem customer correspondente, customer com cidade vazia/ausente;
  * - `orders` ou `customers` vazio => `[]`.
  */
 export function cidadesComPedido(
   orders: readonly OrderCidadeRef[],
   customers: readonly CustomerCidadeRef[]
 ): string[] {
-  if (orders.length === 0 || customers.length === 0) return [];
+  const naoTerminais = excluirPedidosTerminais(orders);
+  if (naoTerminais.length === 0 || customers.length === 0) return [];
 
   const customerPorId = new Map<string, CustomerCidadeRef>();
   for (const customer of customers) {
@@ -64,7 +83,7 @@ export function cidadesComPedido(
   }
 
   const rotuloPorChave = new Map<string, string>();
-  for (const order of orders) {
+  for (const order of naoTerminais) {
     if (!order.customerId) continue;
     const customer = customerPorId.get(order.customerId);
     if (!customer) continue;

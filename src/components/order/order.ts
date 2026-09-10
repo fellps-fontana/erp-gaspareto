@@ -21,7 +21,12 @@ import {
   normalizarPeso,
   validarPeso
 } from '../../services/product-service/product-weight-rules';
-import { TODAS_AS_CIDADES, cidadesComPedido, filtrarPorCidade } from './order-filters';
+import {
+  TODAS_AS_CIDADES,
+  cidadesComPedido,
+  excluirPedidosTerminais,
+  filtrarPorCidade
+} from './order-filters';
 import { Timestamp } from 'firebase/firestore';
 
 @Component({
@@ -179,11 +184,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
         this.isLoadingOrders = false;
         if (!orders) return [];
 
-        // Pedidos finalizados/cancelados não aparecem mais nesta tela (nem
-        // no filtro "Todos") — a tela de Pedidos é só operacional agora.
-        // Esse histórico vive na aba Histórico Geral (Gestão), que já cobre
-        // os 3 status por lá (Pedido, PDV, Comanda) sem duplicar aqui.
-        let result = orders.filter(o => !['finished', 'canceled'].includes(o.status));
+        // Passo 1: pedidos em status terminal (finished/canceled) nunca
+        // aparecem nesta tela, em nenhum filtro — regra da seção 5, aplicada
+        // por uma função única em order-filters.ts. Esse histórico vive na aba
+        // Histórico Geral (Gestão).
+        let result = excluirPedidosTerminais(orders);
 
         if (this._filterStatus === 'pending') {
           result = result.filter(o =>
@@ -207,15 +212,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
     );
 
     // Opções do seletor de cidade: derivam de orders$ DIRETO (não de
-    // filteredOrders$), com só a exclusão finished/canceled aplicada antes —
-    // assim a lista de cidades NÃO encolhe quando o usuário escolhe um status
-    // ou uma cidade.
+    // filteredOrders$), então a lista de cidades NÃO encolhe quando o usuário
+    // escolhe um status ou uma cidade. A exclusão de status terminal é feita
+    // dentro de cidadesComPedido (mesma regra da seção 5).
     this.cidadesDisponiveis$ = this.orders$.pipe(
-      map(orders => {
-        if (!orders) return [];
-        const operacionais = orders.filter(o => !['finished', 'canceled'].includes(o.status));
-        return cidadesComPedido(operacionais, this.allCustomers);
-      })
+      map(orders => cidadesComPedido(orders ?? [], this.allCustomers))
     );
 
     this.orderSummary$ = this.filteredOrders$.pipe(

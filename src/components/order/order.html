@@ -19,7 +19,7 @@
           <option value="">Todas as cidades</option>
           <option *ngFor="let cidade of (cidadesDisponiveis$ | async)" [value]="cidade">{{ cidade }}</option>
         </select>
-        <div class="filters filter-group sort-filters" role="group">
+        <div class="filters filter-group" role="group">
           <button [class.active]="sortOrder === 'recent'" (click)="sortOrder = 'recent'">Mais recente</button>
           <button [class.active]="sortOrder === 'oldest'" (click)="sortOrder = 'oldest'">Mais antigo</button>
         </div>
