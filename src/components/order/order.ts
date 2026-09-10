@@ -142,7 +142,13 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   loadData() {
     this.isLoadingOrders = true;
-    this.products$ = this.productService.getProducts();
+    this.products$ = this.productService.getProducts().pipe(
+      map(products =>
+        [...products].sort((a, b) =>
+          (a.title ?? '').localeCompare(b.title ?? '', 'pt-BR', { sensitivity: 'base' })
+        )
+      )
+    );
 
     this.orders$ = this.orderService.getOrders().pipe(
       catchError(err => {
