@@ -199,3 +199,102 @@ a relatório de subagent) antes do commit final. Ver memória de sessão
 
 Commits: `c0e7e92`/`c8b36c1` (mesmo conteúdo, commits distintos em
 `main`/`homologacao`) — PR #13.
+
+## Atualização 2026-09-10 — Barra única de filtros + filtro por cidade
+
+Consolidação dos filtros da tela de Pedidos (`/orders`) numa única barra no
+header, mais um filtro novo por cidade. Publicado via PR #16 (`main`),
+validado antes em homologação (hologaerp).
+
+**Barra única.** Os dois grupos de botões soltos no header (status +
+ordenação) viraram um só container `.filters-bar`. Ordem visual: status →
+seletor de cidade → ordenação. Botões-pílula de status/ordenação
+inalterados; sem regressão de comportamento neles.
+
+**Filtro por cidade** (regra-de-negocio.md seções 5, 9, 10 — não crítica, é
+filtro de exibição). Seletor `<select>` (não texto livre), opção default
+"Todas as cidades". As opções são as cidades **distintas** dos clientes
+referenciados por algum pedido não-terminal carregado na tela — derivadas
+de `orders$` direto (não de `filteredOrders$`), então não encolhem quando o
+operador escolhe status ou cidade. O filtro faz **join client-side**
+`order.customerId → customer.cidade` sobre `this.allCustomers` (já carregado
+no componente); nenhuma query nova no Firestore, nenhum campo novo no
+documento do pedido. Pedido sem `customerId`, ou com cliente sem `cidade`
+cadastrada, **não aparece** quando uma cidade específica está selecionada
+(aparece só em "Todas as cidades"). Comparação imune a acento/caixa.
+
+**Composição AND.** Status + cidade + ordenação aplicados juntos no mesmo
+pipe de `updateFilter()`, na ordem: excluir terminais → status → cidade →
+sort. Trocar um eixo não reseta os outros (cada um é getter/setter → `updateFilter()`).
+
+**Decisões do dono do módulo (Felipe):** "Ativos" continua sendo "sem filtro
+de status" (3 botões mutuamente exclusivos, não vira seleção múltipla);
+cidade órfã (seleção que sai da lista de opções) mantém a seleção e mostra
+lista vazia, sem auto-reset; `filterCidade` não persiste entre navegações;
+opções do seletor derivam só dos pedidos não-terminais.
+
+### Modelo de dados / arquivos entregues
+
+- **`src/components/order/order-filters.ts`** (novo) — regra pura, sem
+  Angular/Firestore, exclusiva da tela de Pedidos (por isso mora na pasta do
+  componente, não em `services/` como `product-weight-rules.ts`, que é
+  compartilhado). Exporta: `TODAS_AS_CIDADES` (sentinela `''`),
+  `PEDIDO_STATUS_TERMINAL` (`['finished','canceled']` — fonte única da
+  exclusão da seção 5), `excluirPedidosTerminais<T>()`, `normalizarCidade()`
+  (trim + colapsa espaços + remove acento NFD + lowercase),
+  `cidadesComPedido()` (dedupe + ordenação `localeCompare` pt-BR, aplica a
+  exclusão terminal internamente), `filtrarPorCidade<T>()`.
+- **`src/components/order/order.ts`** — campo `_filterCidade` (getter/setter
+  → `updateFilter()`), stream `cidadesDisponiveis$`, passo de cidade no pipe
+  de `filteredOrders$`, `updateFilter()` chamado no callback do `customerSub`
+  (resolve a corrida customers-chega-depois-de-orders). Idioma imperativo
+  mantido — sem `combineLatest`/`computed`/`effect`.
+- **`order.html`** — `.filters-bar` unificando os grupos + `<select
+  [(ngModel)]="filterCidade">`.
+- **`order.css` / `order_mobile.css`** — `.filters-bar` (flex + wrap),
+  `.city-filter-select` em pílula com tokens da identidade visual (sem cor
+  crua); no mobile o select empilha full-width.
+
+### Lacunas conhecidas
+
+- A exclusão terminal continua a rodar como filtro client-side sobre a lista
+  completa de `getOrders()` — a query não filtra status no Firestore (mesmo
+  padrão pré-existente). Volume pequeno, sem impacto.
+- Double-subscribe pré-existente de `orders$` (a tela abre listener em
+  `filteredOrders$` e agora também em `cidadesDisponiveis$`) não corrigido —
+  fora de escopo, dívida técnica anterior a esta entrega.
+- Cliente com pedido mas sem `cidade` cadastrada (cadastros antigos, pré
+  mini-mapa) fica invisível a qualquer filtro de cidade específico — é a
+  única semântica coerente com os dados de hoje, confirmada com o usuário.
+
+### O que cada agent entregou
+
+- **killua** — modelagem: função pura em arquivo novo (padrão
+  `product-weight-rules.ts`), state do componente, composição AND dos 3
+  eixos, contrato das funções com edge cases (order sem `customerId`,
+  customer ausente/sem cidade, acento/caixa, listas vazias), tratamento da
+  corrida de carregamento.
+- **hanzo** — implementação (commit `19dd8d3`) + rodada de correção
+  (`d750791`): `order-filters.ts`, alterações no componente, barra única no
+  HTML, CSS desktop/mobile.
+- **style** — gate em 2 rodadas. Achado bloqueante na rodada 1: a regra da
+  seção 5 (exclusão `finished`/`canceled`) estava duplicada como literal cru
+  em 2 pontos de `order.ts` — extraída para `PEDIDO_STATUS_TERMINAL` +
+  `excluirPedidosTerminais` em `order-filters.ts`, consumida pelos dois
+  caminhos (lista filtrada e derivação de cidades). Rodada 2: aprovado.
+- **gon** — não entrou (sem auth/autorização, input externo novo ou
+  dependência nova; o join é sobre dados que a tela já exibe).
+- Sem **mike** — não é regra crítica no sentido TDD (não toca estoque,
+  dinheiro nem transição de estado).
+
+### Nota operacional — merge concorrente com PR #15
+
+No momento do merge, a PR #15 ("Ordenar produtos alfabeticamente em Novo
+Pedido") já havia entrado na `main` (commit `024dc75`) e também tocava
+`order.ts` — em `loadData()`, envolvendo `products$` num `sort` por
+`title`. O merge commit `a898dde` combinou os dois sem sobreposição: a
+`main` pós-merge tem tanto o `sort` de produtos da PR #15 quanto os filtros
+desta entrega, ambos íntegros. Build de produção da `main` mesclada:
+compila (só warnings de budget pré-existentes).
+
+Commits: `19dd8d3`, `d750791` — PR #16, merge `a898dde`.
