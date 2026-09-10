@@ -21,6 +21,12 @@ import {
   normalizarPeso,
   validarPeso
 } from '../../services/product-service/product-weight-rules';
+import {
+  TODAS_AS_CIDADES,
+  cidadesComPedido,
+  excluirPedidosTerminais,
+  filtrarPorCidade
+} from './order-filters';
 import { Timestamp } from 'firebase/firestore';
 
 @Component({
@@ -44,12 +50,19 @@ export class OrdersComponent implements OnInit, OnDestroy {
   orders$!: Observable<Order[]>;
   filteredOrders$!: Observable<Order[]>;
   orderSummary$!: Observable<{ productName: string; totalQuantity: number; soldByWeight: boolean }[]>;
+  cidadesDisponiveis$!: Observable<string[]>;
 
   // ── FILTROS ───────────────────────────────────────────────────────
   private _filterStatus: 'all' | 'pending' | 'delivered' = 'all';
 
   get filterStatus() { return this._filterStatus; }
   set filterStatus(v: 'all' | 'pending' | 'delivered') { this._filterStatus = v; this.updateFilter(); }
+
+  // ── FILTRO POR CIDADE (join client-side order.customerId -> customer.cidade) ──
+  private _filterCidade: string = TODAS_AS_CIDADES;
+
+  get filterCidade(): string { return this._filterCidade; }
+  set filterCidade(v: string) { this._filterCidade = v; this.updateFilter(); }
 
   // ── ORDENAÇÃO ─────────────────────────────────────────────────────
   private _sortOrder: 'recent' | 'oldest' = 'recent';
@@ -128,7 +141,12 @@ export class OrdersComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadData();
     this.customerSub = this.customerService.getCustomers().subscribe(
-      customers => this.allCustomers = customers
+      customers => {
+        this.allCustomers = customers;
+        // customers pode chegar depois de orders$ já ter emitido — re-piparia
+        // o filtro pra resolver o join order.customerId -> customer.cidade.
+        this.updateFilter();
+      }
     );
     this.vendedorSub = this.vendedorService.getVendedores().subscribe(
       vendedores => this.vendedores = vendedores
@@ -172,11 +190,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
         this.isLoadingOrders = false;
         if (!orders) return [];
 
-        // Pedidos finalizados/cancelados não aparecem mais nesta tela (nem
-        // no filtro "Todos") — a tela de Pedidos é só operacional agora.
-        // Esse histórico vive na aba Histórico Geral (Gestão), que já cobre
-        // os 3 status por lá (Pedido, PDV, Comanda) sem duplicar aqui.
-        let result = orders.filter(o => !['finished', 'canceled'].includes(o.status));
+        // Passo 1: pedidos em status terminal (finished/canceled) nunca
+        // aparecem nesta tela, em nenhum filtro — regra da seção 5, aplicada
+        // por uma função única em order-filters.ts. Esse histórico vive na aba
+        // Histórico Geral (Gestão).
+        let result = excluirPedidosTerminais(orders);
 
         if (this._filterStatus === 'pending') {
           result = result.filter(o =>
@@ -186,6 +204,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
           result = result.filter(o => o.status === 'delivered');
         }
 
+        // Passo 3: filtro por cidade (join client-side com this.allCustomers).
+        result = filtrarPorCidade(result, this.allCustomers, this._filterCidade);
+
         if (this._sortOrder === 'oldest') {
           result = [...result].sort(
             (a, b) => this.getTimestampMillis(a.createdAt) - this.getTimestampMillis(b.createdAt)
@@ -194,6 +215,14 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
         return result;
       })
+    );
+
+    // Opções do seletor de cidade: derivam de orders$ DIRETO (não de
+    // filteredOrders$), então a lista de cidades NÃO encolhe quando o usuário
+    // escolhe um status ou uma cidade. A exclusão de status terminal é feita
+    // dentro de cidadesComPedido (mesma regra da seção 5).
+    this.cidadesDisponiveis$ = this.orders$.pipe(
+      map(orders => cidadesComPedido(orders ?? [], this.allCustomers))
     );
 
     this.orderSummary$ = this.filteredOrders$.pipe(

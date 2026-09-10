@@ -133,12 +133,18 @@
         text-align: center;
     }
 
-    .filters {
+    .filters-bar {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
         padding-bottom: 5px;
         justify-content: flex-start;
+    }
+
+    .filters-bar .filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
     }
 
     .filters button {
@@ -149,6 +155,12 @@
         padding: 10px 14px;
         margin-right: 0;
         /* substitui o espaçamento por margin (order.css) pelo gap acima */
+    }
+
+    /* Seletor de cidade ocupa a largura toda, empilhado abaixo dos grupos de botão */
+    .city-filter-select {
+        flex: 1 1 100%;
+        width: 100%;
     }
 
     .btn-new-order {
