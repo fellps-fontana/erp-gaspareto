@@ -5,3 +5,4 @@ initializeApp();
 
 export { resetUserPassword } from './reset-user-password';
 export { setSuperAdmin } from './set-super-admin';
+export { resolveMapsShortLink } from './resolve-maps-short-link';
