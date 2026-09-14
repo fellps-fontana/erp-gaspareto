@@ -27,6 +27,20 @@ const BRAZIL_FALLBACK_ZOOM = 4;
 // sem depender do geocoder, que não resolve coordenadas cruas.
 const LAT_LNG_PATTERN = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
 
+// Padrões de link LONGO do Google Maps que já carregam a coordenada no
+// próprio texto da URL — resolvem sem chamar geocode nem Cloud Function.
+const MAPS_LINK_COORD_PATTERNS = [
+  /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+  /[?&]q=(-?\d+\.\d+),\+?(-?\d+\.\d+)/,
+  /\/search\/(-?\d+\.\d+),\+?(-?\d+\.\d+)/,
+];
+
+// Hosts legítimos do Google Maps — comparação exata (nunca substring), pra
+// não aceitar domínio forjado tipo "google.com.attacker.io".
+const GOOGLE_MAPS_HOSTS = new Set(['www.google.com', 'google.com', 'maps.google.com']);
+
+const SEARCH_NOT_FOUND_ERROR = 'Endereço não encontrado. Tente refinar a busca.';
+
 @Component({
   selector: 'app-map-picker',
   standalone: true,
@@ -109,6 +123,32 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
     const term = this.searchTerm.trim();
     if (!term || !this.map) return;
 
+    if (this.isShortMapsLink(term)) {
+      this.searchLoading = true;
+      this.searchError = '';
+      try {
+        const result = await this.geocodingService.resolveShortMapsLink(term);
+        if (result) {
+          this.centerMap(result.lat, result.lng);
+          this.setMarker(result.lat, result.lng);
+          this.positionChange.emit({ lat: result.lat, lng: result.lng });
+        } else {
+          this.searchError = SEARCH_NOT_FOUND_ERROR;
+        }
+      } finally {
+        this.searchLoading = false;
+      }
+      return;
+    }
+
+    const mapsLinkCoords = this.extractCoordsFromMapsLink(term);
+    if (mapsLinkCoords) {
+      this.centerMap(mapsLinkCoords.lat, mapsLinkCoords.lng);
+      this.setMarker(mapsLinkCoords.lat, mapsLinkCoords.lng);
+      this.positionChange.emit(mapsLinkCoords);
+      return;
+    }
+
     const coords = term.match(LAT_LNG_PATTERN);
     if (coords) {
       const searchedLat = parseFloat(coords[1]);
@@ -126,10 +166,46 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
       if (result) {
         this.centerMap(result.lat, result.lng);
       } else {
-        this.searchError = 'Endereço não encontrado. Tente refinar a busca.';
+        this.searchError = SEARCH_NOT_FOUND_ERROR;
       }
     } finally {
       this.searchLoading = false;
+    }
+  }
+
+  // Link curto (maps.app.goo.gl / goo.gl/maps) não carrega coordenada no
+  // texto — precisa resolver o redirect via Cloud Function.
+  private isShortMapsLink(term: string): boolean {
+    const url = this.tryParseUrl(term);
+    if (!url) return false;
+    const host = url.hostname.toLowerCase();
+    if (host === 'maps.app.goo.gl') return true;
+    if (host === 'goo.gl' && url.pathname.startsWith('/maps')) return true;
+    return false;
+  }
+
+  // Link longo do Google Maps já carrega a coordenada na própria URL —
+  // extrai sem chamar geocode nem Cloud Function.
+  private extractCoordsFromMapsLink(term: string): { lat: number; lng: number } | null {
+    const url = this.tryParseUrl(term);
+    if (!url) return null;
+    const host = url.hostname.toLowerCase();
+    if (!GOOGLE_MAPS_HOSTS.has(host) || !url.pathname.includes('/maps')) return null;
+
+    for (const pattern of MAPS_LINK_COORD_PATTERNS) {
+      const match = term.match(pattern);
+      if (match) {
+        return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+      }
+    }
+    return null;
+  }
+
+  private tryParseUrl(term: string): URL | null {
+    try {
+      return new URL(term);
+    } catch {
+      return null;
     }
   }
 

@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 import { environment } from '../../enviroments/enviroments';
 
 export interface GeocodeResult {
@@ -32,6 +33,23 @@ interface GoogleGeocodeResponse {
 
 @Injectable({ providedIn: 'root' })
 export class GeocodingService {
+  private functions = inject(Functions);
+
+  // Links curtos do Google Maps (maps.app.goo.gl / goo.gl/maps) não carregam
+  // coordenada no próprio texto — só o servidor consegue seguir o redirect.
+  async resolveShortMapsLink(url: string): Promise<GeocodeResult | null> {
+    try {
+      const resolveMapsShortLinkFn = httpsCallable<{ url: string }, GeocodeResult>(
+        this.functions,
+        'resolveMapsShortLink'
+      );
+      const result = await resolveMapsShortLinkFn({ url });
+      return result.data;
+    } catch {
+      return null;
+    }
+  }
+
   geocode(address: string): Promise<GeocodeResult | null> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
