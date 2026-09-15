@@ -17,6 +17,12 @@ export interface ReverseGeocodeResult {
   address: string;
 }
 
+interface ResolveMapsShortLinkResult {
+  lat?: number;
+  lng?: number;
+  address?: string;
+}
+
 interface GoogleAddressComponent {
   long_name: string;
   short_name: string;
@@ -37,14 +43,20 @@ export class GeocodingService {
 
   // Links curtos do Google Maps (maps.app.goo.gl / goo.gl/maps) não carregam
   // coordenada no próprio texto — só o servidor consegue seguir o redirect.
+  // Link de "lugar" (share de negócio/endereço) não traz lat/lng no redirect,
+  // só o texto do endereço — nesse caso cai pro geocode (Nominatim) local.
   async resolveShortMapsLink(url: string): Promise<GeocodeResult | null> {
     try {
-      const resolveMapsShortLinkFn = httpsCallable<{ url: string }, GeocodeResult>(
+      const resolveMapsShortLinkFn = httpsCallable<{ url: string }, ResolveMapsShortLinkResult>(
         this.functions,
         'resolveMapsShortLink'
       );
       const result = await resolveMapsShortLinkFn({ url });
-      return result.data;
+      const { lat, lng, address } = result.data;
+
+      if (lat != null && lng != null) return { lat, lng };
+      if (address) return this.geocode(address);
+      return null;
     } catch {
       return null;
     }

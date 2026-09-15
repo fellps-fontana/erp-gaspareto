@@ -5,23 +5,24 @@ export interface ResolveMapsShortLinkInput {
 }
 
 export interface ResolveMapsShortLinkOutput {
-  lat: number;
-  lng: number;
+  lat?: number;
+  lng?: number;
+  address?: string;
 }
 
 /**
  * Resolve um link curto do Google Maps (maps.app.goo.gl ou goo.gl/maps) seguindo
- * o redirect HTTP do servidor (302) e extraindo as coordenadas lat/lng da URL
- * de destino. Evita CORS que ocorreria se feito no client.
+ * o redirect HTTP do servidor (302) e extraindo coordenadas (lat/lng) ou endereço
+ * da URL de destino. Evita CORS que ocorreria se feito no client.
  *
  * Qualquer usuário autenticado pode chamar.
  *
  * @param url - URL curta do Google Maps (maps.app.goo.gl ou goo.gl/maps/...)
- * @returns lat e lng extraídos da URL de destino do redirect
+ * @returns { lat, lng } se link de coordenada, ou { address } se link de lugar/endereço
  *
  * @throws HttpsError('unauthenticated') se chamada sem autenticação
  * @throws HttpsError('invalid-argument') se url tiver host não autorizado (anti-SSRF)
- * @throws HttpsError('not-found') se redirect não retornar Location ou coordenadas não forem encontradas
+ * @throws HttpsError('not-found') se redirect não retornar Location ou nenhuma coordenada/endereço for encontrado
  */
 export const resolveMapsShortLink = onCall<ResolveMapsShortLinkInput>(
   { region: 'us-central1' },
@@ -73,16 +74,16 @@ export const resolveMapsShortLink = onCall<ResolveMapsShortLinkInput>(
       throw new HttpsError('not-found', 'Header Location não encontrado no redirect');
     }
 
-    // Extrair lat/lng da URL de destino
-    const coords = extractCoordinates(location);
-    if (!coords) {
+    // Extrair coordenadas ou endereço da URL de destino
+    const result = extractCoordinates(location);
+    if (!result) {
       throw new HttpsError(
         'not-found',
-        'Não foi possível extrair coordenadas da URL de destino'
+        'Não foi possível extrair coordenadas ou endereço da URL de destino'
       );
     }
 
-    return coords;
+    return result;
   }
 );
 
@@ -115,18 +116,22 @@ function isAuthorizedHost(urlObj: URL): boolean {
 }
 
 /**
- * Extrai lat/lng da URL de destino do Google Maps.
- * Tenta 3 padrões em ordem:
+ * Extrai coordenadas ou endereço da URL de destino do Google Maps.
+ * Tenta 3 padrões de coordenada em ordem:
  * 1. @lat,lng (ex: /maps/@27.084450,-52.647169,zoom)
  * 2. q=lat,lng (ex: ?q=27.084450,-52.647169)
  * 3. /search/lat,+lng (ex: /maps/search/27.084450,+-52.647169)
  *
- * @returns { lat, lng } se encontrado, null caso contrário
+ * Se nenhum padrão de coordenada bater, tenta extrair endereço do parâmetro
+ * `q` (ex: ?q=Superalfa+-+Chapecó...) — case de compartilhamento de lugar do app
+ * mobile que não carrega coordenadas, só o nome/endereço.
+ *
+ * @returns { lat, lng } se coordenada encontrada, { address } se endereço, null caso contrário
  */
-function extractCoordinates(url: string): ResolveMapsShortLinkOutput | null {
+function extractCoordinates(destinationUrl: string): ResolveMapsShortLinkOutput | null {
   // Padrão 1: @lat,lng
   const pattern1 = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-  const match1 = url.match(pattern1);
+  const match1 = destinationUrl.match(pattern1);
   if (match1) {
     return {
       lat: parseFloat(match1[1]),
@@ -136,7 +141,7 @@ function extractCoordinates(url: string): ResolveMapsShortLinkOutput | null {
 
   // Padrão 2: q=lat,lng (pode ter + antes do lng negativo)
   const pattern2 = /[?&]q=(-?\d+\.\d+),\+?(-?\d+\.\d+)/;
-  const match2 = url.match(pattern2);
+  const match2 = destinationUrl.match(pattern2);
   if (match2) {
     return {
       lat: parseFloat(match2[1]),
@@ -146,12 +151,46 @@ function extractCoordinates(url: string): ResolveMapsShortLinkOutput | null {
 
   // Padrão 3: /search/lat,+lng (pode ter + antes do lng negativo)
   const pattern3 = /\/search\/(-?\d+\.\d+),\+?(-?\d+\.\d+)/;
-  const match3 = url.match(pattern3);
+  const match3 = destinationUrl.match(pattern3);
   if (match3) {
     return {
       lat: parseFloat(match3[1]),
       lng: parseFloat(match3[2]),
     };
+  }
+
+  // Fallback: extrair endereço do parâmetro q se houver
+  const addressResult = extractAddressFromQuery(destinationUrl);
+  if (addressResult) {
+    return addressResult;
+  }
+
+  return null;
+}
+
+/**
+ * Extrai endereço do parâmetro `q` da URL de destino (fallback quando coordenadas não existem).
+ * Decodifica o valor de `q` e retorna como address.
+ *
+ * @returns { address } se q encontrado e não-vazio, null caso contrário
+ */
+function extractAddressFromQuery(destinationUrl: string): ResolveMapsShortLinkOutput | null {
+  // Tentar extrair q= com URLSearchParams (suporta múltiplos parâmetros e decodificação automática)
+  try {
+    const urlObj = new URL(destinationUrl);
+    const q = urlObj.searchParams.get('q');
+    if (q && q.trim()) {
+      return { address: q };
+    }
+  } catch {
+    // Se URLSearchParams falhar, tentar regex simples
+    const qMatch = destinationUrl.match(/[?&]q=([^&]+)/);
+    if (qMatch && qMatch[1]) {
+      const decoded = decodeURIComponent(qMatch[1]);
+      if (decoded.trim()) {
+        return { address: decoded };
+      }
+    }
   }
 
   return null;
