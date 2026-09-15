@@ -55,11 +55,36 @@ export class GeocodingService {
       const { lat, lng, address } = result.data;
 
       if (lat != null && lng != null) return { lat, lng };
-      if (address) return this.geocode(address);
+      if (address) return this.geocodePlaceAddress(address);
       return null;
     } catch {
       return null;
     }
+  }
+
+  // Endereço de "lugar" vem com nome do negócio/filial colado na frente
+  // (ex.: "Superalfa - Chapecó Matriz - Av. Fernando Machado, 2690 - ..."),
+  // o que confunde a busca livre do Nominatim. Tenta o texto completo
+  // primeiro e vai removendo segmentos (separados por " - ") do início até
+  // achar resultado ou sobrar só 1 segmento — nunca tenta string vazia.
+  // Chamadas sequenciais (await uma de cada vez): Nominatim tem rate limit
+  // de uso público (~1 req/s), não pode disparar em paralelo. Teto de
+  // segurança em 6 tentativas para textos com muitos separadores.
+  private async geocodePlaceAddress(address: string): Promise<GeocodeResult | null> {
+    const trimmed = address.trim();
+    if (!trimmed) return null;
+
+    const MAX_ATTEMPTS = 6;
+    const segments = trimmed.split(' - ');
+    const attempts = Math.min(segments.length, MAX_ATTEMPTS);
+
+    for (let removed = 0; removed < attempts; removed++) {
+      const candidate = segments.slice(removed).join(' - ');
+      const result = await this.geocode(candidate);
+      if (result) return result;
+    }
+
+    return null;
   }
 
   geocode(address: string): Promise<GeocodeResult | null> {
