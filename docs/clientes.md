@@ -50,7 +50,12 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   centraliza direto na coordenada e move o pin, sem passar pelo geocoder
   (Nominatim `/search` só resolve endereço em texto, não coordenada crua).
   Sem fallback de centro dedicado: tenta geolocalização do navegador,
-  senão abre num centro fixo genérico do Brasil (zoom baixo).
+  senão abre num centro fixo genérico do Brasil (zoom baixo). Também
+  aceita link do Google Maps colado na busca (PRs #17/#19/#20): link
+  longo (`@lat,lng`, `q=lat,lng`, `/search/lat,lng`) é extraído por regex
+  no próprio componente, sem chamada de rede; link curto
+  (`maps.app.goo.gl`/`goo.gl/maps`) é resolvido via
+  `GeocodingService.resolveShortMapsLink`.
 - **`GoogleMapsLoaderService`** (`src/services/google-maps-loader-service/`)
   — Promise cacheada que aguarda o script do Google Maps (carregado
   globalmente via `<script defer>` em `index.html`) ficar pronto, sem
@@ -62,6 +67,22 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   - `geocode(address)` — Nominatim (OpenStreetMap), usado pela busca por
     texto do mini-mapa e pela rota de entrega (`delivery-route.ts`) quando
     um pedido não tem `addressLat`/`addressLng` salvos.
+  - `resolveShortMapsLink(url)` (PRs #17/#19/#20) — resolve link curto do
+    Google Maps via Cloud Function `resolveMapsShortLink`
+    (`functions/src/resolve-maps-short-link.ts`). A function segue o
+    redirect HTTP no servidor (`redirect: 'manual'`, só lê o header
+    `Location` — evita CORS e não baixa corpo de resposta de host não
+    confiável) e devolve `{ lat, lng }` (link de pin solto) ou
+    `{ address }` (link de "lugar"/negócio, que não carrega coordenada,
+    só nome+endereço no parâmetro `q`). No caso `address`, o texto
+    completo costuma ter o nome do negócio colado na frente
+    (`"<Nome> - <Filial> - <Endereço>"`), o que confunde o parser do
+    Nominatim — `geocodePlaceAddress` tenta geocodar o texto completo e,
+    se falhar, vai removendo segmentos do início (separados por `" - "`)
+    até achar resultado ou esgotar (teto de 6 tentativas, sequencial).
+    Allowlist de host anti-SSRF na function restrita a
+    `maps.app.goo.gl`/`goo.gl/maps`, HTTPS obrigatório; exige usuário
+    autenticado do tenant, não toca Firestore.
   - `reverseGeocode(lat, lng)` — Google Geocoding API. Extrai
     `rua`/`numero`/`bairro`/`cidade`/`uf`/`cep` dos `address_components`
     por `type` (não por ordem do array — a extração itera a lista de tipos
@@ -102,6 +123,16 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   na mesma sessão de página herda o erro antigo em vez de tentar de novo.
   Não é bug bloqueante (recarregar a página resolve), sinalizado pelo
   style na revisão, sem task aberta pra corrigir ainda.
+- Homolog (`hologaerp`) está no plano Firebase Spark (gratuito) — Cloud
+  Functions v2 exige plano Blaze. `resolveMapsShortLink` está deployada em
+  prod (`projetosfelipe-9e458`) mas não em homolog; testar link curto do
+  Maps em homolog só depois de upgradar o plano. Link longo funciona
+  normalmente lá (é só regex no client, não depende de function).
+- `geocodePlaceAddress` (retry progressivo removendo segmentos do texto de
+  endereço) é uma heurística sobre o formato que o Google usa hoje
+  (`"<Nome> - <Filial> - <Endereço>"`) — não é garantia formal, o Google
+  pode mudar esse formato de `q=` sem aviso. Sem teste automatizado
+  cobrindo esse fluxo (feature não é regra crítica, TDD não entrou).
 
 ## O que cada agent entregou
 
@@ -127,7 +158,18 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   do array de resposta em vez da prioridade declarada — corrigido
   invertendo os loops); duplicação de `setCenter`+`setZoom` em 5 pontos do
   `MapPickerComponent` pós-migração pro Google Maps (extraído método
-  `centerMap`).
+  `centerMap`). Nas rodadas de busca por link do Maps (PRs #17/#19/#20):
+  validação de host do link longo usando `.includes()` (burlável por
+  `google.com.attacker.io`, corrigido pra comparação exata); string de
+  erro duplicada; parâmetro `url` ambíguo dentro das funções auxiliares da
+  Cloud Function (renomeado pra `destinationUrl`).
+- **gon**: gate condicional (PR #17), Cloud Function nova com fetch de URL
+  do usuário — achou bypass de path na allowlist do `goo.gl`
+  (`startsWith('/maps')` aceitava `/mapsXYZ`), erro cru de exceção
+  vazando pro client, e falta de checagem de protocolo HTTPS; todos
+  corrigidos e reaprovados. Não precisou de nova rodada nos PRs
+  #19/#20 (mesma fronteira de confiança já existente, sem dependência
+  nova).
 
 ## Notas operacionais
 
@@ -199,3 +241,41 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   lados: usuário reportou funcionando, reteste isolado da chave retornou
   `MAP_INIT_OK` sem erro. Header CSP conferido via `curl -I` em staging e
   produção após deploy. Merge limpo, branch apagada.
+- **PR #17** — implementação: busca no `MapPickerComponent` passou a
+  aceitar link do Google Maps (além de coordenada crua e endereço). Link
+  longo resolvido por regex no client; link curto via Cloud Function nova
+  `resolveMapsShortLink` (`functions/src/resolve-maps-short-link.ts`), com
+  allowlist anti-SSRF e gate de segurança do `gon` (2 rodadas — ver acima).
+  Testado em homolog (só link longo — homolog no plano Spark, function não
+  deploya lá). Após merge, achado real em produção: CSP do hosting
+  (`firebase.json`) não incluía `*.cloudfunctions.net` em `connect-src` —
+  o navegador bloqueava toda chamada `httpsCallable` antes de sair, sem
+  gerar log nenhum no servidor (diagnosticado comparando chamada manual
+  via `curl`, que aparecia em `firebase functions:log`, com a do
+  navegador, que nunca aparecia). Corrigido no PR #18. Esse mesmo bug
+  provavelmente já afetava `resetUserPassword`/`setSuperAdmin`
+  (pré-existentes), sem ninguém ter notado. Merge limpo, branch apagada.
+- **PR #18** — correção: adiciona `https://*.cloudfunctions.net` ao
+  `connect-src` da CSP em `firebase.json` (achado acima). Deploy manual de
+  hosting em prod e homolog após merge (CSP é header de hosting, não sobe
+  sozinho só com o merge — precisou de `firebase deploy --only hosting`
+  nos dois projetos).
+- **PR #19** — correção: link de "lugar" (negócio/endereço compartilhado
+  do celular — o caso mais comum de link curto, não o pin solto) não
+  carrega coordenada no redirect, só um `q=<texto>`. `resolveMapsShortLink`
+  ganhou fallback: sem coordenada nos 3 padrões, extrai `q` decodificado e
+  devolve `{ address }`; client geocoda via Nominatim (`geocode` já
+  existente). Function redeployada manualmente em prod após merge (não
+  sobe sozinha, só hosting tem deploy automático).
+- **PR #20** — correção: o `address` devolvido pela function costuma vir
+  com nome do negócio colado na frente
+  (`"Superalfa - Chapecó Matriz - Av. ..."`), que o Nominatim não geocoda
+  — confirmado testando direto contra a API pública. `geocodePlaceAddress`
+  tenta o texto completo e, se falhar, remove segmentos do início
+  (separados por `" - "`) até achar resultado, sequencial, teto de 6
+  tentativas. Só `src/`, hosting subiu sozinho no merge. Confirmado
+  funcionando em produção pelo usuário (caso de teste real: link
+  `maps.app.goo.gl/KUdPBgAXETxTKMNY6`).
+- PRs #17-#20 tiveram merge limpo (fast-forward via squash/merge commit,
+  sem conflito), cada um confirmado por análise pós-merge sem divergência
+  entre revisado e mergeado.
