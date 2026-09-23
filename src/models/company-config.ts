@@ -16,6 +16,7 @@ export interface ModuleConfig {
 
 export interface CompanyConfig {
   id?: string;
+  name?: string;
   modules: ModuleConfig;
 }
 
