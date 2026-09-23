@@ -91,6 +91,11 @@ cross-tenant controlado. Ver `.claude/context/regra-de-negocio.md` seção 13
   (`src/components/home/`); primeira infra de Cloud Functions do projeto
   (`functions/` — `resetUserPassword`, `setSuperAdmin`,
   `requireSuperAdmin`).
+- **Nome da empresa na UI (PR #22):** `CompanyConfig.name?` +
+  signal `ConfigService.companyName`, preenchido pelo mesmo listener de
+  `companies/{companyId}` que carrega os módulos (sem leitura extra) e
+  zerado ao deslogar. A sidebar da Gestão (`product-inventory.html`) exibe
+  esse nome no lugar do antigo texto fixo `VERMEIOLANDIA`.
 
 ## Lacunas conhecidas / pendências
 
@@ -188,3 +193,8 @@ cross-tenant controlado. Ver `.claude/context/regra-de-negocio.md` seção 13
   vezes (interrupções de sessão) — se testes começarem a falhar de forma
   inconsistente, verificar primeiro se o emulador está respondendo
   (`curl 127.0.0.1:8080`) antes de suspeitar do código.
+- `npm test` sozinho **não** sobe o emulador: os ~41 specs de service
+  (isolamento por `companyId`, recorrência de contas, etc.) falham com
+  `auth/network-request-failed`. Rodar a suíte completa com
+  `npx firebase emulators:exec --only firestore,auth "npx ng test --watch=false"`
+  — 150/150 verdes em 2026-09-22.
