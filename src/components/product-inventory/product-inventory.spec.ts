@@ -37,9 +37,10 @@ describe('ProductInventoryComponent', () => {
     },
     config: {
       modules$: of({ gestao: true, clientes: true, compras: true }),
-      // O template chama config.modules() (signal) diretamente — necessário só
-      // pra suites que disparam fixture.detectChanges() (ex.: modal de detalhe).
-      modules: () => ({ gestao: true, clientes: true, compras: true, vendedores: true })
+      // O template chama config.modules()/companyName() (signals) diretamente —
+      // necessário só pra suites que disparam fixture.detectChanges() (ex.: modal de detalhe).
+      modules: () => ({ gestao: true, clientes: true, compras: true, vendedores: true }),
+      companyName: () => ''
     },
     geocodingService: { reverseGeocode: () => of(null) },
     vendedorService: {
