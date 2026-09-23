@@ -1456,6 +1456,59 @@ input[type="color"] {
 }
 
 /* ==========================================================
+   MODAL DETALHE DO LANÇAMENTO (Histórico Geral)
+   ========================================================== */
+.detalhe-lancamento-modal {
+  max-width: 34rem;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.detalhe-lancamento-modal h2 {
+  margin-bottom: 0.5rem;
+}
+
+.detalhe-lancamento-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.detalhe-lancamento-endereco,
+.detalhe-lancamento-observacoes {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  margin: 0 0 0.75rem;
+}
+
+.detalhe-lancamento-observacoes strong {
+  color: var(--text-primary);
+}
+
+.detalhe-lancamento-itens {
+  margin-bottom: 0.75rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.detalhe-lancamento-itens li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.balanco-formula.detalhe-lancamento-valores {
+  padding: 1rem 1.25rem;
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+}
+
+/* ==========================================================
    ABA COMPRAS
    ========================================================== */
 .compra-produtos-lista {
@@ -1476,6 +1529,16 @@ input[type="color"] {
 }
 
 .compra-card:hover { background: var(--bg-muted); }
+
+/* Histórico Geral: card clicável, abre o modal de detalhe do lançamento */
+.compra-card.historico-card-clickable {
+  cursor: pointer;
+}
+
+.compra-card.historico-card-clickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
 
 .compra-info {
   flex: 1;

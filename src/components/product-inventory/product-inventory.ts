@@ -28,6 +28,19 @@ import { VendedorService } from '../../services/vendedor-service/vendedor-servic
 import { ComandaService } from '../../services/comanda-service/comanda-service';
 import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
 import { MapPickerComponent } from '../map-picker/map-picker';
+import { calcularTotalItemPorPeso } from '../../services/product-service/product-weight-rules';
+
+// --- HISTÓRICO GERAL: item de produto dentro de um lançamento unificado ---
+// Snapshot preservado (priceAtSale/priceAtCost) igual Sale/Order/Comanda —
+// é o que sustenta o cálculo de custo/lucro do detalhe do lançamento.
+export interface HistoricoItemProduto {
+  idProduct: string;
+  productName: string;
+  quantity: number;
+  priceAtSale: number;
+  priceAtCost: number; // snapshot no momento do lançamento — base do custo/lucro
+  soldByWeight?: boolean; // snapshot: true = quantity representa peso em kg
+}
 
 // --- HISTÓRICO GERAL: item unificado das 3 origens (pdv/pedido/comanda) ---
 // Não é uma coleção do Firestore, é só uma forma comum de exibir sales,
@@ -43,7 +56,13 @@ export interface HistoricoItem {
   total: number;
   paymentMethod?: PaymentMethod; // só pdv/pedido — comanda não tem
   installments?: number; // 1/ausente = à vista, N = parcelado — espelha Sale/Order.installments
-  itens: { idProduct: string; productName: string; quantity: number }[];
+  itens: HistoricoItemProduto[];
+  // --- DETALHE DO LANÇAMENTO (modal aberto pelo card — ver abrirDetalheLancamento) ---
+  itemsTotal: number; // subtotal só dos produtos, sem frete
+  shippingCost: number; // só 'pedido' pode ser > 0; pdv/comanda não têm frete, sempre 0
+  deliveryType?: 'pickup' | 'delivery'; // só 'pedido'
+  address?: string; // só 'pedido' com deliveryType 'delivery'
+  observations?: string; // só 'pedido', opcional
 }
 
 @Component({
@@ -168,6 +187,8 @@ export class ProductInventoryComponent implements OnInit {
   filtroHistoricoBusca: string = '';
   filtroHistoricoFormaPagamento: PaymentMethod | 'todos' = 'todos';
   filtrosHistoricoVisiveis: boolean = false;
+  /** Lançamento aberto no modal de detalhe — null = modal fechado. */
+  detalheLancamentoAberto: HistoricoItem | null = null;
 
   // campos de endereço resolvidos via mini-mapa (lat/lng -> geocodificação reversa)
   clienteRua = '';
@@ -291,58 +312,127 @@ export class ProductInventoryComponent implements OnInit {
     // endereço, ciclo de status), então a origem "pedido" cobre esse caso.
     const itensPdv: HistoricoItem[] = vendas
       .filter(v => v.sale_type === 'pdv')
-      .map(v => ({
-        id: v.id!,
-        origem: 'pdv' as const,
-        data: this.dataDoPedido(v.date),
-        clienteNome: 'Balcão (sem cliente)',
-        clienteId: undefined,
-        status: v.status || 'completed',
-        total: v.total || 0,
-        paymentMethod: v.paymentMethod,
-        installments: v.installments,
-        itens: (v.items || []).map((i: any) => ({
-          idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
-        }))
-      }));
+      .map(v => {
+        const itens = this.mapearItensHistorico(v.items);
+        return {
+          id: v.id!,
+          origem: 'pdv' as const,
+          data: this.dataDoPedido(v.date),
+          clienteNome: 'Balcão (sem cliente)',
+          clienteId: undefined,
+          status: v.status || 'completed',
+          total: v.total || 0,
+          paymentMethod: v.paymentMethod,
+          installments: v.installments,
+          itens,
+          itemsTotal: this.somaItensPorPrecoVenda(itens),
+          shippingCost: 0 // PDV não tem frete
+        };
+      });
 
-    const itensPedido: HistoricoItem[] = pedidos.map(p => ({
-      id: p.id!,
-      numero: p.orderNumber,
-      origem: 'pedido' as const,
-      data: this.dataDoPedido(p.createdAt),
-      clienteNome: p.customerName || 'Sem nome',
-      clienteId: p.customerId,
-      status: p.status,
-      total: p.total || 0,
-      paymentMethod: p.paymentMethod,
-      installments: p.installments,
-      itens: (p.items || []).map(i => ({
-        idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
-      }))
-    }));
+    const itensPedido: HistoricoItem[] = pedidos.map(p => {
+      const itens = this.mapearItensHistorico(p.items);
+      return {
+        id: p.id!,
+        numero: p.orderNumber,
+        origem: 'pedido' as const,
+        data: this.dataDoPedido(p.createdAt),
+        clienteNome: p.customerName || 'Sem nome',
+        clienteId: p.customerId,
+        status: p.status,
+        total: p.total || 0,
+        paymentMethod: p.paymentMethod,
+        installments: p.installments,
+        itens,
+        // p.itemsTotal é o valor gravado pelo OrderService; fallback pra soma
+        // dos itens só cobre pedido antigo/inconsistente sem o campo.
+        itemsTotal: p.itemsTotal ?? this.somaItensPorPrecoVenda(itens),
+        shippingCost: p.shippingCost || 0,
+        deliveryType: p.deliveryType,
+        address: p.address,
+        observations: p.observations
+      };
+    });
 
     // Comandas guardam o nome do cliente como texto livre, não vinculado a
     // um Customer.id — por isso não entram no filtro por cliente (mesma
     // limitação que já existe hoje pras vendas de PDV no Relatório).
-    const itensComanda: HistoricoItem[] = comandas.map(c => ({
-      id: c.id!,
-      origem: 'comanda' as const,
-      data: this.dataDoPedido(c.createdAt),
-      clienteNome: c.customerName || 'Sem nome',
-      clienteId: undefined,
-      status: c.status,
-      total: c.total || 0,
-      itens: (c.items || []).map((i: any) => ({
-        idProduct: i.idProduct, productName: i.productName, quantity: i.quantity
-      }))
-    }));
+    const itensComanda: HistoricoItem[] = comandas.map(c => {
+      const itens = this.mapearItensHistorico(c.items);
+      return {
+        id: c.id!,
+        origem: 'comanda' as const,
+        data: this.dataDoPedido(c.createdAt),
+        clienteNome: c.customerName || 'Sem nome',
+        clienteId: undefined,
+        status: c.status,
+        total: c.total || 0,
+        itens,
+        itemsTotal: this.somaItensPorPrecoVenda(itens),
+        shippingCost: 0 // Comanda não tem frete
+      };
+    });
 
     return [...itensPdv, ...itensPedido, ...itensComanda].sort((a, b) => {
       const ta = a.data ? a.data.getTime() : 0;
       const tb = b.data ? b.data.getTime() : 0;
       return tb - ta;
     });
+  }
+
+  // Normaliza os itens crus do snapshot (Sale/Order/Comanda) pro formato do
+  // Histórico Geral, preservando priceAtSale/priceAtCost/soldByWeight — é o
+  // que sustenta o cálculo de custo/lucro no modal de detalhe, sem precisar
+  // buscar nada novo no Firestore.
+  private mapearItensHistorico(itens: { idProduct: string; productName: string; quantity: number; priceAtSale: number; priceAtCost: number; soldByWeight?: boolean }[] | undefined): HistoricoItemProduto[] {
+    return (itens || []).map(i => ({
+      idProduct: i.idProduct,
+      productName: i.productName,
+      quantity: i.quantity,
+      priceAtSale: i.priceAtSale || 0,
+      priceAtCost: i.priceAtCost || 0,
+      soldByWeight: i.soldByWeight
+    }));
+  }
+
+  // Fallback de itemsTotal (pdv/comanda sempre usam este cálculo; pedido só
+  // recorre a ele se Order.itemsTotal não estiver gravado). Reusa
+  // subtotalItemHistorico pra não duplicar a regra de peso.
+  private somaItensPorPrecoVenda(itens: HistoricoItemProduto[]): number {
+    return itens.reduce((soma, i) => soma + this.subtotalItemHistorico(i), 0);
+  }
+
+  // ==========================================================
+  // MODAL: DETALHE DO LANÇAMENTO (item do Histórico Geral)
+  // ==========================================================
+
+  abrirDetalheLancamento(item: HistoricoItem) {
+    this.detalheLancamentoAberto = item;
+  }
+
+  fecharDetalheLancamento() {
+    this.detalheLancamentoAberto = null;
+  }
+
+  // Custo dos produtos do lançamento — mesma fórmula do relatório
+  // (soma priceAtCost * quantity), sobre o snapshot gravado nos itens.
+  custoHistoricoItem(item: HistoricoItem): number {
+    return item.itens.reduce((soma, i) => soma + i.priceAtCost * i.quantity, 0);
+  }
+
+  // Lucro = subtotal dos produtos - custo dos produtos. Frete é repasse,
+  // não entra no lucro nem no custo.
+  lucroHistoricoItem(item: HistoricoItem): number {
+    return item.itemsTotal - this.custoHistoricoItem(item);
+  }
+
+  // Total em dinheiro de um item do lançamento — mesma regra de peso do PDV
+  // (pdv.ts#totalLinha): delega a produto por kg pra calcularTotalItemPorPeso
+  // (arredondamento seguro a centavos), senão priceAtSale * quantity direto.
+  subtotalItemHistorico(i: HistoricoItemProduto): number {
+    return i.soldByWeight
+      ? calcularTotalItemPorPeso(i.priceAtSale, i.quantity)
+      : i.priceAtSale * i.quantity;
   }
 
   get historicoFiltrado(): HistoricoItem[] {
@@ -1013,7 +1103,9 @@ export class ProductInventoryComponent implements OnInit {
     return map[status] || status;
   }
 
-  tipoEntregaLabel(tipo: 'pickup' | 'delivery'): string {
+  // Aceita undefined porque HistoricoItem.deliveryType é opcional (só existe
+  // pra origem 'pedido') — sem non-null assertion no call site.
+  tipoEntregaLabel(tipo: 'pickup' | 'delivery' | undefined): string {
     return tipo === 'delivery' ? 'Entrega' : 'Retirada';
   }
 
