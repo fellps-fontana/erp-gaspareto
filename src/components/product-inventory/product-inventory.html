@@ -835,7 +835,15 @@
           Nenhum lançamento encontrado com esses filtros.
         </div>
 
-        <div class="compra-card" *ngFor="let item of historicoFiltrado; trackBy: trackByHistorico">
+        <div
+          class="compra-card historico-card-clickable"
+          *ngFor="let item of historicoFiltrado; trackBy: trackByHistorico"
+          role="button"
+          tabindex="0"
+          [attr.aria-label]="'Ver detalhes do lançamento de ' + item.clienteNome"
+          (click)="abrirDetalheLancamento(item)"
+          (keydown.enter)="abrirDetalheLancamento(item)"
+        >
           <div class="compra-info">
             <div class="pedido-historico-header">
               <div class="header-left-group">
@@ -954,6 +962,79 @@
 
       <div class="checkout-actions">
         <button class="btn-cancel" (click)="fecharHistoricoCliente()">FECHAR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DETALHE DO LANÇAMENTO (Histórico Geral: pdv/pedido/comanda) -->
+  <div class="checkout-overlay" *ngIf="detalheLancamentoAberto as item" (click)="fecharDetalheLancamento()">
+    <div class="checkout-modal detalhe-lancamento-modal" (click)="$event.stopPropagation()">
+      <div class="pedido-historico-header">
+        <div class="header-left-group">
+          <span class="order-number" *ngIf="item.numero">#{{ item.numero }}</span>
+          <span class="status-badge" [ngClass]="item.origem">{{ origemLabel(item.origem) }}</span>
+        </div>
+        <div class="header-right-group">
+          <span class="status-badge" [ngClass]="statusClassHistorico(item)">{{ statusLabelHistorico(item) }}</span>
+          <span class="pedido-historico-data">{{ item.data | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+      </div>
+
+      <h2>{{ item.clienteNome }}</h2>
+
+      <div class="detalhe-lancamento-meta">
+        <span class="meta-badge" *ngIf="item.paymentMethod">
+          💳 {{ paymentMethodLabel(item.paymentMethod) }}<ng-container *ngIf="item.installments && item.installments > 1"> · {{ item.installments }}x</ng-container>
+        </span>
+        <span class="meta-badge" *ngIf="item.origem === 'pedido'">🚚 {{ tipoEntregaLabel(item.deliveryType) }}</span>
+      </div>
+
+      <p class="detalhe-lancamento-endereco" *ngIf="item.origem === 'pedido' && item.deliveryType === 'delivery' && item.address">
+        📍 {{ item.address }}
+      </p>
+
+      <ul class="pedido-historico-itens detalhe-lancamento-itens">
+        <li *ngFor="let i of item.itens">
+          <span>{{ i.quantity }}{{ i.soldByWeight ? 'kg' : 'x' }} {{ i.productName }}</span>
+          <span>R$ {{ i.priceAtSale | number:'1.2-2' }} — R$ {{ subtotalItemHistorico(i) | number:'1.2-2' }}</span>
+        </li>
+      </ul>
+
+      <p class="detalhe-lancamento-observacoes" *ngIf="item.observations">
+        <strong>Observações:</strong> {{ item.observations }}
+      </p>
+
+      <div class="balanco-formula detalhe-lancamento-valores">
+        <div class="formula-linha">
+          <span class="formula-label">Subtotal Produtos</span>
+          <span class="formula-valor">R$ {{ item.itemsTotal | number:'1.2-2' }}</span>
+        </div>
+        <div class="formula-linha" *ngIf="item.origem === 'pedido'">
+          <span class="formula-label">Frete</span>
+          <span class="formula-valor" *ngIf="item.deliveryType !== 'pickup'; else semFrete">R$ {{ item.shippingCost | number:'1.2-2' }}</span>
+          <ng-template #semFrete><span class="formula-valor">Retirada — sem frete</span></ng-template>
+        </div>
+        <div class="formula-separador"></div>
+        <div class="formula-linha formula-resultado">
+          <span class="formula-label">Total Pago</span>
+          <span class="formula-valor">R$ {{ item.total | number:'1.2-2' }}</span>
+        </div>
+        <div class="formula-linha">
+          <span class="formula-label">Custo dos Produtos</span>
+          <span class="formula-valor negativo">− R$ {{ custoHistoricoItem(item) | number:'1.2-2' }}</span>
+        </div>
+        <div
+          class="formula-linha formula-resultado"
+          [class.positivo]="lucroHistoricoItem(item) >= 0"
+          [class.negativo]="lucroHistoricoItem(item) < 0"
+        >
+          <span class="formula-label">Lucro</span>
+          <span class="formula-valor">R$ {{ lucroHistoricoItem(item) | number:'1.2-2' }}</span>
+        </div>
+      </div>
+
+      <div class="checkout-actions">
+        <button class="btn-cancel" (click)="fecharDetalheLancamento()">FECHAR</button>
       </div>
     </div>
   </div>

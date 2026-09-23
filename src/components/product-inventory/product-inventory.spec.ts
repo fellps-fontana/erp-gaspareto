@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ProductInventoryComponent, HistoricoItem } from './product-inventory';
+import { ProductInventoryComponent, HistoricoItem, HistoricoItemProduto } from './product-inventory';
 import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
@@ -36,7 +36,11 @@ describe('ProductInventoryComponent', () => {
       warning: jasmine.createSpy('warning')
     },
     config: {
-      modules$: of({ gestao: true, clientes: true, compras: true })
+      modules$: of({ gestao: true, clientes: true, compras: true }),
+      // O template chama config.modules()/companyName() (signals) diretamente —
+      // necessário só pra suites que disparam fixture.detectChanges() (ex.: modal de detalhe).
+      modules: () => ({ gestao: true, clientes: true, compras: true, vendedores: true }),
+      companyName: () => ''
     },
     geocodingService: { reverseGeocode: () => of(null) },
     vendedorService: {
@@ -118,7 +122,9 @@ describe('ProductInventoryComponent', () => {
           status: 'finished',
           total: 100,
           paymentMethod: PaymentMethod.DINHEIRO,
-          itens: []
+          itens: [],
+          itemsTotal: 100,
+          shippingCost: 0
         },
         {
           id: '2',
@@ -130,7 +136,9 @@ describe('ProductInventoryComponent', () => {
           status: 'finished',
           total: 200,
           paymentMethod: PaymentMethod.PIX,
-          itens: []
+          itens: [],
+          itemsTotal: 200,
+          shippingCost: 0
         },
         {
           id: '3',
@@ -142,7 +150,9 @@ describe('ProductInventoryComponent', () => {
           status: 'finished',
           total: 150,
           paymentMethod: PaymentMethod.CARTAO,
-          itens: []
+          itens: [],
+          itemsTotal: 150,
+          shippingCost: 0
         },
         {
           id: '4',
@@ -152,7 +162,9 @@ describe('ProductInventoryComponent', () => {
           status: 'completed',
           total: 50,
           paymentMethod: PaymentMethod.CHEQUE,
-          itens: []
+          itens: [],
+          itemsTotal: 50,
+          shippingCost: 0
         }
       ];
     });
@@ -205,6 +217,183 @@ describe('ProductInventoryComponent', () => {
       const result = component.historicoFiltrado;
       expect(result.length).toBe(1, 'Should return 1 item (origin pedido + CARTAO)');
       expect(result[0].id).toBe('3', 'Should return the CARTAO pedido item');
+    });
+  });
+
+  describe('custoHistoricoItem() / lucroHistoricoItem()', () => {
+    it('should sum priceAtCost * quantity across items for custoHistoricoItem', () => {
+      const item: HistoricoItem = {
+        id: '10',
+        origem: 'pedido',
+        data: new Date('2026-01-01'),
+        clienteNome: 'Cliente X',
+        status: 'finished',
+        total: 130,
+        itens: [
+          { idProduct: 'p1', productName: 'Produto 1', quantity: 2, priceAtSale: 20, priceAtCost: 10 },
+          { idProduct: 'p2', productName: 'Produto 2', quantity: 3, priceAtSale: 30, priceAtCost: 15 }
+        ],
+        itemsTotal: 130, // (2*20) + (3*30)
+        shippingCost: 10
+      };
+
+      expect(component.custoHistoricoItem(item)).toBe(65, '(2*10) + (3*15) = 65');
+    });
+
+    it('should compute lucro as itemsTotal - custo, excluding shippingCost', () => {
+      const item: HistoricoItem = {
+        id: '11',
+        origem: 'pedido',
+        data: new Date('2026-01-01'),
+        clienteNome: 'Cliente Y',
+        status: 'finished',
+        total: 140, // itemsTotal (130) + shippingCost (10)
+        itens: [
+          { idProduct: 'p1', productName: 'Produto 1', quantity: 2, priceAtSale: 20, priceAtCost: 10 },
+          { idProduct: 'p2', productName: 'Produto 2', quantity: 3, priceAtSale: 30, priceAtCost: 15 }
+        ],
+        itemsTotal: 130,
+        shippingCost: 10
+      };
+
+      // Lucro = itemsTotal (130) - custo (65) = 65 — frete (10) não entra na conta.
+      expect(component.lucroHistoricoItem(item)).toBe(65, 'Frete não deve entrar no lucro nem no custo');
+    });
+
+    it('should return a negative lucro when custo exceeds itemsTotal', () => {
+      const item: HistoricoItem = {
+        id: '12',
+        origem: 'pdv',
+        data: new Date('2026-01-01'),
+        clienteNome: 'Balcão',
+        status: 'completed',
+        total: 10,
+        itens: [
+          { idProduct: 'p1', productName: 'Produto Prejuízo', quantity: 1, priceAtSale: 10, priceAtCost: 15 }
+        ],
+        itemsTotal: 10,
+        shippingCost: 0
+      };
+
+      expect(component.lucroHistoricoItem(item)).toBe(-5, '10 - 15 = -5');
+    });
+  });
+
+  describe('subtotalItemHistorico() / itemsTotal / lucro — item vendido por peso (soldByWeight)', () => {
+    // 19.99 * 2.5 = 49.975 (halfway exato) — calcularTotalItemPorPeso arredonda
+    // "tie goes up" pra 49.98. Multiplicação crua (priceAtSale * quantity) não
+    // garante esse arredondamento, então o teste prova que a função certa foi usada.
+    it('subtotalItemHistorico usa calcularTotalItemPorPeso pra item soldByWeight (tie-break arredonda pra cima)', () => {
+      const item: HistoricoItemProduto = {
+        idProduct: 'p1', productName: 'Queijo', quantity: 2.5, priceAtSale: 19.99, priceAtCost: 10, soldByWeight: true
+      };
+
+      expect(component.subtotalItemHistorico(item)).toBe(49.98, '19.99 * 2.5 deve arredondar (tie-break) pra 49.98');
+    });
+
+    it('subtotalItemHistorico usa priceAtSale * quantity direto quando soldByWeight é falsy', () => {
+      const item: HistoricoItemProduto = {
+        idProduct: 'p2', productName: 'Refrigerante', quantity: 3, priceAtSale: 5, priceAtCost: 2
+      };
+
+      expect(component.subtotalItemHistorico(item)).toBe(15, '5 * 3 = 15, sem soldByWeight');
+    });
+
+    it('montarHistorico usa a mesma regra de peso pra compor itemsTotal (pdv)', () => {
+      const vendas = [{
+        id: 'v1',
+        sale_type: 'pdv',
+        date: new Date('2026-02-01'),
+        total: 49.98,
+        items: [
+          { idProduct: 'p1', productName: 'Queijo', quantity: 2.5, priceAtSale: 19.99, priceAtCost: 10, soldByWeight: true }
+        ]
+      }];
+
+      const historico = (component as any).montarHistorico(vendas, [], []) as HistoricoItem[];
+
+      expect(historico[0].itemsTotal).toBe(49.98, 'itemsTotal deve vir de calcularTotalItemPorPeso, não de priceAtSale*quantity cru (49.975)');
+    });
+
+    it('lucroHistoricoItem usa o itemsTotal com peso (não a soma crua) menos o custo', () => {
+      const item: HistoricoItem = {
+        id: '30',
+        origem: 'pdv',
+        data: new Date('2026-02-01'),
+        clienteNome: 'Balcão',
+        status: 'completed',
+        total: 49.98,
+        itens: [
+          { idProduct: 'p1', productName: 'Queijo', quantity: 2.5, priceAtSale: 19.99, priceAtCost: 10, soldByWeight: true }
+        ],
+        itemsTotal: 49.98,
+        shippingCost: 0
+      };
+
+      // custo = 10 * 2.5 = 25; lucro = 49.98 - 25 = 24.98 (toBeCloseTo por causa
+      // do ruído de ponto flutuante: 49.98 - 25 === 24.979999999999997 em JS).
+      expect(component.lucroHistoricoItem(item)).toBeCloseTo(24.98, 2);
+    });
+  });
+
+  describe('Modal de detalhe do lançamento — linha de Frete', () => {
+    function abrirModalCom(item: HistoricoItem): HTMLElement {
+      component.detalheLancamentoAberto = item;
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    function linhaFrete(el: HTMLElement): Element | undefined {
+      const linhas = Array.from(el.querySelectorAll('.detalhe-lancamento-valores .formula-linha'));
+      return linhas.find(l => (l.textContent || '').includes('Frete'));
+    }
+
+    const baseItem = (overrides: Partial<HistoricoItem>): HistoricoItem => ({
+      id: 'x',
+      origem: 'pedido',
+      data: new Date('2026-02-01'),
+      clienteNome: 'Cliente Teste',
+      status: 'finished',
+      total: 0,
+      itens: [],
+      itemsTotal: 0,
+      shippingCost: 0,
+      ...overrides
+    });
+
+    it('pedido com deliveryType delivery mostra o valor do frete', () => {
+      const el = abrirModalCom(baseItem({
+        total: 60, itemsTotal: 50, shippingCost: 10, deliveryType: 'delivery', address: 'Rua X, 123'
+      }));
+
+      const linha = linhaFrete(el);
+      expect(linha).toBeTruthy('Deve existir uma linha de Frete pra pedido delivery');
+      // Separador decimal depende do LOCALE_ID registrado no TestBed (não é
+      // o mesmo do app real, que usa pt-BR) — casa "10.00" ou "10,00".
+      expect(linha!.textContent).toMatch(/R\$\s*10[.,]00/);
+    });
+
+    it('pedido com deliveryType pickup mostra "Retirada — sem frete" em vez do valor', () => {
+      const el = abrirModalCom(baseItem({
+        total: 50, itemsTotal: 50, shippingCost: 0, deliveryType: 'pickup'
+      }));
+
+      const linha = linhaFrete(el);
+      expect(linha).toBeTruthy('Deve existir uma linha de Frete pra pedido pickup');
+      expect(linha!.textContent).toContain('Retirada — sem frete');
+      expect(linha!.textContent).not.toContain('R$ 0,00');
+    });
+
+    it('pdv não mostra a linha de Frete', () => {
+      const el = abrirModalCom(baseItem({ origem: 'pdv', clienteNome: 'Balcão', total: 50, itemsTotal: 50 }));
+
+      expect(linhaFrete(el)).toBeFalsy('PDV não tem frete — linha não deve ser renderizada');
+    });
+
+    it('comanda não mostra a linha de Frete', () => {
+      const el = abrirModalCom(baseItem({ origem: 'comanda', total: 50, itemsTotal: 50 }));
+
+      expect(linhaFrete(el)).toBeFalsy('Comanda não tem frete — linha não deve ser renderizada');
     });
   });
 });
