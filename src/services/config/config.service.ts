@@ -20,6 +20,7 @@ export class ConfigService extends FirestoreBaseService {
   private destroyRef = inject(DestroyRef);
 
   readonly modules = signal<ModuleConfig>({ ...DEFAULT_MODULES });
+  readonly companyName = signal<string>('');
   readonly modules$: Observable<ModuleConfig>;
 
   constructor() {
@@ -39,6 +40,7 @@ export class ConfigService extends FirestoreBaseService {
   private loadCompanyModules(companyId: string | null): Observable<ModuleConfig> {
     // Enquanto companyId for null (deslogado), manter DEFAULT_MODULES
     if (!companyId) {
+      this.companyName.set('');
       return of({ ...DEFAULT_MODULES });
     }
 
@@ -46,6 +48,7 @@ export class ConfigService extends FirestoreBaseService {
     // Ao trocar companyId, switchMap cancela o listener antigo e abre um novo
     const companyRef = doc(this.firestore, `companies/${companyId}`);
     return this.docDataObservable<CompanyConfig>(companyRef).pipe(
+      tap(company => this.companyName.set(company?.name ?? '')),
       map(company => {
         if (!company) {
           // Doc não encontrado - logar inconsistência
