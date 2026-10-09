@@ -69,6 +69,26 @@ const GOOGLE_MAPS_HOSTS = new Set([
   'maps.google.com',
 ]);
 
+// Apple Maps: parâmetros que podem carregar lat,lng, em ordem de prioridade.
+// "coordinate" é o redirect real de maps.apple.com/?ll=; "sll" é só o centro da busca.
+const APPLE_MAPS_HOST = 'maps.apple.com';
+const APPLE_COORD_PARAMS = ['coordinate', 'll', 'daddr', 'q', 'sll'];
+
+// Waze — comparação exata de host, como no Google.
+const WAZE_HOSTS = new Set(['waze.com', 'www.waze.com']);
+
+// Parâmetros do Waze: ll (link /ul) e to (live-map/directions).
+const WAZE_LL_PARAM = 'll';
+const WAZE_TO_PARAM = 'to';
+
+// Waze live-map emite "to=ll.<lat>,<lng>".
+const WAZE_TO_PREFIX = 'll.';
+
+// Link curto do Waze: /ul/h<geohash> — o "h" é marcador, o resto é o geohash.
+const WAZE_GEOHASH_PATH = /^\/ul\/h([0-9b-hjkmnp-z]+)$/i;
+
+const GEOHASH_ALPHABET = '0123456789bcdefghjkmnpqrstuvwxyz';
+
 const SEARCH_NOT_FOUND_ERROR = 'Endereço não encontrado. Tente refinar a busca.';
 
 @Component({
@@ -173,7 +193,11 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
-    const mapsLinkCoords = url ? this.extractCoordsFromMapsLink(url) : null;
+    const mapsLinkCoords = url
+      ? (this.extractCoordsFromMapsLink(url) ??
+        this.extractCoordsFromAppleLink(url) ??
+        this.extractCoordsFromWazeLink(url))
+      : null;
     if (mapsLinkCoords) {
       this.centerMap(mapsLinkCoords.lat, mapsLinkCoords.lng);
       this.setMarker(mapsLinkCoords.lat, mapsLinkCoords.lng);
@@ -224,16 +248,70 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
     const pin = url.href.match(PLACE_PIN_PATTERN);
     if (pin) return this.toValidCoords(pin[1], pin[2]);
 
-    for (const param of COORD_QUERY_PARAMS) {
-      const fromQuery = url.searchParams.get(param)?.match(QUERY_LAT_LNG_PREFIX);
-      if (fromQuery) return this.toValidCoords(fromQuery[1], fromQuery[2]);
-    }
+    const fromQuery = this.firstCoordsFromParams(url, COORD_QUERY_PARAMS);
+    if (fromQuery) return fromQuery;
 
     for (const pattern of MAPS_LINK_COORD_PATTERNS) {
       const match = url.href.match(pattern);
       if (match) return this.toValidCoords(match[1], match[2]);
     }
     return null;
+  }
+
+  // Apple Maps já carrega a coordenada na query — sem geocode.
+  private extractCoordsFromAppleLink(url: URL): { lat: number; lng: number } | null {
+    if (url.hostname.toLowerCase() !== APPLE_MAPS_HOST) return null;
+    return this.firstCoordsFromParams(url, APPLE_COORD_PARAMS);
+  }
+
+  // Waze: ll=lat,lng, to=ll.lat,lng ou geohash no caminho do link curto.
+  private extractCoordsFromWazeLink(url: URL): { lat: number; lng: number } | null {
+    if (!WAZE_HOSTS.has(url.hostname.toLowerCase())) return null;
+
+    const fromLl = this.firstCoordsFromParams(url, [WAZE_LL_PARAM]);
+    if (fromLl) return fromLl;
+
+    const to = url.searchParams.get(WAZE_TO_PARAM);
+    if (to?.toLowerCase().startsWith(WAZE_TO_PREFIX)) {
+      const fromTo = this.coordsFromValue(to.slice(WAZE_TO_PREFIX.length));
+      if (fromTo) return fromTo;
+    }
+
+    const geohash = url.pathname.match(WAZE_GEOHASH_PATH)?.[1];
+    return geohash ? this.decodeGeohash(geohash.toLowerCase()) : null;
+  }
+
+  // Primeiro parâmetro (na ordem dada) cujo valor começa com um par lat,lng válido.
+  private firstCoordsFromParams(url: URL, params: string[]): { lat: number; lng: number } | null {
+    for (const param of params) {
+      const coords = this.coordsFromValue(url.searchParams.get(param));
+      if (coords) return coords;
+    }
+    return null;
+  }
+
+  // Valor que começa com um par lat,lng válido (tolera sufixo) vira coordenada.
+  private coordsFromValue(value: string | null | undefined): { lat: number; lng: number } | null {
+    const match = value?.match(QUERY_LAT_LNG_PREFIX);
+    return match ? this.toValidCoords(match[1], match[2]) : null;
+  }
+
+  // Geohash base32 -> centro da célula (bits alternam longitude/latitude).
+  private decodeGeohash(geohash: string): { lat: number; lng: number } {
+    const latRange = [-MAX_LATITUDE, MAX_LATITUDE];
+    const lngRange = [-MAX_LONGITUDE, MAX_LONGITUDE];
+    let isLng = true;
+    for (const char of geohash) {
+      const value = GEOHASH_ALPHABET.indexOf(char);
+      for (let bit = 4; bit >= 0; bit--) {
+        const range = isLng ? lngRange : latRange;
+        const mid = (range[0] + range[1]) / 2;
+        if ((value >> bit) & 1) range[0] = mid;
+        else range[1] = mid;
+        isLng = !isLng;
+      }
+    }
+    return { lat: (latRange[0] + latRange[1]) / 2, lng: (lngRange[0] + lngRange[1]) / 2 };
   }
 
   // Coordenada fora da faixa geográfica é tratada como não reconhecida.
