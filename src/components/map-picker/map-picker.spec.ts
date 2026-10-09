@@ -166,4 +166,114 @@ describe('MapPickerComponent - busca por link/coordenada', () => {
     await search('-26.97, -52.72');
     expect(emitted).toEqual([{ lat: -26.97, lng: -52.72 }]);
   });
+
+  describe('Apple Maps', () => {
+    const expected = [{ lat: -27.0983, lng: -52.6261 }];
+
+    it('aceita ?ll=lat,lng', async () => {
+      await search('https://maps.apple.com/?ll=-27.0983,-52.6261&q=Nome');
+      expect(emitted).toEqual(expected);
+      expect(geocoding.geocode).not.toHaveBeenCalled();
+    });
+
+    it('aceita /place?coordinate=lat%2Clng', async () => {
+      await search('https://maps.apple.com/place?coordinate=-27.0983%2C-52.6261&name=Nome');
+      expect(emitted).toEqual(expected);
+      expect(geocoding.geocode).not.toHaveBeenCalled();
+    });
+
+    it('usa ll quando vem junto de address', async () => {
+      await search('https://maps.apple.com/?address=Rua%20X,%20Centro&ll=-27.0983,-52.6261');
+      expect(emitted).toEqual(expected);
+    });
+
+    it('aceita daddr=lat,lng', async () => {
+      await search('https://maps.apple.com/?daddr=-27.0983,-52.6261');
+      expect(emitted).toEqual(expected);
+    });
+
+    it('aceita q=lat,lng', async () => {
+      await search('https://maps.apple.com/?q=-27.0983,-52.6261');
+      expect(emitted).toEqual(expected);
+    });
+
+    it('aceita sll=lat,lng', async () => {
+      await search('https://maps.apple.com/?sll=-27.0983,-52.6261');
+      expect(emitted).toEqual(expected);
+    });
+
+    it('prioriza coordinate sobre ll e sll', async () => {
+      await search('https://maps.apple.com/?sll=-1,-2&ll=-3,-4&coordinate=-27.0983,-52.6261');
+      expect(emitted).toEqual(expected);
+    });
+
+    it('rejeita host forjado maps.apple.com.evil.com', async () => {
+      await search('https://maps.apple.com.evil.com/?ll=-27.0983,-52.6261');
+      expect(emitted).toEqual([]);
+    });
+
+    it('coordenada fora da faixa não é reconhecida', async () => {
+      await search('https://maps.apple.com/?ll=-91.5,-52.6');
+      expect(emitted).toEqual([]);
+    });
+  });
+
+  describe('Waze', () => {
+    const expected = [{ lat: -27.0983, lng: -52.6261 }];
+
+    it('aceita /ul?ll=lat,lng&navigate=yes', async () => {
+      await search('https://waze.com/ul?ll=-27.0983,-52.6261&navigate=yes');
+      expect(emitted).toEqual(expected);
+      expect(geocoding.geocode).not.toHaveBeenCalled();
+    });
+
+    it('aceita ll com %2C', async () => {
+      await search('https://waze.com/ul?ll=-27.0983%2C-52.6261&navigate=yes');
+      expect(emitted).toEqual(expected);
+    });
+
+    it('aceita live-map/directions?to=ll.lat%2Clng em www.waze.com', async () => {
+      await search('https://www.waze.com/pt-BR/live-map/directions?to=ll.-27.0983%2C-52.6261');
+      expect(emitted).toEqual(expected);
+      expect(geocoding.geocode).not.toHaveBeenCalled();
+    });
+
+    it('decodifica o geohash do link curto /ul/h<geohash>', async () => {
+      await search('https://waze.com/ul/h6gkzwgu1f');
+      expect(emitted.length).toBe(1);
+      // Centro da célula de "6gkzwgu1f" (9 caracteres, ~5 m de precisão).
+      expect(emitted[0].lat).toBeCloseTo(-25.37947, 4);
+      expect(emitted[0].lng).toBeCloseTo(-49.26808, 4);
+      expect(geocoding.geocode).not.toHaveBeenCalled();
+    });
+
+    it('geohash em maiúsculas decodifica igual ao minúsculo', async () => {
+      await search('https://waze.com/ul/h6gkzwgu1f');
+      await search('https://waze.com/ul/h6GKZWGU1F');
+      expect(emitted.length).toBe(2);
+      expect(emitted[1]).toEqual(emitted[0]);
+    });
+
+    it('to=ll.lat,lng fora da faixa não é reconhecido', async () => {
+      await search('https://www.waze.com/pt-BR/live-map/directions?to=ll.-95.5,-52.6');
+      expect(emitted).toEqual([]);
+    });
+
+    it('to sem prefixo "ll." não é reconhecido e cai no geocode', async () => {
+      await search('https://www.waze.com/pt-BR/live-map/directions?to=-27.0983,-52.6261');
+      expect(emitted).toEqual([]);
+      expect(geocoding.geocode).toHaveBeenCalled();
+    });
+
+    it('rejeita host forjado waze.com.evil.io', async () => {
+      await search('https://waze.com.evil.io/ul?ll=-27.0983,-52.6261');
+      await search('https://waze.com.evil.io/ul/h6gkzwgu1f');
+      expect(emitted).toEqual([]);
+    });
+
+    it('coordenada fora da faixa não é reconhecida', async () => {
+      await search('https://waze.com/ul?ll=-27.5,-181.5');
+      expect(emitted).toEqual([]);
+    });
+  });
 });
