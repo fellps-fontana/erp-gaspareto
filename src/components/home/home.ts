@@ -3,13 +3,15 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
-import { of, switchMap } from 'rxjs';
+import { from, of, switchMap } from 'rxjs';
 import { ThemeService } from '../../services/theme/theme-service';
 import { ConfigService } from '../../services/config/config.service';
 import { CustomerService } from '../../services/customer-service/customer-service';
 import { TenantService } from '../../services/tenant-service/tenant-service';
 import { CompanyService } from '../../services/company-service/company-service';
+import { BuildInfoService } from '../../services/build-info-service/build-info-service';
 import { Company } from '../../models/company-model';
+import { BuildInfo } from '../../models/build-info-model';
 
 @Component({
   selector: 'app-home',
@@ -24,6 +26,7 @@ export class HomeComponent {
   readonly tenant = inject(TenantService);
   private readonly customerService = inject(CustomerService);
   private readonly companyService = inject(CompanyService);
+  private readonly buildInfoService = inject(BuildInfoService);
 
   // Lista de clientes que fazem aniversário hoje — usada pelo ícone/painel de notificação
   // (visível só quando config.modules().notificacoes.aniversario está ligado).
@@ -42,6 +45,17 @@ export class HomeComponent {
       )
     ),
     { initialValue: [] as Company[] }
+  );
+
+  // Versão do último deploy (/build-info.json) — exibida só no banner do super-admin, então
+  // usuário comum nem dispara o fetch. Null = arquivo ausente/inválido (ex.: ng serve).
+  readonly buildInfo = toSignal(
+    toObservable(this.tenant.isSuperAdmin).pipe(
+      switchMap(isSuperAdmin =>
+        isSuperAdmin ? from(this.buildInfoService.getBuildInfo()) : of(null)
+      )
+    ),
+    { initialValue: null as BuildInfo | null }
   );
 
   // Nome de exibição da empresa ativa na sessão (override do super-admin ou a própria empresa).
