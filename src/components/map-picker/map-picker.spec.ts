@@ -1,0 +1,169 @@
+import { TestBed } from '@angular/core/testing';
+import { MapPickerComponent } from './map-picker';
+import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
+import { GoogleMapsLoaderService } from '../../services/google-maps-loader-service/google-maps-loader-service';
+
+interface MapPickerInternals {
+  map: unknown;
+  setMarker: (lat: number, lng: number) => void;
+}
+
+describe('MapPickerComponent - busca por link/coordenada', () => {
+  let component: MapPickerComponent;
+  let geocoding: jasmine.SpyObj<GeocodingService>;
+  let emitted: { lat: number; lng: number }[];
+  let internals: MapPickerInternals;
+
+  beforeEach(async () => {
+    geocoding = jasmine.createSpyObj('GeocodingService', ['geocode', 'resolveShortMapsLink']);
+    geocoding.geocode.and.resolveTo(null);
+    geocoding.resolveShortMapsLink.and.resolveTo({ lat: -10, lng: -20 });
+
+    await TestBed.configureTestingModule({
+      imports: [MapPickerComponent],
+      providers: [
+        { provide: GeocodingService, useValue: geocoding },
+        {
+          provide: GoogleMapsLoaderService,
+          useValue: { load: () => Promise.reject(new Error('sem Google Maps no teste')) },
+        },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(MapPickerComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    internals = component as unknown as MapPickerInternals;
+    internals.map = { setCenter: () => undefined, setZoom: () => undefined };
+    spyOn(internals, 'setMarker');
+
+    emitted = [];
+    component.positionChange.subscribe(v => emitted.push(v));
+  });
+
+  // Sem Google Maps real, o ngOnDestroy não pode ver o map fake.
+  afterEach(() => {
+    internals.map = undefined;
+  });
+
+  async function search(term: string) {
+    component.searchTerm = term;
+    await component.onSearch();
+  }
+
+  it('aceita o texto do WhatsApp com prefixo "Localização: "', async () => {
+    await search('Localização: https://maps.google.com/?q=-27.079844,-52.635666');
+    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+    expect(geocoding.geocode).not.toHaveBeenCalled();
+    expect(geocoding.resolveShortMapsLink).not.toHaveBeenCalled();
+  });
+
+  it('aceita o link puro de maps.google.com com q=lat,lng', async () => {
+    await search('https://maps.google.com/?q=-27.079844,-52.635666');
+    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+    expect(geocoding.geocode).not.toHaveBeenCalled();
+  });
+
+  it('decodifica q com %2C e +', async () => {
+    await search('https://maps.google.com/?q=-27.07%2C+-52.63');
+    expect(emitted).toEqual([{ lat: -27.07, lng: -52.63 }]);
+  });
+
+  it('aceita q=lat,lng(rótulo)', async () => {
+    await search('https://maps.google.com/?q=-27.079844,-52.635666(Cliente)');
+    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+  });
+
+  it('aceita q=lat,lng&z=15', async () => {
+    await search('https://maps.google.com/?q=-27.079844,-52.635666&z=15');
+    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+  });
+
+  it('ignora ponto final colado na URL do texto', async () => {
+    await search('Localização: https://maps.google.com/?q=-27.079844,-52.635666.');
+    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+  });
+
+  it('aceita www.google.com.br/maps/@lat,lng', async () => {
+    await search('https://www.google.com.br/maps/@-27.5,-52.2,15z');
+    expect(emitted).toEqual([{ lat: -27.5, lng: -52.2 }]);
+  });
+
+  it('rejeita host forjado google.com.br.evil.com', async () => {
+    await search('https://google.com.br.evil.com/maps/@-27.5,-52.2,15z');
+    expect(emitted).toEqual([]);
+  });
+
+  it('prefere o pino !3d!4d ao centro da tela @lat,lng', async () => {
+    await search(
+      'https://www.google.com/maps/place/Cliente/@-27.5,-52.2,17z/data=!4m5!3m4!8m2!3d-27.0798!4d-52.6356',
+    );
+    expect(emitted).toEqual([{ lat: -27.0798, lng: -52.6356 }]);
+  });
+
+  it('aceita ?api=1&query=lat,lng em /maps/search/', async () => {
+    await search('https://www.google.com/maps/search/?api=1&query=-27.07,-52.63');
+    expect(emitted).toEqual([{ lat: -27.07, lng: -52.63 }]);
+  });
+
+  it('aceita /maps/dir/?api=1&destination=lat,lng', async () => {
+    await search('https://www.google.com/maps/dir/?api=1&destination=-27.07,-52.63');
+    expect(emitted).toEqual([{ lat: -27.07, lng: -52.63 }]);
+  });
+
+  it('aceita ?ll=lat,lng em maps.google.com', async () => {
+    await search('https://maps.google.com/?ll=-27.07,-52.63');
+    expect(emitted).toEqual([{ lat: -27.07, lng: -52.63 }]);
+  });
+
+  it('mantém suporte a google.com/maps/@lat,lng', async () => {
+    await search('https://www.google.com/maps/@-27.5,-52.2,15z');
+    expect(emitted).toEqual([{ lat: -27.5, lng: -52.2 }]);
+  });
+
+  it('mantém suporte a google.com/maps/search/lat,lng', async () => {
+    await search('https://www.google.com/maps/search/-27.5,-52.2');
+    expect(emitted).toEqual([{ lat: -27.5, lng: -52.2 }]);
+  });
+
+  it('google.com sem /maps no caminho não é link Maps', async () => {
+    await search('https://www.google.com/search?q=-27.5,-52.2');
+    expect(emitted).toEqual([]);
+  });
+
+  it('link curto resolve via serviço, com e sem texto em volta', async () => {
+    await search('https://maps.app.goo.gl/abc123');
+    await search('Localização: https://maps.app.goo.gl/abc123 enviado');
+    expect(geocoding.resolveShortMapsLink.calls.allArgs()).toEqual([
+      ['https://maps.app.goo.gl/abc123'],
+      ['https://maps.app.goo.gl/abc123'],
+    ]);
+    expect(emitted).toEqual([
+      { lat: -10, lng: -20 },
+      { lat: -10, lng: -20 },
+    ]);
+  });
+
+  it('rejeita host forjado google.com.attacker.io', async () => {
+    await search('https://google.com.attacker.io/maps?q=-27,-52');
+    expect(emitted).toEqual([]);
+  });
+
+  it('rejeita host forjado maps.google.com.evil.com', async () => {
+    await search('https://maps.google.com.evil.com/?q=-27,-52');
+    expect(emitted).toEqual([]);
+  });
+
+  it('coordenada fora da faixa não é reconhecida', async () => {
+    await search('https://maps.google.com/?q=-91.5,-52.6');
+    await search('https://maps.google.com/?q=-27.5,-181.5');
+    expect(emitted).toEqual([]);
+  });
+
+  it('continua aceitando "lat, lng" cru', async () => {
+    await search('-26.97, -52.72');
+    expect(emitted).toEqual([{ lat: -26.97, lng: -52.72 }]);
+  });
+});

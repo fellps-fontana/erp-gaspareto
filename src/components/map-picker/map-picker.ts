@@ -27,17 +27,47 @@ const BRAZIL_FALLBACK_ZOOM = 4;
 // sem depender do geocoder, que não resolve coordenadas cruas.
 const LAT_LNG_PATTERN = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
 
-// Padrões de link LONGO do Google Maps que já carregam a coordenada no
-// próprio texto da URL — resolvem sem chamar geocode nem Cloud Function.
+// Primeira URL http(s) dentro do texto — o WhatsApp prefixa o link com
+// "Localização: ", o que impede new URL() de aceitar o termo inteiro.
+const FIRST_URL_PATTERN = /https?:\/\/\S+/i;
+
+// Pontuação final colada na URL pelo texto em volta ("...666)." etc.).
+const TRAILING_PUNCTUATION_PATTERN = /[).,;!?]+$/;
+
+// Par lat,lng no INÍCIO do valor do parâmetro — tolera sufixo, pois o Google emite
+// "q=lat,lng(rótulo)" e "q=lat,lng&z=15".
+const QUERY_LAT_LNG_PREFIX = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/;
+
+const MAX_LATITUDE = 90;
+const MAX_LONGITUDE = 180;
+
+// Pino exato do lugar (/maps/place/.../data=...!3d<lat>!4d<lng>) — tem
+// prioridade sobre @lat,lng, que é só o centro da tela.
+const PLACE_PIN_PATTERN = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+
+// Parâmetros de query que podem carregar lat,lng, em ordem de prioridade
+// (q: busca; query/destination: api=1 de search/dir; ll: centro).
+const COORD_QUERY_PARAMS = ['q', 'query', 'destination', 'll'];
+
+// Padrões de link LONGO do Google Maps (caminho da URL) que já carregam a
+// coordenada, depois do pino e dos parâmetros de query.
 const MAPS_LINK_COORD_PATTERNS = [
   /@(-?\d+\.\d+),(-?\d+\.\d+)/,
-  /[?&]q=(-?\d+\.\d+),\+?(-?\d+\.\d+)/,
   /\/search\/(-?\d+\.\d+),\+?(-?\d+\.\d+)/,
 ];
 
+// Em maps.google.com qualquer caminho é Maps; nos demais hosts exige '/maps'.
+const MAPS_ONLY_HOST = 'maps.google.com';
+
 // Hosts legítimos do Google Maps — comparação exata (nunca substring), pra
 // não aceitar domínio forjado tipo "google.com.attacker.io".
-const GOOGLE_MAPS_HOSTS = new Set(['www.google.com', 'google.com', 'maps.google.com']);
+const GOOGLE_MAPS_HOSTS = new Set([
+  'www.google.com',
+  'google.com',
+  'www.google.com.br',
+  'google.com.br',
+  'maps.google.com',
+]);
 
 const SEARCH_NOT_FOUND_ERROR = 'Endereço não encontrado. Tente refinar a busca.';
 
@@ -123,11 +153,13 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
     const term = this.searchTerm.trim();
     if (!term || !this.map) return;
 
-    if (this.isShortMapsLink(term)) {
+    const url = this.extractUrl(term);
+
+    if (url && this.isShortMapsLink(url)) {
       this.searchLoading = true;
       this.searchError = '';
       try {
-        const result = await this.geocodingService.resolveShortMapsLink(term);
+        const result = await this.geocodingService.resolveShortMapsLink(url.href);
         if (result) {
           this.centerMap(result.lat, result.lng);
           this.setMarker(result.lat, result.lng);
@@ -141,7 +173,7 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
-    const mapsLinkCoords = this.extractCoordsFromMapsLink(term);
+    const mapsLinkCoords = url ? this.extractCoordsFromMapsLink(url) : null;
     if (mapsLinkCoords) {
       this.centerMap(mapsLinkCoords.lat, mapsLinkCoords.lng);
       this.setMarker(mapsLinkCoords.lat, mapsLinkCoords.lng);
@@ -175,9 +207,7 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   // Link curto (maps.app.goo.gl / goo.gl/maps) não carrega coordenada no
   // texto — precisa resolver o redirect via Cloud Function.
-  private isShortMapsLink(term: string): boolean {
-    const url = this.tryParseUrl(term);
-    if (!url) return false;
+  private isShortMapsLink(url: URL): boolean {
     const host = url.hostname.toLowerCase();
     if (host === 'maps.app.goo.gl') return true;
     if (host === 'goo.gl' && url.pathname.startsWith('/maps')) return true;
@@ -186,19 +216,37 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   // Link longo do Google Maps já carrega a coordenada na própria URL —
   // extrai sem chamar geocode nem Cloud Function.
-  private extractCoordsFromMapsLink(term: string): { lat: number; lng: number } | null {
-    const url = this.tryParseUrl(term);
-    if (!url) return null;
+  private extractCoordsFromMapsLink(url: URL): { lat: number; lng: number } | null {
     const host = url.hostname.toLowerCase();
-    if (!GOOGLE_MAPS_HOSTS.has(host) || !url.pathname.includes('/maps')) return null;
+    if (!GOOGLE_MAPS_HOSTS.has(host)) return null;
+    if (host !== MAPS_ONLY_HOST && !url.pathname.includes('/maps')) return null;
+
+    const pin = url.href.match(PLACE_PIN_PATTERN);
+    if (pin) return this.toValidCoords(pin[1], pin[2]);
+
+    for (const param of COORD_QUERY_PARAMS) {
+      const fromQuery = url.searchParams.get(param)?.match(QUERY_LAT_LNG_PREFIX);
+      if (fromQuery) return this.toValidCoords(fromQuery[1], fromQuery[2]);
+    }
 
     for (const pattern of MAPS_LINK_COORD_PATTERNS) {
-      const match = term.match(pattern);
-      if (match) {
-        return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-      }
+      const match = url.href.match(pattern);
+      if (match) return this.toValidCoords(match[1], match[2]);
     }
     return null;
+  }
+
+  // Coordenada fora da faixa geográfica é tratada como não reconhecida.
+  private toValidCoords(rawLat: string, rawLng: string): { lat: number; lng: number } | null {
+    const lat = parseFloat(rawLat);
+    const lng = parseFloat(rawLng);
+    if (Math.abs(lat) > MAX_LATITUDE || Math.abs(lng) > MAX_LONGITUDE) return null;
+    return { lat, lng };
+  }
+
+  private extractUrl(term: string): URL | null {
+    const raw = term.match(FIRST_URL_PATTERN)?.[0].replace(TRAILING_PUNCTUATION_PATTERN, '');
+    return raw ? this.tryParseUrl(raw) : null;
   }
 
   private tryParseUrl(term: string): URL | null {
