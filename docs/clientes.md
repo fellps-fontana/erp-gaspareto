@@ -134,6 +134,15 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
 - **Leaflet removido por completo** (era a biblioteca original do
   mini-mapa, trocada pelo Google Maps JS API): sem dependência em
   `package.json`, sem CSS em `angular.json`, sem ícones em `public/`.
+- **Busca nas listas (PR #30):** campo com lupa (mesmo visual da busca de
+  cliente em Pedidos) no topo das listas das abas Clientes (nome ou
+  telefone), Estoque (`title`) e Compras (`name`) de `product-inventory`.
+  Filtro client-side em tempo real, "contém", insensível a caixa e acento.
+  Regra pura em `src/components/product-inventory/busca-por-nome.ts`
+  (`normalizarBusca`, `filtrarPorTermo`) — regra de exibição, não crítica.
+  Os getters `customersFiltrados`/`productsFiltrados`/
+  `purchaseProductsFiltrados` só alimentam essas três listas; os selects
+  de filtro do Relatório/Histórico continuam com a lista completa.
 
 ## Lacunas conhecidas / pendências
 
@@ -360,3 +369,8 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   produção pelo usuário. Homolog não recebeu (plano Spark, sem
   functions). O secret precisa existir antes de qualquer redeploy da
   function, em qualquer projeto.
+- **PR #30** — implementação: busca por nome nas abas Clientes, Estoque e
+  Compras (hanzo codou; revisão inline do Kira, sem `style`/`gon` por ser
+  só filtro de exibição; 5 specs novos). Suíte 210/210 com emuladores.
+  Merge `7cdbd00`, análise pós-merge sem divergência. Deploy de hosting em
+  homolog (antes do merge) e em prod (após o merge, mesmo tree da `main`).
