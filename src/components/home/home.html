@@ -56,6 +56,23 @@
 
     <span class="super-admin-banner__current">Operando como: <strong>{{ selectedCompanyName }}</strong></span>
 
+    <span
+      class="super-admin-banner__deploy"
+      [title]="buildInfo() ? 'Branch: ' + (buildInfo()?.branch ?? '—') + ' · Projeto: ' + (buildInfo()?.project ?? '—') : 'build-info.json não encontrado (ambiente local)'"
+    >
+      <ng-container *ngIf="buildInfo() as info; else deployLocal">
+        Deploy: {{ info.deployedAt | date: 'dd/MM/yyyy HH:mm' }} ·
+        <code>{{ info.commit }}</code
+        ><span
+          *ngIf="info.dirty"
+          class="super-admin-banner__dirty"
+          title="deploy com mudanças não commitadas"
+          >*</span
+        >
+      </ng-container>
+      <ng-template #deployLocal>Deploy: versão local</ng-template>
+    </span>
+
     <a class="super-admin-banner__link" [routerLink]="['/admin']">Administrador da plataforma</a>
   </div>
 
