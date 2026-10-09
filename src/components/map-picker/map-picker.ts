@@ -34,15 +34,23 @@ const FIRST_URL_PATTERN = /https?:\/\/\S+/i;
 // Pontuação final colada na URL pelo texto em volta ("...666)." etc.).
 const TRAILING_PUNCTUATION_PATTERN = /[).,;!?]+$/;
 
-// Par lat,lng no INÍCIO do valor de q — tolera sufixo, pois o Google emite
+// Par lat,lng no INÍCIO do valor do parâmetro — tolera sufixo, pois o Google emite
 // "q=lat,lng(rótulo)" e "q=lat,lng&z=15".
 const QUERY_LAT_LNG_PREFIX = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/;
 
 const MAX_LATITUDE = 90;
 const MAX_LONGITUDE = 180;
 
+// Pino exato do lugar (/maps/place/.../data=...!3d<lat>!4d<lng>) — tem
+// prioridade sobre @lat,lng, que é só o centro da tela.
+const PLACE_PIN_PATTERN = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+
+// Parâmetros de query que podem carregar lat,lng, em ordem de prioridade
+// (q: busca; query/destination: api=1 de search/dir; ll: centro).
+const COORD_QUERY_PARAMS = ['q', 'query', 'destination', 'll'];
+
 // Padrões de link LONGO do Google Maps (caminho da URL) que já carregam a
-// coordenada — o parâmetro q é lido à parte, via searchParams.
+// coordenada, depois do pino e dos parâmetros de query.
 const MAPS_LINK_COORD_PATTERNS = [
   /@(-?\d+\.\d+),(-?\d+\.\d+)/,
   /\/search\/(-?\d+\.\d+),\+?(-?\d+\.\d+)/,
@@ -53,7 +61,13 @@ const MAPS_ONLY_HOST = 'maps.google.com';
 
 // Hosts legítimos do Google Maps — comparação exata (nunca substring), pra
 // não aceitar domínio forjado tipo "google.com.attacker.io".
-const GOOGLE_MAPS_HOSTS = new Set(['www.google.com', 'google.com', 'maps.google.com']);
+const GOOGLE_MAPS_HOSTS = new Set([
+  'www.google.com',
+  'google.com',
+  'www.google.com.br',
+  'google.com.br',
+  'maps.google.com',
+]);
 
 const SEARCH_NOT_FOUND_ERROR = 'Endereço não encontrado. Tente refinar a busca.';
 
@@ -207,8 +221,13 @@ export class MapPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
     if (!GOOGLE_MAPS_HOSTS.has(host)) return null;
     if (host !== MAPS_ONLY_HOST && !url.pathname.includes('/maps')) return null;
 
-    const fromQuery = url.searchParams.get('q')?.match(QUERY_LAT_LNG_PREFIX);
-    if (fromQuery) return this.toValidCoords(fromQuery[1], fromQuery[2]);
+    const pin = url.href.match(PLACE_PIN_PATTERN);
+    if (pin) return this.toValidCoords(pin[1], pin[2]);
+
+    for (const param of COORD_QUERY_PARAMS) {
+      const fromQuery = url.searchParams.get(param)?.match(QUERY_LAT_LNG_PREFIX);
+      if (fromQuery) return this.toValidCoords(fromQuery[1], fromQuery[2]);
+    }
 
     for (const pattern of MAPS_LINK_COORD_PATTERNS) {
       const match = url.href.match(pattern);

@@ -86,6 +86,38 @@ describe('MapPickerComponent - busca por link/coordenada', () => {
     expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
   });
 
+  it('aceita www.google.com.br/maps/@lat,lng', async () => {
+    await search('https://www.google.com.br/maps/@-27.5,-52.2,15z');
+    expect(emitted).toEqual([{ lat: -27.5, lng: -52.2 }]);
+  });
+
+  it('rejeita host forjado google.com.br.evil.com', async () => {
+    await search('https://google.com.br.evil.com/maps/@-27.5,-52.2,15z');
+    expect(emitted).toEqual([]);
+  });
+
+  it('prefere o pino !3d!4d ao centro da tela @lat,lng', async () => {
+    await search(
+      'https://www.google.com/maps/place/Cliente/@-27.5,-52.2,17z/data=!4m5!3m4!8m2!3d-27.0798!4d-52.6356',
+    );
+    expect(emitted).toEqual([{ lat: -27.0798, lng: -52.6356 }]);
+  });
+
+  it('aceita ?api=1&query=lat,lng em /maps/search/', async () => {
+    await search('https://www.google.com/maps/search/?api=1&query=-27.07,-52.63');
+    expect(emitted).toEqual([{ lat: -27.07, lng: -52.63 }]);
+  });
+
+  it('aceita /maps/dir/?api=1&destination=lat,lng', async () => {
+    await search('https://www.google.com/maps/dir/?api=1&destination=-27.07,-52.63');
+    expect(emitted).toEqual([{ lat: -27.07, lng: -52.63 }]);
+  });
+
+  it('aceita ?ll=lat,lng em maps.google.com', async () => {
+    await search('https://maps.google.com/?ll=-27.07,-52.63');
+    expect(emitted).toEqual([{ lat: -27.07, lng: -52.63 }]);
+  });
+
   it('mantém suporte a google.com/maps/@lat,lng', async () => {
     await search('https://www.google.com/maps/@-27.5,-52.2,15z');
     expect(emitted).toEqual([{ lat: -27.5, lng: -52.2 }]);
