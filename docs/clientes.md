@@ -64,6 +64,13 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   Coordenada fora de |lat| ≤ 90 / |lng| ≤ 180 é descartada. Link curto
   (`maps.app.goo.gl`/`goo.gl/maps`) é resolvido via
   `GeocodingService.resolveShortMapsLink`, recebendo só a URL extraída.
+  Desde o PR #27 também reconhece, sem chamada de rede, **Apple Maps**
+  (host exato `maps.apple.com`; parâmetros `coordinate` > `ll` > `daddr` >
+  `q` se for lat,lng > `sll`) e **Waze** (hosts exatos `waze.com`/
+  `www.waze.com`; `ll` > `to=ll.<lat>,<lng>` > geohash do path
+  `/ul/h<geohash>`, decodificado no próprio componente pelo centro da
+  célula). Ordem da cadeia em `onSearch`: Google curto > Google longo >
+  Apple > Waze > "lat, lng" cru > geocode de texto.
 - **`GoogleMapsLoaderService`** (`src/services/google-maps-loader-service/`)
   — Promise cacheada que aguarda o script do Google Maps (carregado
   globalmente via `<script defer>` em `index.html`) ficar pronto, sem
@@ -91,6 +98,18 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
     Allowlist de host anti-SSRF na function restrita a
     `maps.app.goo.gl`/`goo.gl/maps`, HTTPS obrigatório; exige usuário
     autenticado do tenant, não toca Firestore.
+    **Desde o PR #27** a function geocodifica no servidor: prioridade de
+    coordenada no `Location` é pino `!3d!4d` > `@lat,lng` > `q=lat,lng` >
+    `/search/lat,lng`; sem coordenada, extrai texto de endereço
+    (`q` > `query` > `destination` > destino de `/maps/dir/` > segmento de
+    `/maps/place/`) e chama a Google Geocoding API (secret
+    `GOOGLE_GEOCODING_API_KEY`, `region=br`), devolvendo `{ lat, lng }`.
+    Qualquer falha do geocode (sem chave, status ≠ OK, rede, timeout,
+    texto > 300 caracteres) devolve `{ address }` e o client cai no
+    `geocodePlaceAddress`/Nominatim como antes. `maxInstances: 10`;
+    `withTimeout` (5s, um único `AbortController`) cobre o fetch do link
+    curto e o fetch + leitura do corpo do geocode; logs só com mensagem
+    fixa + `error.name` (a chave vai na query string e nunca chega ao log).
   - `reverseGeocode(lat, lng)` — Google Geocoding API. Extrai
     `rua`/`numero`/`bairro`/`cidade`/`uf`/`cep` dos `address_components`
     por `type` (não por ordem do array — a extração itera a lista de tipos
@@ -142,10 +161,17 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   pode mudar esse formato de `q=` sem aviso. Sem teste automatizado
   cobrindo esse fluxo (feature não é regra crítica, TDD não entrou).
 
-- Formatos de link fora do Google ainda não reconhecidos (caem no
-  geocode e dão "Endereço não encontrado"): Waze (`waze.com/ul?ll=`) e
-  Apple Maps (`maps.apple.com/?ll=`). Levantados no PR #25, deixados de
-  fora até haver demanda real.
+- Links ainda não suportados (levantamento do PR #27): `g.co/kgs/…` e
+  `share.google/…` (compartilhar da busca do Google — redirect sem
+  coordenada); `maps.apple/p/…` (link curto do Apple Maps, não validado
+  sem link real); `goo.gl/maps/…` antigo dá 404 no próprio Google.
+- Sem rate limit por usuário na `resolveMapsShortLink` (decisão do
+  usuário no PR #27: ERP interno). Proteção de custo da Geocoding API fica
+  no alerta de orçamento/cota do GCP — revisitar (limite por uid ou App
+  Check) se o cadastro de empresa nova ficar aberto ao público.
+- Chave do Google Maps do front (`src/enviroments/`) aceita chamada sem
+  referrer — recomendado restringir por domínio no GCP; se restringir, o
+  secret da function precisa de chave própria restrita por API.
 - "lat, lng" digitado cru na busca não passa pela validação de faixa
   (só os links passam) — pré-existente, apontado pelo style no PR #25.
 
@@ -192,6 +218,17 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   em input patológico (pior caso trava só a aba do próprio usuário).
 - **hanzo (PR #25)**: extração de URL do texto colado, novos formatos de
   link e o primeiro `map-picker.spec.ts` (20 casos, Google Maps mockado).
+- **PR #27**: **levi** — geocode server-side na function, prioridade do
+  pino, extração de rota/lugar e o primeiro
+  `resolve-maps-short-link.spec.ts` (13 casos, fetch mockado). **hanzo** —
+  Apple Maps e Waze no `map-picker` (+18 casos). **style** — map-picker
+  aprovado na 2ª rodada (loop param→regex→faixa duplicado em 3 lugares,
+  strings mágicas do Waze); function reaberta após o gon e reprovada uma
+  vez porque o timeout limpava o timer antes de `response.json()` (corpo
+  travado pendurava a function). **gon** — map-picker aprovado de
+  primeira; function com 1 rodada: proxy de geocode sem limite de custo
+  (→ limite de 300 caracteres + `maxInstances`), fetch do link curto sem
+  timeout, `console.error` com objeto de erro cru.
 
 ## Notas operacionais
 
@@ -309,3 +346,17 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   `!3d!4d` e parâmetros `query`/`destination`/`ll`. Só `src/`, suíte
   181/181. Merge limpo (`83448c6`), análise pós-merge sem divergência
   entre revisado e mergeado.
+- **PR #27** — correção: link de lugar compartilhado do iPhone
+  (`maps.app.goo.gl/Agz3WjrKK1qHG4oH7?g_st=iw`) falhava porque o endereço
+  do `q=` vinha com o telefone do lugar colado no fim
+  (`"... - fone, Chapecó - SC, 33289-798"`); o retry do Nominatim só corta
+  segmentos do início, então nunca achava ou a última tentativa casava
+  `SC, 33289-798` (litoral de SC). Google Geocoding com o mesmo texto
+  acerta (-27.0984, -52.6261). Suítes: front 199/199, functions 31/31.
+  Merge `fff3aaf`, análise pós-merge sem divergência. **Deploy manual em
+  prod** (merge não publica nada): secret `GOOGLE_GEOCODING_API_KEY`
+  criado com a chave do front, `firebase deploy --only
+  functions:resolveMapsShortLink` e hosting. Confirmado funcionando em
+  produção pelo usuário. Homolog não recebeu (plano Spark, sem
+  functions). O secret precisa existir antes de qualquer redeploy da
+  function, em qualquer projeto.
