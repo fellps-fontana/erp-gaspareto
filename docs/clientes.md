@@ -51,11 +51,19 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   (Nominatim `/search` só resolve endereço em texto, não coordenada crua).
   Sem fallback de centro dedicado: tenta geolocalização do navegador,
   senão abre num centro fixo genérico do Brasil (zoom baixo). Também
-  aceita link do Google Maps colado na busca (PRs #17/#19/#20): link
-  longo (`@lat,lng`, `q=lat,lng`, `/search/lat,lng`) é extraído por regex
-  no próprio componente, sem chamada de rede; link curto
+  aceita link do Google Maps colado na busca (PRs #17/#19/#20/#25): a
+  primeira URL http(s) é extraída do texto colado (ex: mensagem do
+  WhatsApp `"Localização: https://maps.google.com/?q=lat,lng"`), com
+  pontuação final aparada. Link longo é extraído no próprio componente,
+  sem chamada de rede, na prioridade: pino exato `!3d<lat>!4d<lng>` (link
+  `/place/`) > parâmetros `q`/`query`/`destination`/`ll` (lidos via
+  `searchParams`, tolerando sufixo tipo `(rótulo)`) > `@lat,lng` (centro
+  da tela de quem compartilhou) > `/search/lat,lng`. Hosts aceitos por
+  igualdade exata: `maps.google.com` (qualquer path), `google.com`,
+  `www.google.com`, `google.com.br`, `www.google.com.br` (exigem `/maps`).
+  Coordenada fora de |lat| ≤ 90 / |lng| ≤ 180 é descartada. Link curto
   (`maps.app.goo.gl`/`goo.gl/maps`) é resolvido via
-  `GeocodingService.resolveShortMapsLink`.
+  `GeocodingService.resolveShortMapsLink`, recebendo só a URL extraída.
 - **`GoogleMapsLoaderService`** (`src/services/google-maps-loader-service/`)
   — Promise cacheada que aguarda o script do Google Maps (carregado
   globalmente via `<script defer>` em `index.html`) ficar pronto, sem
@@ -134,6 +142,13 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   pode mudar esse formato de `q=` sem aviso. Sem teste automatizado
   cobrindo esse fluxo (feature não é regra crítica, TDD não entrou).
 
+- Formatos de link fora do Google ainda não reconhecidos (caem no
+  geocode e dão "Endereço não encontrado"): Waze (`waze.com/ul?ll=`) e
+  Apple Maps (`maps.apple.com/?ll=`). Levantados no PR #25, deixados de
+  fora até haver demanda real.
+- "lat, lng" digitado cru na busca não passa pela validação de faixa
+  (só os links passam) — pré-existente, apontado pelo style no PR #25.
+
 ## O que cada agent entregou
 
 - **killua**: arquitetura das duas rodadas — desenho original do
@@ -162,14 +177,21 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   validação de host do link longo usando `.includes()` (burlável por
   `google.com.attacker.io`, corrigido pra comparação exata); string de
   erro duplicada; parâmetro `url` ambíguo dentro das funções auxiliares da
-  Cloud Function (renomeado pra `destinationUrl`).
+  Cloud Function (renomeado pra `destinationUrl`). No PR #25: regressão
+  em `q=lat,lng(rótulo)` (regex nova ancorada no fim rejeitava o sufixo
+  que o padrão antigo aceitava) e números mágicos de faixa lat/lng —
+  ambos corrigidos na 2ª rodada.
 - **gon**: gate condicional (PR #17), Cloud Function nova com fetch de URL
   do usuário — achou bypass de path na allowlist do `goo.gl`
   (`startsWith('/maps')` aceitava `/mapsXYZ`), erro cru de exceção
   vazando pro client, e falta de checagem de protocolo HTTPS; todos
   corrigidos e reaprovados. Não precisou de nova rodada nos PRs
   #19/#20 (mesma fronteira de confiança já existente, sem dependência
-  nova).
+  nova). PR #25: aprovado de primeira nas duas rodadas (sem SSRF, ReDoS
+  ou XSS); nota baixa não bloqueante sobre `TRAILING_PUNCTUATION_PATTERN`
+  em input patológico (pior caso trava só a aba do próprio usuário).
+- **hanzo (PR #25)**: extração de URL do texto colado, novos formatos de
+  link e o primeiro `map-picker.spec.ts` (20 casos, Google Maps mockado).
 
 ## Notas operacionais
 
@@ -278,4 +300,12 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   `maps.app.goo.gl/KUdPBgAXETxTKMNY6`).
 - PRs #17-#20 tiveram merge limpo (fast-forward via squash/merge commit,
   sem conflito), cada um confirmado por análise pós-merge sem divergência
+  entre revisado e mergeado.
+- **PR #25** — correção + melhoria: link de localização do WhatsApp
+  (`"Localização: https://maps.google.com/?q=lat,lng"`) caía no geocode
+  porque o prefixo de texto quebrava `new URL()` e o código exigia `/maps`
+  no path (o link do WhatsApp usa `maps.google.com/?q=`, path `/`).
+  Segundo commit no mesmo PR adicionou `google.com.br`, pino exato
+  `!3d!4d` e parâmetros `query`/`destination`/`ll`. Só `src/`, suíte
+  181/181. Merge limpo (`83448c6`), análise pós-merge sem divergência
   entre revisado e mergeado.
