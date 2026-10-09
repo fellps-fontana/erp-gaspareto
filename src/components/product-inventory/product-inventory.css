@@ -1186,6 +1186,42 @@ input[type="color"] {
   gap: 1rem;
 }
 
+/* Busca no topo das listas (Estoque / Clientes / Compras) */
+.busca-lista {
+  width: 100%;
+  margin-bottom: var(--sp-md);
+}
+
+.busca-lista-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-input);
+  transition: border-color 0.2s;
+}
+
+.busca-lista-input-row:focus-within {
+  border-color: var(--color-primary);
+}
+
+.busca-lista-input-row .search-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.busca-lista-input-row input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  outline: none;
+}
+
 .clientes-vazio {
   grid-column: 1 / -1;
   color: var(--text-secondary);

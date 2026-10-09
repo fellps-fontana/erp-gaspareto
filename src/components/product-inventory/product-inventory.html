@@ -478,8 +478,22 @@
         </div>
       </div>
 
+      <div class="busca-lista" *ngIf="!exibirFormularioNovo && !produtoSelecionadoCompra && products.length > 0">
+        <div class="busca-lista-input-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" [(ngModel)]="buscaProduto" placeholder="Buscar produto pelo nome..." autocomplete="off">
+        </div>
+      </div>
+
       <div class="produtos-lista" *ngIf="!exibirFormularioNovo && !produtoSelecionadoCompra">
-        <div class="produto-card" *ngFor="let p of products" [style.border-left-color]="p.color">
+        <div class="clientes-vazio" *ngIf="products.length > 0 && productsFiltrados.length === 0">
+          Nenhum produto encontrado para "{{ buscaProduto }}"
+        </div>
+
+        <div class="produto-card" *ngFor="let p of productsFiltrados" [style.border-left-color]="p.color">
 
           <div class="prod-thumb" *ngIf="p.urlImage">
             <img [src]="p.urlImage" alt="foto">
@@ -593,12 +607,25 @@
       </div>
 
       <!-- LISTA -->
+      <div class="busca-lista" *ngIf="!exibirFormularioCliente && customers.length > 0">
+        <div class="busca-lista-input-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" [(ngModel)]="buscaCliente" placeholder="Buscar pelo nome ou telefone..." autocomplete="off">
+        </div>
+      </div>
+
       <div class="clientes-grid" *ngIf="!exibirFormularioCliente">
         <div *ngIf="customers.length === 0" class="clientes-vazio">
           Nenhum cliente cadastrado.
         </div>
+        <div *ngIf="customers.length > 0 && customersFiltrados.length === 0" class="clientes-vazio">
+          Nenhum cliente encontrado para "{{ buscaCliente }}"
+        </div>
 
-        <div class="cliente-card" *ngFor="let c of customers">
+        <div class="cliente-card" *ngFor="let c of customersFiltrados">
           <div class="cliente-avatar">{{ c.name.charAt(0).toUpperCase() }}</div>
 
           <div class="cliente-info">
@@ -676,12 +703,25 @@
       </div>
 
       <!-- LISTA -->
+      <div class="busca-lista" *ngIf="!exibirFormularioCompra && purchaseProducts.length > 0">
+        <div class="busca-lista-input-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" [(ngModel)]="buscaCompra" placeholder="Buscar produto de compra pelo nome..." autocomplete="off">
+        </div>
+      </div>
+
       <div class="compra-produtos-lista" *ngIf="!exibirFormularioCompra">
         <div class="clientes-vazio" *ngIf="purchaseProducts.length === 0">
           Nenhum produto de compra cadastrado.
         </div>
+        <div class="clientes-vazio" *ngIf="purchaseProducts.length > 0 && purchaseProductsFiltrados.length === 0">
+          Nenhum produto de compra encontrado para "{{ buscaCompra }}"
+        </div>
 
-        <div class="compra-card" *ngFor="let p of purchaseProducts">
+        <div class="compra-card" *ngFor="let p of purchaseProductsFiltrados">
           <div class="compra-info">
             <span class="compra-nome">{{ p.name }}</span>
             <div class="compra-meta">

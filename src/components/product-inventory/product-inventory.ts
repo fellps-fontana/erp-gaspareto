@@ -28,6 +28,7 @@ import { VendedorService } from '../../services/vendedor-service/vendedor-servic
 import { ComandaService } from '../../services/comanda-service/comanda-service';
 import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
 import { MapPickerComponent } from '../map-picker/map-picker';
+import { filtrarPorTermo } from './busca-por-nome';
 import { calcularTotalItemPorPeso } from '../../services/product-service/product-weight-rules';
 
 // --- HISTÓRICO GERAL: item de produto dentro de um lançamento unificado ---
@@ -150,6 +151,23 @@ export class ProductInventoryComponent implements OnInit {
     recurring: false,
     recurrencePeriod: undefined
   };
+
+  // --- BUSCA NAS LISTAS (estado de UI; filtro puro em busca-por-nome.ts) ---
+  buscaCliente = '';
+  buscaProduto = '';
+  buscaCompra = '';
+
+  get customersFiltrados(): Customer[] {
+    return filtrarPorTermo(this.customers, this.buscaCliente, c => [c.name, c.phone]);
+  }
+
+  get productsFiltrados(): Product[] {
+    return filtrarPorTermo(this.products, this.buscaProduto, p => [p.title]);
+  }
+
+  get purchaseProductsFiltrados(): PurchaseProduct[] {
+    return filtrarPorTermo(this.purchaseProducts, this.buscaCompra, p => [p.name]);
+  }
 
   // --- CLIENTES ---
   customers: Customer[] = [];
