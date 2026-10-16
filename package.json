@@ -12,6 +12,7 @@
     "test:rules:only": "jest test/firestore.rules.spec.ts",
     "test:rules": "firebase emulators:exec --only firestore,auth \"npm run test:rules:only\"",
     "seed:demo": "node scripts/seed-demo.mjs",
+    "seed:demo:hml": "node scripts/seed-demo.mjs --target=hml",
     "deploy:rules:staging": "firebase deploy --only firestore:rules,firestore:indexes --project hml",
     "deploy:hosting:staging": "npm run build:staging && firebase deploy --only hosting --project hml",
     "reinstall": "rimraf node_modules package-lock.json && npm install"
