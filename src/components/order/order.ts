@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -1002,6 +1002,21 @@ export class OrdersComponent implements OnInit, OnDestroy {
   viewDetails(order: Order) {
     this.selectedOrderDetails = order;
     this.isDetailsModalOpen   = true;
+  }
+
+  /** Esc fecha o detalhe, mas só se ele for o modal do topo (nenhum outro aberto por cima). */
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (!this.isDetailsModalOpen) return;
+    const outroModalAberto = this.isPaymentModalOpen || this.isInstallmentsModalOpen
+      || this.isCancelPaymentsModalOpen || this.isConfirmModalOpen || this.isNewOrderOpen;
+    if (outroModalAberto) return;
+    this.closeDetails();
+  }
+
+  /** Clique no fundo (overlay) fecha; clique dentro do conteúdo não chega aqui como alvo do overlay. */
+  onDetailsBackdropClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) this.closeDetails();
   }
 
   closeDetails() {

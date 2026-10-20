@@ -491,7 +491,7 @@
   <!-- ═══════════════════════════════════════════════════════════
        MODAL DETALHES
   ════════════════════════════════════════════════════════════ -->
-  <div class="modal-backdrop" *ngIf="isDetailsModalOpen && selectedOrderDetails">
+  <div class="modal-backdrop" *ngIf="isDetailsModalOpen && selectedOrderDetails" (click)="onDetailsBackdropClick($event)">
     <div class="modal-content details-modal">
       <div class="modal-header">
         <h3>Detalhes do Pedido #{{ selectedOrderDetails.orderNumber }}</h3>
