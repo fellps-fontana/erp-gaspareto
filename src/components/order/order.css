@@ -1293,9 +1293,7 @@ textarea:focus {
 }
 
 /* Parcelas previstas (seção 5.3) — atraso é só destaque, sem juros/multa */
-.btn-icon.schedule {
-  color: var(--color-info);
-}
+
 
 .next-installment {
   font-size: 0.8rem;
@@ -1482,3 +1480,12 @@ textarea:focus {
 
 .estimate-item.paid strong { color: var(--color-success); }
 .estimate-item.balance strong { color: var(--color-warning); }
+
+/* Rodapé do detalhe: botões espaçados, quebram linha sem encostar */
+.details-modal .modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-sm) var(--sp-md);
+  margin-top: var(--sp-md);
+}

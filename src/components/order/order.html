@@ -187,16 +187,6 @@
           </button>
         </div>
         <div class="secondary-actions">
-          <button *ngIf="canScheduleInstallments(order)"
-            class="btn-icon schedule" [disabled]="isProcessingAction"
-            (click)="openInstallmentsModal(order)" title="Montar parcelas">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-          </button>
           <button *ngIf="canRegisterPayment(order) && order.status !== 'delivered'"
             class="btn-icon pay" [disabled]="isProcessingAction"
             (click)="openPaymentModal(order)" title="Registrar pagamento">
@@ -600,7 +590,6 @@
           (click)="editFromDetails(selectedOrderDetails)">Editar</button>
         <button class="btn-secondary" *ngIf="canScheduleInstallments(selectedOrderDetails)"
           (click)="openInstallmentsFromDetails(selectedOrderDetails)">Montar parcelas</button>
-        <button class="btn-secondary" (click)="closeDetails()">Fechar</button>
       </div>
     </div>
   </div>

@@ -308,3 +308,10 @@
     justify-content: space-between;
   }
 }
+
+@media (max-width: 600px) {
+  .details-modal .modal-footer .btn-secondary {
+    flex: 1 1 140px;
+    min-height: 44px;
+  }
+}
