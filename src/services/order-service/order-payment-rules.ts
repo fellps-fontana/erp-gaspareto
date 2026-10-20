@@ -14,7 +14,7 @@ export type CodigoPagamentoInvalido =
   | 'VALOR_INVALIDO' | 'ACIMA_DO_SALDO' | 'PEDIDO_CANCELADO' | 'PEDIDO_FINALIZADO'
   | 'PARCELA_INEXISTENTE' | 'CARTAO_NAO_PARCELA' | 'PARCELAS_NAO_FECHAM'
   | 'TOTAL_ABAIXO_DO_PAGO' | 'PARCELAS_NAO_REAJUSTADAS' | 'FORMA_INVALIDA'
-  | 'PEDIDO_NAO_EDITAVEL';
+  | 'PEDIDO_NAO_EDITAVEL' | 'PARCELAS_ACIMA_DO_LIMITE';
 
 export class PagamentoInvalidoError extends Error {
   constructor(public readonly codigo: CodigoPagamentoInvalido, message: string) {
@@ -47,10 +47,13 @@ export const STATUS_PEDIDO = {
   CANCELADO: 'canceled'
 } as const;
 
+export const MAXIMO_DE_PARCELAS = 60;
+
 const CENTAVOS_POR_UNIDADE = 100;
 const DIAS_PARA_NOVA_PARCELA = 30;
 const DIA_INICIAL_DO_MES = 1;
 const PARCELA_MINIMA = 1;
+const CENTAVOS_MINIMOS_POR_PARCELA = 1;
 const INSTALLMENTS_UNICO = 1;
 const ID_PAGAMENTO_LEGADO = 'legado';
 
@@ -198,11 +201,21 @@ function validarParcelaAgendada(parcela: ParcelaInput): void {
   }
 }
 
+function validarTamanhoDaAgenda(quantidade: number): void {
+  if (quantidade > MAXIMO_DE_PARCELAS) {
+    throw new PagamentoInvalidoError(
+      'PARCELAS_ACIMA_DO_LIMITE',
+      `Quantidade de parcelas acima do maximo de ${MAXIMO_DE_PARCELAS} por pedido.`
+    );
+  }
+}
+
 function validarAgenda(
   parcelas: readonly ParcelaInput[],
   saldoCentavos: number,
   codigoSoma: 'PARCELAS_NAO_FECHAM' | 'PARCELAS_NAO_REAJUSTADAS'
 ): void {
+  validarTamanhoDaAgenda(parcelas.length);
   parcelas.forEach(validarParcelaAgendada);
   const somaCentavos = parcelas.reduce((acc, p) => acc + paraCentavos(p.amount), 0);
   if (somaCentavos !== saldoCentavos) {
@@ -210,11 +223,18 @@ function validarAgenda(
   }
 }
 
-function validarQuantidadeDeParcelas(quantidade: number): void {
+function validarQuantidadeDeParcelas(quantidade: number, saldoCentavos: number): void {
   if (!Number.isInteger(quantidade) || quantidade < PARCELA_MINIMA) {
     throw new PagamentoInvalidoError(
       'VALOR_INVALIDO',
       'Quantidade de parcelas deve ser inteiro maior ou igual a 1.'
+    );
+  }
+  validarTamanhoDaAgenda(quantidade);
+  if (quantidade * CENTAVOS_MINIMOS_POR_PARCELA > saldoCentavos) {
+    throw new PagamentoInvalidoError(
+      'VALOR_INVALIDO',
+      'Saldo insuficiente para dividir nessa quantidade de parcelas (minimo de R$ 0,01 cada).'
     );
   }
 }
@@ -399,8 +419,8 @@ export function gerarParcelasIguais(
   primeiraData: Date,
   method: PaymentMethod
 ): ParcelaInput[] {
-  validarQuantidadeDeParcelas(quantidade);
   const totalCentavos = paraCentavos(saldo);
+  validarQuantidadeDeParcelas(quantidade, totalCentavos);
   const valorBaseCentavos = Math.floor(totalCentavos / quantidade);
   const valorUltimaCentavos = totalCentavos - valorBaseCentavos * (quantidade - 1);
 

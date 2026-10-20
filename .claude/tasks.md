@@ -1134,3 +1134,16 @@ ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.ts, src/
 NAO FAZER: nao alterar services/models; nao criar formula nova de calculo no componente; nao editar .claude/tasks.md.
 RETORNO ESPERADO: diff aplicado, `ng build`, resumo.
 HISTORICO: 2026-10-20 — hanzo (mesmo executor da 056): sub-aba 'A Receber' no Relatorio com seletor de ano (atual-3..atual+2), Chart.js 12 barras empilhadas Recebido/Previsto/Vencido (cores lidas dos tokens success/info/danger), cards Recebido no Ano / A Receber no Ano / Vencido Total ('todos os anos'), modal do mes via listarMovimentoDoMes; tudo de montarPanoramaAnual. selecionarReportTab() destroi/recria o chart na troca de aba/ano/dados + ngOnDestroy; trava de modulo vendedores preservada. ng build ok; product-inventory.spec 23 SUCCESS. Revisao style 1a rodada: PRECISA CORRIGIR (2 bugs: grafico em branco ao voltar da aba principal — canvas destruido pelo *ngIf com chart orfao; modal do mes fechando a cada snapshot de orders). hanzo corrigiu: selecionarAbaPrincipal(tab) destroi/redesenha; recalcularPanorama() no snapshot nao fecha modal e recalcula movimentos; atualizarPanorama() (troca de ano) fecha. Opcionais aplicados: constantes ANOS_PANORAMA_PARA_TRAS/FRENTE, grade via token, classes kpi-value-*, hint 'ignora filtros' nos cards de Vendas. product-inventory.spec 23 SUCCESS. 2a rodada style: APROVADO. Restam opcionais pre-existentes (destroy de salesChart/topProductsChart, filtro de cancelada no componente em vez do SaleService).
+
+## TASK-058 — Pedidos: limite de 60 parcelas em Montar parcelas (crash com N enorme)
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-057
+FLUXO: Correcao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secao 5.3, "### Parcelas previstas", bullet "Limite"); .claude/context/clean-code.md
+ESCOPO: Rejeitar mais de 60 parcelas previstas (PARCELAS_ACIMA_DO_LIMITE) e parcela abaixo de R$ 0,01 no modo iguais, validando antes de montar a lista.
+CRITERIO DE ACEITE: gerarParcelasIguais(…, 61/100000) e agendas/reajustes com 61 itens lancam PARCELAS_ACIMA_DO_LIMITE; quantidade > saldo em centavos lanca VALOR_INVALIDO; UI limita o input e mostra a mensagem.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-payment-rules.ts, src/services/order-service/order-payment-rules.spec.ts, src/components/order/payment-error-messages.ts, src/components/order-installments/order-installments.ts, src/components/order-installments/order-installments.html
+NAO FAZER: mexer em outras regras de parcelas
+RETORNO ESPERADO: suite verde + aprovacao do style
+HISTORICO: Bug reportado pelo usuario (N enorme travou a aba: Array.from sem teto). Limite 60 decidido pelo usuario. mike RED: 8 testes (5 falharam por assercao; caso 1e9 trocado por 100000 para nao travar o runner). levi GREEN: MAXIMO_DE_PARCELAS exportada, validarTamanhoDaAgenda em validarAgenda (cobre agenda livre e reajuste) e em validarQuantidadeDeParcelas (antes do Array.from) + piso de centavos. Kira inline na UI: [max] no input, mensagem de quantidade propria e PARCELAS_ACIMA_DO_LIMITE em MENSAGENS_PAGAMENTO. Suite 464 SUCCESS. style APROVADO em 1 rodada (obs nao bloqueante: "R$ 0,01" fixo em 2 mensagens). gon nao se aplica.

@@ -11,7 +11,7 @@
     <div class="installments-equal" *ngIf="mode === 'iguais'">
       <div class="form-field">
         <label for="equalCountInput">Nº de parcelas</label>
-        <input id="equalCountInput" type="number" min="1" step="1" [(ngModel)]="equalCount">
+        <input id="equalCountInput" type="number" min="1" [max]="maximoDeParcelas" step="1" [(ngModel)]="equalCount">
       </div>
       <div class="form-field">
         <label for="equalDateInput">1º vencimento</label>

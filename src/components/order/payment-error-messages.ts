@@ -1,5 +1,6 @@
 import {
   CodigoPagamentoInvalido,
+  MAXIMO_DE_PARCELAS,
   PagamentoInvalidoError
 } from '../../services/order-service/order-payment-rules';
 
@@ -15,7 +16,8 @@ export const MENSAGENS_PAGAMENTO: Record<CodigoPagamentoInvalido, string> = {
   TOTAL_ABAIXO_DO_PAGO: 'O novo total não pode ficar abaixo do que já foi pago.',
   PARCELAS_NAO_REAJUSTADAS: 'Reajuste as parcelas previstas ao novo total do pedido.',
   FORMA_INVALIDA: 'Forma de pagamento inválida.',
-  PEDIDO_NAO_EDITAVEL: 'Pedido já entregue, concluído ou cancelado não pode ser editado.'
+  PEDIDO_NAO_EDITAVEL: 'Pedido já entregue, concluído ou cancelado não pode ser editado.',
+  PARCELAS_ACIMA_DO_LIMITE: `Máximo de ${MAXIMO_DE_PARCELAS} parcelas por pedido.`
 };
 
 /** Erro de regra vira a mensagem do código; qualquer outro erro usa o fallback de quem chama. */

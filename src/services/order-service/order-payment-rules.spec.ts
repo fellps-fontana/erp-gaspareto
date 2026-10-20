@@ -1204,4 +1204,78 @@ describe('OrderPaymentRules - Pagamentos, parcelas e A receber de Pedidos [CRITI
       expect(r.total).toBe(12);
     });
   });
+
+  describe('Limite de parcelas (60) - PARCELAS_ACIMA_DO_LIMITE e piso de R$ 0,01', () => {
+    /** N parcelas mensais que somam exatamente o total (centavos sobrantes na ultima). */
+    const parcelasQueSomam = (quantidade: number, total: number): ParcelaInput[] => {
+      const totalCentavos = Math.round(total * 100);
+      const base = Math.floor(totalCentavos / quantidade);
+      const ultima = totalCentavos - base * (quantidade - 1);
+      return Array.from({ length: quantidade }, (_, indice) => ({
+        amount: (indice === quantidade - 1 ? ultima : base) / 100,
+        dueDate: dia(2027, 1, indice + 1),
+        method: PaymentMethod.DINHEIRO
+      }));
+    };
+
+    describe('gerarParcelasIguais - teto de 60 parcelas', () => {
+      it('[RED] gerarParcelasIguais(1000, 60) aceita o limite e gera 60 parcelas somando 1000', () => {
+        const parcelas = gerarParcelasIguais(1000, 60, dia(2026, 11, 10), PaymentMethod.DINHEIRO);
+        expect(parcelas.length).toBe(60);
+        expect(arredondar2(parcelas.reduce((acc, p) => acc + p.amount, 0))).toBe(1000);
+      });
+
+      it('[RED] gerarParcelasIguais(1000, 61) lanca PARCELAS_ACIMA_DO_LIMITE (borda: 61 e o primeiro valor recusado)', () => {
+        const erro = capturarErro(() =>
+          gerarParcelasIguais(1000, 61, dia(2026, 11, 10), PaymentMethod.DINHEIRO));
+        expect(erro).toBeInstanceOf(PagamentoInvalidoError);
+        expect(erro.codigo).toBe('PARCELAS_ACIMA_DO_LIMITE');
+      });
+
+      it('[RED] gerarParcelasIguais(1000, 100000) lanca PARCELAS_ACIMA_DO_LIMITE sem montar a lista (valida antes de Array.from)', () => {
+        const erro = capturarErro(() =>
+          gerarParcelasIguais(1000, 100000, dia(2026, 11, 10), PaymentMethod.DINHEIRO));
+        expect(erro.codigo).toBe('PARCELAS_ACIMA_DO_LIMITE');
+      });
+    });
+
+    describe('gerarParcelasIguais - piso de R$ 0,01 por parcela', () => {
+      it('[RED] gerarParcelasIguais(0.05, 6) lanca VALOR_INVALIDO (6 parcelas de 5 centavos nao cabem: parcela abaixo de R$ 0,01)', () => {
+        const erro = capturarErro(() =>
+          gerarParcelasIguais(0.05, 6, dia(2026, 11, 10), PaymentMethod.DINHEIRO));
+        expect(erro).toBeInstanceOf(PagamentoInvalidoError);
+        expect(erro.codigo).toBe('VALOR_INVALIDO');
+      });
+
+      it('[RED] gerarParcelasIguais(0.05, 5) gera 5 parcelas de 0.01 (borda: piso exato e aceito)', () => {
+        const parcelas = gerarParcelasIguais(0.05, 5, dia(2026, 11, 10), PaymentMethod.DINHEIRO);
+        expect(parcelas.map(p => p.amount)).toEqual([0.01, 0.01, 0.01, 0.01, 0.01]);
+      });
+    });
+
+    describe('aplicarAgendaParcelas - teto de 60 nas parcelas informadas', () => {
+      it('[RED] 61 parcelas somando o saldo lancam PARCELAS_ACIMA_DO_LIMITE', () => {
+        const erro = capturarErro(() =>
+          aplicarAgendaParcelas(pedido({ total: 100 }), parcelasQueSomam(61, 100), novoGerador()));
+        expect(erro).toBeInstanceOf(PagamentoInvalidoError);
+        expect(erro.codigo).toBe('PARCELAS_ACIMA_DO_LIMITE');
+      });
+
+      it('[RED] 60 parcelas somando o saldo sao aceitas (borda: 60 e o teto)', () => {
+        const r = aplicarAgendaParcelas(pedido({ total: 100 }), parcelasQueSomam(60, 100), novoGerador());
+        expect(r.filter(p => p.status === 'previsto').length).toBe(60);
+        expect(somaPrevistos(r)).toBe(100);
+      });
+    });
+
+    describe('validarNovoTotal - teto de 60 no reajuste da edicao', () => {
+      it('[RED] novasParcelas de 61 itens somando o novo saldo lancam PARCELAS_ACIMA_DO_LIMITE', () => {
+        const order = pedido({ total: 100 });
+        const erro = capturarErro(() =>
+          validarNovoTotal(order, 100, parcelasQueSomam(61, 100), novoGerador()));
+        expect(erro).toBeInstanceOf(PagamentoInvalidoError);
+        expect(erro.codigo).toBe('PARCELAS_ACIMA_DO_LIMITE');
+      });
+    });
+  });
 });

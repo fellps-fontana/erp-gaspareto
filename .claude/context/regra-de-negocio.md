@@ -276,6 +276,11 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   lançamento livre. A soma TEM que ser igual ao saldo, cada parcela `> 0` e com
   `dueDate`, senão não salva (validação no serviço). Forma `cartao` não pode ser
   parcela prevista.
+- **Limite (decisão do usuário, 2026-10-20)**: no máximo **60** parcelas
+  `previsto` por pedido, nos dois modos e no reajuste da edição; acima disso o
+  serviço rejeita com `PARCELAS_ACIMA_DO_LIMITE`. No modo iguais, a quantidade
+  também não pode deixar parcela abaixo de R$ 0,01 (quantidade > saldo em
+  centavos → `VALOR_INVALIDO`), e a validação acontece ANTES de montar a lista.
 - Atraso é só destaque visual ("vencida há X dias"; vencida = `dueDate` anterior
   ao início do dia de hoje); sem juros/multa.
 - Editar itens/frete com pagamentos lançados: permitido só se `novoTotal >=

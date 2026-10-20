@@ -6,12 +6,14 @@ import { OrderPayment } from '../../models/order-model';
 import { PAYMENT_METHOD_LABELS, PaymentMethod } from '../../models/sell-model';
 import { NotificationService } from '../../services/notification-service/notification.service';
 import {
+  MAXIMO_DE_PARCELAS,
   PagamentoInvalidoError,
   ParcelaInput,
   ResumoAgenda,
   gerarParcelasIguais,
   resumirAgenda
 } from '../../services/order-service/order-payment-rules';
+import { mensagemDoErroDePagamento } from '../order/payment-error-messages';
 
 interface ParcelaRow {
   amount: number | null;
@@ -47,6 +49,7 @@ export class OrderInstallmentsComponent implements OnInit {
 
   mode: 'iguais' | 'livre' = 'iguais';
   rows: ParcelaRow[] = [];
+  readonly maximoDeParcelas = MAXIMO_DE_PARCELAS;
   equalCount = 2;
   equalFirstDate = '';
   equalMethod: PaymentMethod = PaymentMethod.BOLETO;
@@ -97,9 +100,11 @@ export class OrderInstallmentsComponent implements OnInit {
         method: p.method
       }));
     } catch (error) {
-      this.notif.warning(error instanceof PagamentoInvalidoError
-        ? 'Informe uma quantidade de parcelas válida.'
-        : 'Não foi possível gerar as parcelas.');
+      const quantidadeInvalida =
+        error instanceof PagamentoInvalidoError && error.codigo === 'VALOR_INVALIDO';
+      this.notif.warning(quantidadeInvalida
+        ? 'Informe uma quantidade de parcelas válida (cada parcela precisa ter ao menos R$ 0,01).'
+        : mensagemDoErroDePagamento(error, 'Não foi possível gerar as parcelas.'));
     }
   }
 
