@@ -1,0 +1,217 @@
+/* Estilos do modal Montar parcelas (extraídos de order.css; mesma aparência) */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: color-mix(in srgb, var(--bg-app) 80%, transparent);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+  backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  background: var(--bg-card);
+  padding: 30px;
+  border-radius: var(--radius-xl);
+  width: 90%;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: var(--shadow-home-card);
+  border: 1px solid var(--border-color);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: var(--text-inverse);
+}
+
+.modal-content p {
+  color: var(--text-secondary);
+}
+
+.btn-secondary {
+  background: var(--bg-muted);
+  color: var(--text-inverse);
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.btn-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon.cancel {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+}
+
+.btn-icon.cancel:hover {
+  background: var(--color-danger);
+  color: var(--text-inverse);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 25px;
+}
+
+.modal-actions button {
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.modal-actions button:first-child {
+  background: var(--bg-muted);
+  color: var(--text-inverse);
+}
+
+.modal-actions .btn-confirm {
+  background: var(--color-success);
+  color: var(--text-inverse);
+}
+
+.modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.installments-modal {
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.installments-mode {
+  display: flex;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-md);
+}
+
+.installments-mode button {
+  flex: 1;
+  padding: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.installments-mode button.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.installments-equal {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-sm);
+  align-items: end;
+  margin-bottom: var(--sp-md);
+}
+
+.installments-equal .btn-secondary {
+  grid-column: 1 / -1;
+}
+
+.installments-equal label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-xs);
+  font-weight: 600;
+}
+
+.installments-equal input,
+.installments-equal select,
+.installment-row input,
+.installment-row select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.installments-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-md);
+}
+
+.installment-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr auto;
+  gap: var(--sp-sm);
+  align-items: center;
+}
+
+.installments-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm) var(--sp-md);
+  border-radius: var(--radius-md);
+  background: var(--bg-muted);
+  font-size: 0.9rem;
+}
+
+.installments-summary.ok strong { color: var(--color-success); }
+.installments-summary.off strong { color: var(--color-danger); }
+
+/* Celulares pequenos — mesmos refinamentos de order.css para modais */
+@media (max-width: 480px) {
+  .modal-content {
+    padding: 20px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+}
+
+/* Empilha prévia e linhas em telas estreitas */
+@media (max-width: 600px) {
+  .installments-equal {
+    grid-template-columns: 1fr;
+  }
+
+  .installment-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .installment-row select {
+    grid-column: 1 / 2;
+  }
+}

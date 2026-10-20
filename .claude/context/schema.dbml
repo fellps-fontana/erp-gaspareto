@@ -68,7 +68,8 @@ Table sales {
   total          number
   date           timestamp
   items          json      [note: 'array de SaleItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
-  paymentMethod  string    [note: 'enum: dinheiro | pix']
+  paymentMethod  string    [null, note: 'enum: dinheiro | pix | cartao | cheque | boleto | misto. Venda de pedido nasce sem forma (null) e recebe na conclusão; misto = mais de uma forma']
+  installments   number    [null, note: 'informativo; Pix = 1']
   sale_type      string    [note: 'pdv | order']
   customerId     string    [null, ref: > customers.id, note: 'só preenchido quando sale_type = order']
   status         string    [note: 'completed | canceled — não está na interface TS, escrito direto pelo service']
@@ -97,6 +98,10 @@ Table orders {
   actualDeliveryDate    timestamp [null]
   paymentDate           timestamp [null]
   closingDate           timestamp [null]
+  saleId                string    [null, ref: > sales.id, note: 'Sale criada na entrega (regra 5.3). Ausente em pedido delivered antes do deploy']
+  payments              json      [null, note: 'array embutido de OrderPayment: id, amount, method, installments, dueDate?, paidDate?, status (previsto|pago|cancelado|estornado). Ausente = pedido antigo; finished antigo = 1 pagamento derivado']
+  paymentMethod         string    [null, note: 'preenchido na conclusão; pode ser misto']
+  installments          number    [null]
   observations          string    [null]
 }
 

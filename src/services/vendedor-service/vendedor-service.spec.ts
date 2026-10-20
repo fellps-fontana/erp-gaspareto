@@ -1,6 +1,7 @@
 import { VendedorService } from './vendedor-service';
 import { Vendedor, ComissaoVendedorResultado } from '../../models/vendedor-model';
-import { Order, OrderItem } from '../../models/order-model';
+import { Order, OrderItem, OrderPayment } from '../../models/order-model';
+import { PaymentMethod } from '../../models/sell-model';
 import { Timestamp } from '@angular/fire/firestore';
 
 describe('VendedorService.calculateComissaoVendedor - Calculo de comissao a pagar [CRITICA]', () => {
@@ -590,6 +591,70 @@ describe('VendedorService.calculateComissaoVendedor - Calculo de comissao a paga
       expect(result.itens.length).toBe(1);
       expect(result.itens[0].totalVendido).toBe(200, 'frete nao entra em totalVendido do item');
       expect(result.itens[0].totalComissao).toBe(20, 'comissao calculada sobre 200, nao 250');
+    });
+  });
+
+  describe('Regra: Comissao so com saldo 0 - status finished (CRITICA)', () => {
+    // Helper: anexa pagamentos ao pedido (campo opcional de Order, secao 5.3)
+    function withPayments(order: Order, payments: OrderPayment[]): Order {
+      return { ...order, payments };
+    }
+
+    it('Caso 27: Pedido delivered com pagamento parcial (saldo > 0) - nao entra em totalVendido nem em totalComissao', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const item = createOrderItem('prod-A', 1, 100); // vendidoItem = 100, saldo = 100 - 40 = 60
+      const order = withPayments(
+        createOrder('v1', 'delivered', [item], 0),
+        [{ id: 'p1', amount: 40, method: PaymentMethod.PIX, installments: 1, status: 'pago' }]
+      );
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.totalVendido).toBe(0, 'delivered com saldo > 0 nao gera base de comissao');
+      expect(result.totalComissao).toBe(0, 'delivered com saldo > 0 nao gera comissao');
+      expect(result.itens.length).toBe(0, 'delivered com saldo > 0 nao aparece em itens');
+    });
+
+    it('Caso 28: Pedido canceled com sinal retido (payment pago) - nao entra em totalVendido nem em totalComissao', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const item = createOrderItem('prod-A', 1, 100); // vendidoItem = 100
+      const order = withPayments(
+        createOrder('v1', 'canceled', [item], 0),
+        [{ id: 'p1', amount: 30, method: PaymentMethod.DINHEIRO, installments: 1, status: 'pago' }] // sinal retido
+      );
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.totalVendido).toBe(0, 'canceled com sinal retido nao gera base de comissao');
+      expect(result.totalComissao).toBe(0, 'canceled com sinal retido nao gera comissao');
+      expect(result.itens.length).toBe(0, 'canceled nao aparece em itens');
+    });
+
+    it('Caso 29: Pedido finished com pagamentos pagos (saldo 0) - entra normalmente, frete fora da base', () => {
+      const vendedor = createVendedor('v1', 'João', [
+        { idProduct: 'prod-A', percentual: 10 }
+      ]);
+
+      const item = createOrderItem('prod-A', 1, 100); // vendidoItem = 100
+      const order = withPayments(
+        createOrder('v1', 'finished', [item], 30), // total = 130
+        [
+          { id: 'p1', amount: 80, method: PaymentMethod.PIX, installments: 1, status: 'pago' },
+          { id: 'p2', amount: 50, method: PaymentMethod.CARTAO, installments: 2, status: 'pago' }
+        ]
+      );
+
+      const result = VendedorService.calculateComissaoVendedor([order], vendedor);
+
+      expect(result.totalVendido).toBe(100, 'finished com saldo 0 entra; frete (30) fora da base');
+      expect(result.totalComissao).toBe(10, 'comissao 10% sobre 100');
+      expect(result.itens.length).toBe(1);
     });
   });
 });

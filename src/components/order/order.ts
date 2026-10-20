@@ -5,10 +5,10 @@ import { FormsModule } from '@angular/forms';
 import { Observable, map, catchError, of, Subscription } from 'rxjs';
 
 import { Product } from '../../models/product-model';
-import { Order, OrderItem } from '../../models/order-model';
+import { Order, OrderItem, OrderPayment } from '../../models/order-model';
 import { Customer } from '../../models/customer-model';
 import { Vendedor } from '../../models/vendedor-model';
-import { PaymentMethod } from '../../models/sell-model';
+import { PAYMENT_METHOD_LABELS, PaymentMethod } from '../../models/sell-model';
 import { ProductService } from '../../services/product-service/product-service';
 import { OrderService } from '../../services/order-service/order-service';
 import { CustomerService } from '../../services/customer-service/customer-service';
@@ -17,22 +17,37 @@ import { NotificationService } from '../../services/notification-service/notific
 import { ConfigService } from '../../services/config/config.service';
 import {
   bloqueiaAdicaoPorPeso,
-  calcularTotalItemPorPeso,
   normalizarPeso,
   validarPeso
 } from '../../services/product-service/product-weight-rules';
 import {
   TODAS_AS_CIDADES,
   cidadesComPedido,
+  excluirPedidosForaDoKanban,
   excluirPedidosTerminais,
   filtrarPorCidade
 } from './order-filters';
+import {
+  ParcelaInput,
+  avaliarNovoTotal,
+  calcularPago,
+  calcularPrevisto,
+  calcularSaldo,
+  calcularTotalDoPedido,
+  listarPrevistas,
+  proximaPrevista as proximaPrevistaDoPedido,
+  valorDePagamentoValido
+} from '../../services/order-service/order-payment-rules';
+import { mensagemDoErroDePagamento, MENSAGENS_PAGAMENTO } from './payment-error-messages';
+import { OrderInstallmentsComponent } from '../order-installments/order-installments';
+import { OrderReceivablesComponent, RecebiParcelaEvent } from '../order-receivables/order-receivables';
+import { ResumoValores, calcularDiasAtraso, montarAbaAReceber, resumirValoresPedidos } from '../../services/order-service/order-receivables-rules';
 import { Timestamp } from 'firebase/firestore';
 
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, OrderReceivablesComponent, OrderInstallmentsComponent],
   templateUrl: './order.html',
   styleUrls: ['./order.css', './order_mobile.css', './order_details.css']
 })
@@ -51,6 +66,13 @@ export class OrdersComponent implements OnInit, OnDestroy {
   filteredOrders$!: Observable<Order[]>;
   orderSummary$!: Observable<{ productName: string; totalQuantity: number; soldByWeight: boolean }[]>;
   cidadesDisponiveis$!: Observable<string[]>;
+  /** Contador da aba A receber — vem de montarAbaAReceber, sobre TODOS os pedidos. */
+  quantidadeVencidas$!: Observable<number>;
+  /** Valor estimado (total/pago/saldo) do que está no kanban, respeitando os filtros. */
+  valorEstimado$!: Observable<ResumoValores>;
+
+  // ── ABAS ──────────────────────────────────────────────────────────
+  activeTab: 'pedidos' | 'receber' = 'pedidos';
 
   // ── FILTROS ───────────────────────────────────────────────────────
   private _filterStatus: 'all' | 'pending' | 'delivered' = 'all';
@@ -124,9 +146,29 @@ export class OrdersComponent implements OnInit, OnDestroy {
   selectedOrderToFinalize: Order | null = null;
   selectedPaymentMethod: PaymentMethod = PaymentMethod.DINHEIRO;
   selectedInstallments: number = 1;
+  paymentAmount: number | null = null;
+  paymentDate = ''; // yyyy-MM-dd, default hoje
+  private paymentParcelaId: string | null = null;
+  readonly paymentMethodOptions: { value: PaymentMethod; label: string }[] = [
+    PaymentMethod.DINHEIRO, PaymentMethod.PIX, PaymentMethod.CARTAO,
+    PaymentMethod.CHEQUE, PaymentMethod.BOLETO
+  ].map(value => ({ value, label: PAYMENT_METHOD_LABELS[value] }));
+
+  // ── PARCELAS PREVISTAS (seção 5.3 — "Montar parcelas") ─────────────
+  isInstallmentsModalOpen = false;
+  installmentsTargetSaldo = 0;
+  installmentsOrderId: string | null = null;
+  installmentsInitial: OrderPayment[] = [];
+  /** Edição de itens aguardando o reajuste das parcelas para gravar tudo numa única chamada. */
+  private pendingOrderUpdate: { orderId: string; data: Partial<Order> } | null = null;
+
+  // ── CANCELAMENTO COM PAGAMENTOS ───────────────────────────────────
+  isCancelPaymentsModalOpen = false;
+  cancelOrderWithPayments: Order | null = null;
 
   // ── EDIÇÃO ────────────────────────────────────────────────────────
   editingOrderId: string | null = null;
+  private editingOrder: Order | null = null;
 
   // ── CONFIRMAÇÃO GENÉRICA ──────────────────────────────────────────
   isConfirmModalOpen = false;
@@ -194,7 +236,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
         // aparecem nesta tela, em nenhum filtro — regra da seção 5, aplicada
         // por uma função única em order-filters.ts. Esse histórico vive na aba
         // Histórico Geral (Gestão).
-        let result = excluirPedidosTerminais(orders);
+        // Entregue com parcelas cobrindo o saldo sai do kanban (aba A receber, seção 5.3).
+        let result = excluirPedidosForaDoKanban(excluirPedidosTerminais(orders));
 
         if (this._filterStatus === 'pending') {
           result = result.filter(o =>
@@ -217,12 +260,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
       })
     );
 
+    this.valorEstimado$ = this.filteredOrders$.pipe(map(orders => resumirValoresPedidos(orders)));
+
+    this.quantidadeVencidas$ = this.orders$.pipe(
+      map(orders => montarAbaAReceber(orders ?? [], new Date()).quantidadeVencidas)
+    );
+
     // Opções do seletor de cidade: derivam de orders$ DIRETO (não de
     // filteredOrders$), então a lista de cidades NÃO encolhe quando o usuário
     // escolhe um status ou uma cidade. A exclusão de status terminal é feita
     // dentro de cidadesComPedido (mesma regra da seção 5).
     this.cidadesDisponiveis$ = this.orders$.pipe(
-      map(orders => cidadesComPedido(orders ?? [], this.allCustomers))
+      map(orders => cidadesComPedido(excluirPedidosForaDoKanban(orders ?? []), this.allCustomers))
     );
 
     this.orderSummary$ = this.filteredOrders$.pipe(
@@ -299,6 +348,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     }
     this.clearForm();
     this.editingOrderId       = order.id ?? null;
+    this.editingOrder         = order;
     this.customerSearch       = order.customerName;
     this.customerName         = order.customerName;
     this.customerPhone        = order.customerPhone ?? '';
@@ -377,9 +427,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   /** Total em dinheiro de uma linha do carrinho — delega o cálculo por peso à regra pura. */
   totalLinha(item: OrderItem): number {
-    return item.soldByWeight
-      ? calcularTotalItemPorPeso(item.priceAtSale, item.quantity)
-      : item.priceAtSale * item.quantity;
+    return calcularTotalDoPedido([item], 0).itemsTotal;
   }
 
   /** Rótulo de quantidade conforme locale: "1,25 kg" para peso, "2x" para unidade. */
@@ -418,11 +466,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   get itemsTotal(): number {
-    return this.cart.reduce((acc, i) => acc + this.totalLinha(i), 0);
+    return calcularTotalDoPedido(this.cart, this.shippingCost).itemsTotal;
   }
 
   get finalTotal(): number {
-    return this.itemsTotal + Number(this.shippingCost);
+    return calcularTotalDoPedido(this.cart, this.shippingCost).total;
   }
 
   async saveOrder() {
@@ -468,7 +516,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
       };
 
       if (this.editingOrderId) {
-        await this.orderService.updateOrder(this.editingOrderId, orderData);
+        const gravado = await this.updateExistingOrder(this.editingOrderId, orderData);
+        if (!gravado) return; // bloqueado ou aguardando o reajuste das parcelas
         this.notif.success('✅ Pedido Atualizado com Sucesso!');
       } else {
         orderData.status = 'pending';
@@ -478,10 +527,40 @@ export class OrdersComponent implements OnInit, OnDestroy {
       this.closeNewOrder();
     } catch (error) {
       console.error('Erro ao salvar pedido:', error);
-      this.notif.error('Erro ao salvar pedido. Verifique o console.');
+      this.notif.error(mensagemDoErroDePagamento(error, 'Erro ao salvar pedido. Verifique o console.'));
     } finally {
       this.isProcessingAction = false;
     }
+  }
+
+  /**
+   * Edição de itens com pagamentos (seção 5.3): total abaixo do pago é bloqueado;
+   * com previstas que não fecham o novo saldo, abre o reajuste ANTES de gravar.
+   * Retorna true só quando gravou.
+   */
+  private async updateExistingOrder(orderId: string, orderData: Partial<Order>): Promise<boolean> {
+    const order = this.editingOrder;
+    if (order) {
+      const { resultado, novoSaldo } = avaliarNovoTotal(order, this.finalTotal);
+      if (resultado === 'TOTAL_ABAIXO_DO_PAGO') {
+        this.notif.warning(`Total não pode ficar abaixo do já pago: ${this.formatBRL(calcularPago(order))}`);
+        return false;
+      }
+      if (resultado === 'PRECISA_REAJUSTAR') {
+        this.pendingOrderUpdate = { orderId, data: orderData };
+        this.openInstallmentsModalFor(order, novoSaldo);
+        this.notif.warning('As parcelas previstas não fecham o novo saldo. Reajuste-as para salvar.');
+        return false;
+      }
+    }
+    await this.orderService.updateOrder(orderId, orderData);
+    return true;
+  }
+
+  get hasPendingOrderUpdate(): boolean { return this.pendingOrderUpdate !== null; }
+
+  private formatBRL(value: number): string {
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
   clearForm() {
@@ -503,6 +582,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.scheduledDate        = '';
     this.selectedVendedorId   = null;
     this.editingOrderId       = null;
+    this.editingOrder         = null;
   }
 
   setDeliveryType(type: 'pickup' | 'delivery') {
@@ -653,6 +733,12 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   async cancelAction(order: Order) {
     if (!order.id) return;
+    // Com pagamentos 'pago' lançados, o usuário decide entre estornar e reter como sinal (seção 5.3).
+    if (calcularPago(order) > 0) {
+      this.cancelOrderWithPayments = order;
+      this.isCancelPaymentsModalOpen = true;
+      return;
+    }
     this.openConfirmModal(
       `Tem certeza que deseja CANCELAR o pedido de ${order.customerName}?`,
       async () => {
@@ -670,31 +756,193 @@ export class OrdersComponent implements OnInit, OnDestroy {
     );
   }
 
+  closeCancelPaymentsModal() {
+    this.isCancelPaymentsModalOpen = false;
+    this.cancelOrderWithPayments = null;
+  }
+
+  get cancelPaidAmount(): number {
+    return this.cancelOrderWithPayments ? calcularPago(this.cancelOrderWithPayments) : 0;
+  }
+
+  get cancelHasScheduled(): boolean {
+    return !!this.cancelOrderWithPayments && calcularPrevisto(this.cancelOrderWithPayments) > 0;
+  }
+
+  get cancelWasDelivered(): boolean {
+    return this.cancelOrderWithPayments?.status === 'delivered';
+  }
+
+  async confirmCancelWithPayments(estornar: boolean) {
+    const order = this.cancelOrderWithPayments;
+    if (!order?.id) return;
+    this.isProcessingAction = true;
+    try {
+      await this.orderService.cancelOrder(order.id, { estornar });
+      this.notif.success(estornar
+        ? 'Pedido cancelado e pagamentos estornados.'
+        : 'Pedido cancelado. Valor recebido mantido como sinal retido.');
+      this.closeCancelPaymentsModal();
+    } catch (error) {
+      console.error(error);
+      this.notif.error(mensagemDoErroDePagamento(error, 'Erro ao cancelar pedido.'));
+    } finally {
+      this.isProcessingAction = false;
+    }
+  }
+
   // =================================================================
   // PAGAMENTO
   // =================================================================
 
-  openPaymentModal(order: Order) {
-    this.selectedOrderToFinalize  = order;
-    this.selectedPaymentMethod    = PaymentMethod.DINHEIRO;
-    this.isPaymentModalOpen       = true;
+  /** [Recebi] da aba A receber: valor = parcela (editável) e parcelaId preenchido. */
+  onReceiveInstallment({ order, parcela }: RecebiParcelaEvent) {
+    this.openPaymentModal(order, parcela.paymentId, parcela.amount);
   }
 
-  closePaymentModal() { this.isPaymentModalOpen = false; this.selectedOrderToFinalize = null; }
+  openOrderFromReceivables(order: Order) { this.viewDetails(order); }
+
+  openPaymentModal(order: Order, parcelaId?: string, amount?: number) {
+    const parcela = parcelaId ? order.payments?.find(p => p.id === parcelaId) : undefined;
+    this.selectedOrderToFinalize = order;
+    this.selectedPaymentMethod   = parcela?.method ?? PaymentMethod.DINHEIRO;
+    this.selectedInstallments    = 1;
+    this.paymentParcelaId        = parcela ? parcelaId! : null;
+    this.paymentAmount           = amount ?? calcularSaldo(order);
+    this.paymentDate             = this.toDateInputValue(new Date());
+    this.isPaymentModalOpen      = true;
+  }
+
+  closePaymentModal() {
+    this.isPaymentModalOpen = false;
+    this.selectedOrderToFinalize = null;
+    this.paymentParcelaId = null;
+  }
+
+  /** Registrar pagamento: todo status, exceto cancelado e finalizado (saldo já 0). */
+  canRegisterPayment(order: Order): boolean {
+    return order.status !== 'canceled' && order.status !== 'finished';
+  }
+
+  paidOf(order: Order): number { return calcularPago(order); }
+
+  get paymentSaldo(): number {
+    return this.selectedOrderToFinalize ? calcularSaldo(this.selectedOrderToFinalize) : 0;
+  }
+
+  /** Valor digitado válido na UI (> 0 e <= saldo); a regra definitiva segue no serviço. */
+  get isPaymentAmountValid(): boolean {
+    const order = this.selectedOrderToFinalize;
+    return !!order && valorDePagamentoValido(order, Number(this.paymentAmount));
+  }
 
   async confirmPayment() {
-    if (!this.selectedOrderToFinalize) return;
+    const order = this.selectedOrderToFinalize;
+    if (!order?.id) return;
+    if (!this.isPaymentAmountValid) {
+      this.notif.warning(Number(this.paymentAmount) > this.paymentSaldo
+        ? MENSAGENS_PAGAMENTO.ACIMA_DO_SALDO
+        : MENSAGENS_PAGAMENTO.VALOR_INVALIDO);
+      return;
+    }
     this.isProcessingAction = true;
     try {
-      await this.orderService.finalizeOrder(this.selectedOrderToFinalize, this.selectedPaymentMethod, this.selectedInstallments);
-      this.notif.success('💰 Venda Registrada e Pedido Finalizado!');
+      const resultado = await this.orderService.registerPayment(order.id, {
+        amount: Number(this.paymentAmount),
+        method: this.selectedPaymentMethod,
+        installments: Math.max(1, Math.floor(Number(this.selectedInstallments)) || 1),
+        ...(this.paymentParcelaId ? { parcelaId: this.paymentParcelaId } : {}),
+        ...(this.paymentDate ? { paidDate: new Date(`${this.paymentDate}T12:00:00`) } : {})
+      });
+      this.notif.success(resultado.concluido
+        ? '💰 Pagamento registrado e pedido concluído!'
+        : 'Pagamento registrado.');
       this.closePaymentModal();
     } catch (error) {
       console.error(error);
-      this.notif.error('Erro ao finalizar pagamento.');
+      this.notif.error(mensagemDoErroDePagamento(error, 'Erro ao registrar pagamento.'));
     } finally {
       this.isProcessingAction = false;
     }
+  }
+
+  // =================================================================
+  // PARCELAS PREVISTAS
+  // =================================================================
+
+  /** "Montar parcelas": pedido não cancelado/finalizado com saldo a receber. */
+  canScheduleInstallments(order: Order): boolean {
+    return this.canRegisterPayment(order) && calcularSaldo(order) > 0;
+  }
+
+  previstasOf(order: Order): OrderPayment[] {
+    return listarPrevistas(order);
+  }
+
+  proximaPrevista(order: Order): OrderPayment | undefined {
+    return proximaPrevistaDoPedido(order);
+  }
+
+  /** Dias de atraso (0 = em dia); a regra vive em calcularDiasAtraso. Sem juros/multa. */
+  diasDeAtraso(parcela: OrderPayment): number {
+    const vencimento = this.getOrderDate(parcela.dueDate);
+    return vencimento ? calcularDiasAtraso(vencimento, new Date()) : 0;
+  }
+
+  atrasoLabel(parcela: OrderPayment): string {
+    const dias = this.diasDeAtraso(parcela);
+    return dias === 1 ? 'vencida há 1 dia' : `vencida há ${dias} dias`;
+  }
+
+  methodLabel(method: PaymentMethod): string { return PAYMENT_METHOD_LABELS[method]; }
+
+  openInstallmentsModal(order: Order) {
+    this.pendingOrderUpdate = null;
+    this.openInstallmentsModalFor(order, calcularSaldo(order));
+  }
+
+  private openInstallmentsModalFor(order: Order, saldo: number) {
+    this.installmentsOrderId     = order.id ?? null;
+    this.installmentsTargetSaldo = saldo;
+    this.installmentsInitial     = this.previstasOf(order);
+    this.isInstallmentsModalOpen = true;
+  }
+
+  closeInstallmentsModal() {
+    this.isInstallmentsModalOpen = false;
+    this.installmentsOrderId = null;
+    this.installmentsInitial = [];
+    this.pendingOrderUpdate = null;
+  }
+
+  /** Persiste as parcelas emitidas pelo modal; na edição de itens grava pedido + parcelas numa só chamada. */
+  async onInstallmentsSaved(parcelas: ParcelaInput[]) {
+    const orderId = this.installmentsOrderId;
+    if (!orderId) return;
+    const pendente = this.pendingOrderUpdate;
+    this.isProcessingAction = true;
+    try {
+      if (pendente) {
+        await this.orderService.updateOrder(pendente.orderId, pendente.data, { parcelas });
+        this.notif.success('✅ Pedido Atualizado com Sucesso!');
+        this.closeInstallmentsModal();
+        this.closeNewOrder();
+      } else {
+        await this.orderService.setScheduledInstallments(orderId, parcelas);
+        this.notif.success('Parcelas salvas.');
+        this.closeInstallmentsModal();
+      }
+    } catch (error) {
+      console.error(error);
+      this.notif.error(mensagemDoErroDePagamento(error, 'Erro ao salvar parcelas.'));
+    } finally {
+      this.isProcessingAction = false;
+    }
+  }
+
+  openInstallmentsFromDetails(order: Order) {
+    this.closeDetails();
+    this.openInstallmentsModal(order);
   }
 
   // =================================================================

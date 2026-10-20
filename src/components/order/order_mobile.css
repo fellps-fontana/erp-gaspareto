@@ -258,3 +258,27 @@
         justify-content: center;
     }
 }
+@media (max-width: 768px) {
+  .orders-tabs button {
+    flex: 1;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 768px) {
+  .summary-row {
+    flex-direction: column;
+  }
+
+  .estimate-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-sm);
+    padding: 12px 15px;
+  }
+
+  .estimate-values {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

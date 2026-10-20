@@ -1292,3 +1292,184 @@ textarea:focus {
     width: 36px;
   }
 }
+
+/* Progresso de pagamento no card (seção 5.3) */
+.payment-progress {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-success);
+  margin: var(--sp-sm) 0;
+}
+
+.btn-icon.pay {
+  color: var(--color-success);
+}
+
+.payment-form .payment-error {
+  display: block;
+  margin-top: var(--sp-xs);
+  font-size: 0.75rem;
+  color: var(--color-danger);
+}
+
+/* Parcelas previstas (seção 5.3) — atraso é só destaque, sem juros/multa */
+.btn-icon.schedule {
+  color: var(--color-info);
+}
+
+.next-installment {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-sm);
+}
+
+.next-installment.overdue,
+.detail-installments li.overdue {
+  color: var(--color-danger);
+}
+
+.overdue-tag {
+  display: inline-block;
+  margin-left: var(--sp-xs);
+  padding: 2px var(--sp-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-danger);
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.detail-installments ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.detail-installments li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm) 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+
+/* Cancelar pedido com pagamentos (seção 5.3) */
+.cancel-payments-modal {
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.cancel-received strong {
+  color: var(--color-success);
+}
+
+.cancel-warning {
+  color: var(--color-warning);
+  font-size: 0.9rem;
+}
+
+.cancel-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-md);
+}
+
+.cancel-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  padding: var(--sp-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cancel-option small {
+  color: var(--text-secondary);
+}
+
+.cancel-option.refund { border-color: var(--color-danger); }
+.cancel-option.retain { border-color: var(--color-warning); }
+.cancel-option:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Abas Pedidos / A receber */
+.orders-tabs {
+  display: flex;
+  gap: var(--sp-sm);
+  padding: 0 var(--sp-md) var(--sp-md);
+}
+
+.orders-tabs button {
+  padding: 10px var(--sp-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.orders-tabs button.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.tab-badge {
+  margin-left: var(--sp-xs);
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+/* Valor estimado ao lado do Resumo de Produção */
+.summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-md);
+  align-items: stretch;
+  margin-bottom: 25px;
+}
+
+.summary-row .order-summary-header {
+  flex: 1 1 320px;
+  margin-bottom: 0;
+}
+
+.estimate-container {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: 15px 20px;
+  background: var(--orders-summary-strip-bg);
+  border: 1px solid var(--orders-summary-strip-border);
+  border-radius: var(--radius-lg);
+}
+
+.estimate-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-md);
+}
+
+.estimate-item {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.estimate-item strong {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.estimate-item.paid strong { color: var(--color-success); }
+.estimate-item.balance strong { color: var(--color-warning); }
