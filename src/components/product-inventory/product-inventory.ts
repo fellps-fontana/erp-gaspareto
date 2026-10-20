@@ -132,8 +132,6 @@ export class ProductInventoryComponent implements OnInit {
     quantidade: 0,
     novoPrecoCusto: 0
   };
-  gerarContaPagar: boolean = false;
-  nomeConta: string = '';
 
   // --- CONTAS A PAGAR ---
   bills: Bill[] = [];
@@ -922,8 +920,6 @@ export class ProductInventoryComponent implements OnInit {
       novoPrecoCusto: p.buyPrice || 0
     };
     this.exibirFormularioNovo = false;
-    this.gerarContaPagar = false;
-    this.nomeConta = '';
   }
 
   async confirmarCompra() {
@@ -931,8 +927,6 @@ export class ProductInventoryComponent implements OnInit {
       this.notif.warning('Informe uma quantidade válida! ⚠️');
       return;
     }
-
-    const totalCompra = this.dadosCompra.quantidade * this.dadosCompra.novoPrecoCusto;
 
     try {
       await this.purchaseService.addPurchase({
@@ -942,21 +936,8 @@ export class ProductInventoryComponent implements OnInit {
         date: new Date()
       } as any);
 
-      if (this.gerarContaPagar && totalCompra > 0) {
-        const nome = this.nomeConta.trim() || `Compra: ${this.produtoSelecionadoCompra.title}`;
-        await this.billService.addBill({
-          name: nome,
-          value: totalCompra,
-          status: 'pendente',
-          recurring: false
-        });
-        this.resetFiltroContasStatusSeNecessario();
-      }
-
       this.notif.success(`Estoque de "${this.produtoSelecionadoCompra.title}" atualizado! 💰`);
       this.produtoSelecionadoCompra = null;
-      this.gerarContaPagar = false;
-      this.nomeConta = '';
     } catch (error) {
       this.notif.error('Erro ao registrar entrada. ❌');
     }
