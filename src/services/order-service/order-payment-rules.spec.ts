@@ -285,6 +285,47 @@ describe('OrderPaymentRules - Pagamentos, parcelas e A receber de Pedidos [CRITI
     });
   });
 
+  describe('aplicarPagamento - validacao de forma e normalizacao de parcelas (entrada invalida)', () => {
+    it('[RED] method fora do enum PaymentMethod (bitcoin) lanca FORMA_INVALIDA', () => {
+      const erro = capturarErro(() =>
+        aplicarPagamento(pedido({ total: 100 }),
+          { amount: 10, method: 'bitcoin' as unknown as PaymentMethod }, novoGerador()));
+      expect(erro).toBeInstanceOf(PagamentoInvalidoError);
+      expect(erro.codigo).toBe('FORMA_INVALIDA');
+    });
+
+    it('[RED] installments NaN lanca VALOR_INVALIDO (nao finito nao vira informativo)', () => {
+      const erro = capturarErro(() =>
+        aplicarPagamento(pedido({ total: 100 }),
+          { amount: 10, method: PaymentMethod.PIX, installments: NaN }, novoGerador()));
+      expect(erro).toBeInstanceOf(PagamentoInvalidoError);
+      expect(erro.codigo).toBe('VALOR_INVALIDO');
+    });
+
+    it('[RED] installments Infinity lanca VALOR_INVALIDO', () => {
+      const erro = capturarErro(() =>
+        aplicarPagamento(pedido({ total: 100 }),
+          { amount: 10, method: PaymentMethod.PIX, installments: Infinity }, novoGerador()));
+      expect(erro).toBeInstanceOf(PagamentoInvalidoError);
+      expect(erro.codigo).toBe('VALOR_INVALIDO');
+    });
+
+    it('[RED] installments nao numerico (abc) lanca VALOR_INVALIDO', () => {
+      const erro = capturarErro(() =>
+        aplicarPagamento(pedido({ total: 100 }),
+          { amount: 10, method: PaymentMethod.PIX, installments: 'abc' as unknown as number }, novoGerador()));
+      expect(erro).toBeInstanceOf(PagamentoInvalidoError);
+      expect(erro.codigo).toBe('VALOR_INVALIDO');
+    });
+
+    it('[RED] installments 2.7 normaliza por floor para 2 no pago', () => {
+      const r = aplicarPagamento(pedido({ total: 100 }),
+        { amount: 10, method: PaymentMethod.PIX, installments: 2.7, paidDate: dia(2026, 2, 1) }, novoGerador());
+      const pago = r.payments.find(p => p.status === 'pago');
+      expect(pago?.installments).toBe(2);
+    });
+  });
+
   describe('aplicarPagamento - caso feliz e flags', () => {
     it('[RED] pagamento avulso sem previstas cria pago com method, amount e paidDate informados', () => {
       const r = aplicarPagamento(pedido({ total: 100 }),

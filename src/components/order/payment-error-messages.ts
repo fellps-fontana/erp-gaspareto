@@ -14,7 +14,8 @@ export const MENSAGENS_PAGAMENTO: Record<CodigoPagamentoInvalido, string> = {
   PARCELAS_NAO_FECHAM: 'A soma das parcelas não fecha com o saldo do pedido.',
   TOTAL_ABAIXO_DO_PAGO: 'O novo total não pode ficar abaixo do que já foi pago.',
   PARCELAS_NAO_REAJUSTADAS: 'Reajuste as parcelas previstas ao novo total do pedido.',
-  FORMA_INVALIDA: 'Forma de pagamento inválida.'
+  FORMA_INVALIDA: 'Forma de pagamento inválida.',
+  PEDIDO_NAO_EDITAVEL: 'Pedido já entregue, concluído ou cancelado não pode ser editado.'
 };
 
 /** Erro de regra vira a mensagem do código; qualquer outro erro usa o fallback de quem chama. */

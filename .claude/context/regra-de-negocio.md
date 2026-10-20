@@ -282,6 +282,29 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   pago`; se existem `previsto`, a soma deles tem que ser igual ao novo saldo,
   então a edição obriga reajustar as parcelas na mesma operação (atômica).
 
+### Decisões de 2026-10-20 (pós-PR #35, confirmadas pelo usuário)
+- **Pedido de total 0**: entregue sem nenhum pagamento conclui automaticamente
+  na entrega (saldo 0), com forma final `dinheiro` e `installments = 1` (não há
+  pagamento de onde derivar a forma).
+- **Edição só de frete**: `updateOrder` recalcula `itemsTotal`/`total` sempre
+  que `items` OU `shippingCost` mudam (`total = itens + frete`), usando os itens
+  gravados quando só o frete vem; com pagamentos, a mesma validação de
+  `novoTotal >= pago` e reajuste de parcelas vale.
+- **Edição de pedido**: `updateOrder` só aceita pedido em
+  `open|pending|preparing|ready|delivering` (antes da entrega). Pedido
+  `delivered`/`finished`/`canceled` é rejeitado (a `Sale` e o estoque já
+  refletem o pedido). Só campos editáveis entram (itens, frete, endereço e
+  coordenadas, tipo de entrega, observações, cliente, vendedor, data
+  agendada); `status`, `saleId`, `payments`, totais e datas de ciclo vindos de
+  fora são ignorados/rejeitados — essas mudanças só acontecem pelos métodos
+  próprios (pagamento, parcelas, entrega, cancelamento).
+- **Validação de pagamento no serviço**: `method` tem que ser um valor do enum
+  `PaymentMethod` (exceto `misto`), senão `FORMA_INVALIDA`; `installments`
+  não finito (NaN/Infinity/não numérico) é rejeitado com `VALOR_INVALIDO`;
+  finito é normalizado como antes (`Math.floor`, mínimo 1; ausente = 1).
+- `OrderService.updateStatus` (sem uso, sem validação) foi removido: status só
+  muda pelos métodos com regra.
+
 ### Cancelamento com pagamentos
 - `cancelOrder(orderId, { estornar })`, uma transação: estoque (regra
   existente, só se `delivered`) + `status: 'canceled'` + parcelas `previsto` →

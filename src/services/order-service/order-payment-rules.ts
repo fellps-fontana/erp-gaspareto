@@ -13,7 +13,8 @@ import { calcularTotalItemPorPeso } from '../product-service/product-weight-rule
 export type CodigoPagamentoInvalido =
   | 'VALOR_INVALIDO' | 'ACIMA_DO_SALDO' | 'PEDIDO_CANCELADO' | 'PEDIDO_FINALIZADO'
   | 'PARCELA_INEXISTENTE' | 'CARTAO_NAO_PARCELA' | 'PARCELAS_NAO_FECHAM'
-  | 'TOTAL_ABAIXO_DO_PAGO' | 'PARCELAS_NAO_REAJUSTADAS' | 'FORMA_INVALIDA';
+  | 'TOTAL_ABAIXO_DO_PAGO' | 'PARCELAS_NAO_REAJUSTADAS' | 'FORMA_INVALIDA'
+  | 'PEDIDO_NAO_EDITAVEL';
 
 export class PagamentoInvalidoError extends Error {
   constructor(public readonly codigo: CodigoPagamentoInvalido, message: string) {
@@ -151,10 +152,21 @@ function validarStatusAceitaPagamento(order: PedidoFinanceiro): void {
   }
 }
 
+const FORMAS_REGISTRAVEIS: readonly PaymentMethod[] =
+  Object.values(PaymentMethod).filter(forma => forma !== PaymentMethod.MISTO);
+
 function validarFormaRegistravel(method: PaymentMethod): void {
-  if (method === PaymentMethod.MISTO) {
+  if (!FORMAS_REGISTRAVEIS.includes(method)) {
     throw new PagamentoInvalidoError(
-      'FORMA_INVALIDA', 'Misto nao e forma de pagamento registravel.'
+      'FORMA_INVALIDA', 'Forma de pagamento invalida ou nao registravel.'
+    );
+  }
+}
+
+function validarInstallments(installments: number | undefined): void {
+  if (installments !== undefined && !Number.isFinite(installments)) {
+    throw new PagamentoInvalidoError(
+      'VALOR_INVALIDO', 'Numero de parcelas deve ser um valor finito.'
     );
   }
 }
@@ -209,8 +221,12 @@ function validarQuantidadeDeParcelas(quantidade: number): void {
 
 // ---------- montagem de linhas ----------
 
-const parcelasInformativas = (installments = INSTALLMENTS_UNICO): number =>
-  Math.max(INSTALLMENTS_UNICO, installments);
+/** Parcelas informativas do pagamento: inteiro >= 1; ausente vira 1. */
+const normalizarInstallments = (installments: number): number =>
+  Math.max(INSTALLMENTS_UNICO, Math.floor(installments));
+
+const parcelasInformativas = (installments: number | undefined): number =>
+  installments === undefined ? INSTALLMENTS_UNICO : normalizarInstallments(installments);
 
 /** dueDate so entra quando o pago quita uma parcela (posicao k/n); avulso nao tem vencimento. */
 const pagamentoPago = (
@@ -358,6 +374,7 @@ export function aplicarPagamento(
   validarStatusAceitaPagamento(order);
   validarFormaRegistravel(input.method);
   validarValorDoPagamento(order, input.amount);
+  validarInstallments(input.installments);
 
   const payments = listarPagamentos(order);
   const valorCentavos = paraCentavos(input.amount);
@@ -490,6 +507,25 @@ export function resolverFormaFinal(payments: readonly OrderPayment[]): FormaFina
 
 export function deveConcluir(order: PedidoFinanceiro, payments: readonly OrderPayment[]): boolean {
   return order.status === STATUS_PEDIDO.ENTREGUE && saldoEmCentavos(order.total, payments) === 0;
+}
+
+const FORMA_DE_TOTAL_ZERO: FormaFinal = {
+  paymentMethod: PaymentMethod.DINHEIRO,
+  installments: INSTALLMENTS_UNICO
+};
+
+/**
+ * Forma final na conclusao. Pedido de saldo zero sem pago (total 0)
+ * conclui em dinheiro, 1 parcela.
+ */
+export function resolverFormaDeConclusao(
+  order: PedidoFinanceiro,
+  payments: readonly OrderPayment[]
+): FormaFinal | null {
+  if (!deveConcluir(order, payments)) {
+    return null;
+  }
+  return resolverFormaFinal(payments) ?? FORMA_DE_TOTAL_ZERO;
 }
 
 // ---------- apoio a tela (mesma regra do servico, sem duplicar no componente) ----------

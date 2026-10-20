@@ -9,8 +9,8 @@ import { map, catchError } from 'rxjs/operators';
 import { Order, OrderItem, OrderPayment } from '../../models/order-model';
 import {
   aplicarAgendaParcelas, aplicarCancelamento, aplicarPagamento, calcularTotalDoPedido,
-  deveConcluir, FormaFinal, listarPagamentos, ParcelaInput, RegistrarPagamentoInput,
-  resolverFormaFinal, validarNovoTotal
+  FormaFinal, listarPagamentos, ParcelaInput, PagamentoInvalidoError, RegistrarPagamentoInput,
+  resolverFormaDeConclusao, validarNovoTotal
 } from './order-payment-rules';
 import { SaleService } from '../sale-service/sale-service';
 import { Sale } from '../../models/sell-model';
@@ -21,10 +21,26 @@ export interface RegistrarPagamentoResultado { concluido: boolean; saldo: number
 export interface CancelOrderOptions { estornar: boolean; }
 
 type StatusPedido = Order['status'];
-const STATUS_ENTREGAVEIS: readonly StatusPedido[] = [
+/** Antes da entrega: aceita entrega e edicao do pedido. */
+const STATUS_ANTES_DA_ENTREGA: readonly StatusPedido[] = [
   'open', 'pending', 'preparing', 'ready', 'delivering'
 ];
 const STATUS_NAO_CANCELAVEIS: readonly StatusPedido[] = ['finished', 'canceled'];
+
+/** Unico conjunto de campos que a edicao aceita vindos de fora; o resto e ignorado. */
+const CAMPOS_EDITAVEIS: readonly (keyof Order)[] = [
+  'items', 'shippingCost', 'address', 'addressLat', 'addressLng', 'deliveryType',
+  'observations', 'customerName', 'customerPhone', 'customerId',
+  'vendedorId', 'vendedorName', 'scheduledDate'
+];
+
+function camposEditaveis(orderData: Partial<Order>): Partial<Order> {
+  const editaveis: Record<string, unknown> = {};
+  for (const campo of CAMPOS_EDITAVEIS) {
+    if (orderData[campo] !== undefined) editaveis[campo] = orderData[campo];
+  }
+  return editaveis as Partial<Order>;
+}
 
 /** Data do pagamento pago mais recente (paidDate); sem pago com data, usa o instante informado. */
 function dataDoUltimoPagamento(payments: OrderPayment[], agora: Date): Timestamp {
@@ -150,8 +166,9 @@ export class OrderService extends FirestoreBaseService {
   }
 
   /**
-   * Edita itens/frete. Com pagamentos lancados, o novo total passa por
-   * validarNovoTotal na mesma escrita.
+   * Edita pedido antes da entrega. Campos fora da whitelist sao ignorados. Com
+   * pagamentos lancados e total alterado, o novo total passa por validarNovoTotal
+   * na mesma escrita (reajuste das parcelas via opts.parcelas).
    */
   async updateOrder(
     orderId: string,
@@ -163,12 +180,18 @@ export class OrderService extends FirestoreBaseService {
     await runTransaction(this.firestore, async (transaction) => {
       const orderRef = this.orderRef(orderId);
       const order = await this.lerPedido(transaction, orderRef);
-      const data = this.comTotalRecalculado(orderData);
 
-      if (order.payments !== undefined) {
-        const novoTotal = data.total ?? order.total;
+      if (!STATUS_ANTES_DA_ENTREGA.includes(order.status)) {
+        throw new PagamentoInvalidoError(
+          'PEDIDO_NAO_EDITAVEL', `Pedido com status "${order.status}" nao pode ser editado.`
+        );
+      }
+
+      const data = this.comTotalRecalculado(order, camposEditaveis(orderData));
+
+      if (order.payments !== undefined && data.total !== undefined) {
         data.payments = validarNovoTotal(
-          order, novoTotal, opts?.parcelas, () => this.gerarIdPagamento()
+          order, data.total, opts?.parcelas, () => this.gerarIdPagamento()
         );
       }
 
@@ -187,7 +210,7 @@ export class OrderService extends FirestoreBaseService {
       const orderRef = this.orderRef(orderId);
       const order = await this.lerPedido(transaction, orderRef);
 
-      if (!STATUS_ENTREGAVEIS.includes(order.status)) {
+      if (!STATUS_ANTES_DA_ENTREGA.includes(order.status)) {
         throw new Error(`Pedido com status "${order.status}" não pode ser entregue.`);
       }
       if (!order.items || order.items.length === 0) {
@@ -203,7 +226,7 @@ export class OrderService extends FirestoreBaseService {
       const saleId = this.criarVendaDoPedido(transaction, order, serverTimestamp());
       const entregue: Order = { ...order, status: 'delivered', saleId };
       const payments = listarPagamentos(order);
-      const forma = this.formaDeConclusao(entregue, payments);
+      const forma = resolverFormaDeConclusao(entregue, payments);
 
       const entrega = { status: 'delivered', actualDeliveryDate: serverTimestamp(), saleId };
       if (!forma) {
@@ -216,12 +239,6 @@ export class OrderService extends FirestoreBaseService {
         ...this.camposDeConclusao(payments, forma, agora)
       });
     });
-  }
-
-  async updateStatus(orderId: string, status: string): Promise<void> {
-    if (!orderId) return Promise.reject('Order ID is required');
-    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
-    return updateDoc(orderRef, { status });
   }
 
   async cancelOrder(
@@ -271,7 +288,7 @@ export class OrderService extends FirestoreBaseService {
       const orderRef = this.orderRef(orderId);
       const order = await this.lerPedido(transaction, orderRef);
       const resultado = aplicarPagamento(order, input, () => this.gerarIdPagamento());
-      const forma = this.formaDeConclusao(order, resultado.payments);
+      const forma = resolverFormaDeConclusao(order, resultado.payments);
 
       if (forma) {
         const agora = new Date();
@@ -299,12 +316,6 @@ export class OrderService extends FirestoreBaseService {
       const payments = aplicarAgendaParcelas(order, parcelas, () => this.gerarIdPagamento());
       transaction.update(orderRef, { payments });
     });
-  }
-
-  /** Forma final so existe quando o pedido esta entregue com saldo zero (regra 5.3). */
-  private formaDeConclusao(order: Order, payments: OrderPayment[]): FormaFinal | null {
-    if (!deveConcluir(order, payments)) return null;
-    return resolverFormaFinal(payments);
   }
 
   private camposDeConclusao(
@@ -360,15 +371,19 @@ export class OrderService extends FirestoreBaseService {
     return baixas;
   }
 
-  /** Recalcula itensTotal/total quando os itens vem na edicao (peso + frete). */
-  private comTotalRecalculado(orderData: Partial<Order>): Partial<Order> {
-    const data = { ...orderData };
-    if (data.items) {
-      const { itemsTotal, total } = calcularTotalDoPedido(data.items, data.shippingCost ?? 0);
-      data.itemsTotal = itemsTotal;
-      data.total = total;
+  /**
+   * Recalcula itemsTotal/total quando items ou shippingCost vem na edicao. Quando so
+   * o frete vem, usa os itens gravados; quando so os itens vem, usa o frete gravado.
+   */
+  private comTotalRecalculado(order: Order, editaveis: Partial<Order>): Partial<Order> {
+    if (editaveis.items === undefined && editaveis.shippingCost === undefined) {
+      return editaveis;
     }
-    return data;
+    const { itemsTotal, total } = calcularTotalDoPedido(
+      editaveis.items ?? order.items,
+      editaveis.shippingCost ?? order.shippingCost
+    );
+    return { ...editaveis, itemsTotal, total };
   }
 
   private orderRef(orderId: string): DocumentReference {

@@ -830,6 +830,31 @@ describe('OrderService - Multi-tenant (companyId isolation)', () => {
         expect(venda['total']).toBe(100);
         expect((await lerVendas()).length).toBe(1);
       });
+
+      it('[RED] should concluir na entrega pedido de total 0 (itens com preco 0, frete 0) sem pagamentos, com forma dinheiro e 1 parcela', async () => {
+        const produtoId = await gravarProduto('entrega-total-zero', 10);
+        const orderId = await gravarPedido('entrega-total-zero', {
+          status: 'pending',
+          items: [itemDoProduto(produtoId, 1, 0)],
+          itemsTotal: 0,
+          shippingCost: 0,
+          total: 0
+        });
+
+        await service.markAsDelivered(orderId);
+
+        expect((await lerProduto(produtoId))['stock']).toBe(9, 'Baixa de estoque mesmo com total 0');
+        const pedido = await lerPedido(orderId);
+        expect(pedido['status']).toBe('finished', 'Saldo 0 (total 0) conclui na entrega, sem pagamento previo');
+        expect(pedido['paymentMethod']).toBe(PaymentMethod.DINHEIRO, 'Sem pagamento de onde derivar a forma: dinheiro');
+        expect(pedido['installments']).toBe(1, 'Pedido de total 0 concluido com 1 parcela');
+        expect(pedido['paymentDate']).toBeDefined('paymentDate gravada na conclusao');
+        expect(pedido['closingDate']).toBeDefined('closingDate gravada na conclusao');
+        const venda = await lerVenda(pedido['saleId']);
+        expect(venda['paymentMethod']).toBe(PaymentMethod.DINHEIRO, 'Sale recebe forma dinheiro na conclusao');
+        expect(venda['total']).toBe(0, 'Sale com total 0');
+        expect((await lerVendas()).length).toBe(1, 'Exatamente uma Sale');
+      });
     });
 
     describe('[RED] registerPayment() - Pedido legado com customerId', () => {
@@ -1074,6 +1099,179 @@ describe('OrderService - Multi-tenant (companyId isolation)', () => {
         const pedido = await lerPedido(orderId);
         expect(pedido['itemsTotal']).toBeCloseTo(49.99, 2, 'Itens: 10*2 + 19.99*1.5 por peso');
         expect(pedido['total']).toBeCloseTo(54.99, 2, 'Total = itens + frete');
+      });
+
+      it('[RED] should recalcular total so com o frete (itens gravados + novo frete) quando nao ha pagamentos', async () => {
+        const produtoId = await gravarProduto('edita-so-frete', 10);
+        const orderId = await gravarPedido('edita-so-frete', {
+          status: 'pending',
+          items: [itemDoProduto(produtoId, 1)],
+          itemsTotal: 100,
+          shippingCost: 0,
+          total: 100
+        });
+
+        await service.updateOrder(orderId, { shippingCost: 15 });
+
+        const pedido = await lerPedido(orderId);
+        expect(pedido['shippingCost']).toBe(15, 'Frete gravado');
+        expect(pedido['itemsTotal']).toBe(100, 'Itens gravados usados no recalculo (edicao sem items)');
+        expect(pedido['total']).toBe(115, 'Total = itens gravados + novo frete');
+      });
+
+      it('[RED] should rejeitar so frete que leva o total abaixo do pago com TOTAL_ABAIXO_DO_PAGO sem gravar', async () => {
+        const produtoId = await gravarProduto('edita-frete-abaixo', 10);
+        const orderId = await gravarPedido('edita-frete-abaixo', {
+          status: 'pending',
+          items: [itemDoProduto(produtoId, 1)],
+          itemsTotal: 100,
+          shippingCost: 20,
+          total: 120,
+          payments: [
+            { id: 'pago-frete', amount: 110, method: PaymentMethod.DINHEIRO, installments: 1, paidDate: Timestamp.fromDate(DATA_D1), status: 'pago' }
+          ]
+        });
+
+        const erro = await capturarErro(() => service.updateOrder(orderId, { shippingCost: 5 }));
+
+        expect(erro instanceof PagamentoInvalidoError).toBeTruthy('Deve lancar PagamentoInvalidoError');
+        expect(erro?.codigo).toBe('TOTAL_ABAIXO_DO_PAGO');
+        const pedido = await lerPedido(orderId);
+        expect(pedido['shippingCost']).toBe(20, 'Frete nao pode ser gravado');
+        expect(pedido['total']).toBe(120, 'Total nao pode ser gravado');
+        expect(pedido['payments'][0].amount).toBe(110, 'Pagamento intacto');
+      });
+
+      it('[RED] should aceitar so frete que mantem total >= pago e gravar total recalculado', async () => {
+        const produtoId = await gravarProduto('edita-frete-ok', 10);
+        const orderId = await gravarPedido('edita-frete-ok', {
+          status: 'pending',
+          items: [itemDoProduto(produtoId, 1)],
+          itemsTotal: 100,
+          shippingCost: 0,
+          total: 100,
+          payments: [
+            { id: 'pago-frete-ok', amount: 60, method: PaymentMethod.DINHEIRO, installments: 1, paidDate: Timestamp.fromDate(DATA_D1), status: 'pago' }
+          ]
+        });
+
+        await service.updateOrder(orderId, { shippingCost: 10 });
+
+        const pedido = await lerPedido(orderId);
+        expect(pedido['total']).toBe(110, 'Total recalculado com o frete');
+        expect(pedido['payments'][0].amount).toBe(60, 'Pagamento preservado');
+      });
+
+      it('[RED] should exigir reajuste de parcelas quando so o frete muda o saldo com previstas (PARCELAS_NAO_REAJUSTADAS)', async () => {
+        const produtoId = await gravarProduto('edita-frete-reajusta', 10);
+        const orderId = await gravarPedido('edita-frete-reajusta', {
+          status: 'pending',
+          items: [itemDoProduto(produtoId, 1)],
+          itemsTotal: 100,
+          shippingCost: 0,
+          total: 100,
+          payments: [parcelaPrevista('prev-frete', 100, VENCIMENTO_1)]
+        });
+
+        const erro = await capturarErro(() => service.updateOrder(orderId, { shippingCost: 20 }));
+
+        expect(erro instanceof PagamentoInvalidoError).toBeTruthy('Deve lancar PagamentoInvalidoError');
+        expect(erro?.codigo).toBe('PARCELAS_NAO_REAJUSTADAS');
+        const pedido = await lerPedido(orderId);
+        expect(pedido['total']).toBe(100, 'Nada gravado');
+        expect(pedido['payments'][0].amount).toBe(100, 'Prevista intacta');
+      });
+
+      describe('[RED] updateOrder() - Bloqueio por status (edicao so antes da entrega)', () => {
+        async function tentarEditarFrete(label: string, status: Order['status']): Promise<{ erro: any; pedido: any }> {
+          const orderId = await gravarPedido(`edita-status-${label}`, {
+            status,
+            items: [itemDoProduto('prod-status', 1)],
+            itemsTotal: 100,
+            shippingCost: 0,
+            total: 100
+          });
+          const erro = await capturarErro(() => service.updateOrder(orderId, { shippingCost: 50 }));
+          return { erro, pedido: await lerPedido(orderId) };
+        }
+
+        it('[RED] should rejeitar edicao de pedido delivered sem gravar nada', async () => {
+          const { erro, pedido } = await tentarEditarFrete('delivered', 'delivered');
+          expect(erro).toBeDefined('Pedido delivered nao pode ser editado');
+          expect(pedido['shippingCost']).toBe(0, 'Frete nao gravado');
+          expect(pedido['total']).toBe(100, 'Total nao gravado');
+        });
+
+        it('[RED] should rejeitar edicao de pedido finished sem gravar nada', async () => {
+          const { erro, pedido } = await tentarEditarFrete('finished', 'finished');
+          expect(erro).toBeDefined('Pedido finished nao pode ser editado');
+          expect(pedido['shippingCost']).toBe(0, 'Frete nao gravado');
+          expect(pedido['total']).toBe(100, 'Total nao gravado');
+        });
+
+        it('[RED] should rejeitar edicao de pedido canceled sem gravar nada', async () => {
+          const { erro, pedido } = await tentarEditarFrete('canceled', 'canceled');
+          expect(erro).toBeDefined('Pedido canceled nao pode ser editado');
+          expect(pedido['shippingCost']).toBe(0, 'Frete nao gravado');
+          expect(pedido['total']).toBe(100, 'Total nao gravado');
+        });
+
+        it('[RED] should aceitar edicao de pedido pending e recalcular o total com o novo frete', async () => {
+          const { erro, pedido } = await tentarEditarFrete('pending', 'pending');
+          expect(erro).toBeUndefined('Pedido pending aceita edicao');
+          expect(pedido['shippingCost']).toBe(50);
+          expect(pedido['total']).toBe(150, 'Total = itens gravados + frete');
+        });
+
+        it('[RED] should aceitar edicao nos status antes da entrega (open, preparing, ready, delivering)', async () => {
+          for (const status of ['open', 'preparing', 'ready', 'delivering'] as const) {
+            const { erro, pedido } = await tentarEditarFrete(status, status);
+            expect(erro).toBeUndefined(`Pedido ${status} aceita edicao`);
+            expect(pedido['total']).toBe(150, `Total recalculado em ${status}`);
+          }
+        });
+      });
+
+      it('[RED] should ignorar campos protegidos vindos de fora e gravar so o editavel', async () => {
+        const orderId = await gravarPedido('campos-protegidos', {
+          status: 'pending',
+          items: [itemDoProduto('prod-protegido', 1)],
+          itemsTotal: 100,
+          shippingCost: 0,
+          total: 100,
+          actualDeliveryDate: Timestamp.fromDate(DATA_D1)
+        });
+
+        await service.updateOrder(orderId, {
+          observations: 'Obs editada',
+          status: 'delivered',
+          saleId: 'sale-injetada',
+          payments: [
+            { id: 'pago-injetado', amount: 100, method: PaymentMethod.DINHEIRO, installments: 1, paidDate: Timestamp.fromDate(DATA_D2), status: 'pago' }
+          ],
+          total: 999,
+          itemsTotal: 999,
+          paymentDate: Timestamp.fromDate(DATA_D2),
+          closingDate: Timestamp.fromDate(DATA_D2),
+          actualDeliveryDate: Timestamp.fromDate(DATA_D2)
+        });
+
+        const pedido = await lerPedido(orderId);
+        expect(pedido['observations']).toBe('Obs editada', 'Campo editavel e gravado');
+        expect(pedido['status']).toBe('pending', 'status so muda pelos metodos com regra');
+        expect(pedido['saleId']).toBeUndefined('saleId so e gravado pela entrega');
+        expect(pedido['payments']).toBeUndefined('payments so mudam pelos metodos de pagamento');
+        expect(pedido['total']).toBe(100, 'total nao vem de fora');
+        expect(pedido['itemsTotal']).toBe(100, 'itemsTotal nao vem de fora');
+        expect(pedido['paymentDate']).toBeUndefined('paymentDate so na conclusao');
+        expect(pedido['closingDate']).toBeUndefined('closingDate so na conclusao');
+        expect(pedido['actualDeliveryDate'].toMillis()).toBe(DATA_D1.getTime(), 'actualDeliveryDate so na entrega');
+      });
+    });
+
+    describe('[RED] API publica do OrderService', () => {
+      it('[RED] should nao expor updateStatus (status so muda pelos metodos com regra)', () => {
+        expect((service as any).updateStatus).toBeUndefined('updateStatus removido: sem validacao, sem uso');
       });
     });
   });
