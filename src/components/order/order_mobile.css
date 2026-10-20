@@ -259,9 +259,35 @@
     }
 }
 @media (max-width: 768px) {
+  .orders-tabs {
+    width: auto;
+  }
+
   .orders-tabs button {
     flex: 1;
     min-height: 44px;
+    padding: 9px var(--sp-sm);
+  }
+}
+
+/* Rodapé do card: todos os botões cabem (alvo >= 40px) — quebra linha se faltar espaço */
+@media (max-width: 600px) {
+  .card-footer-styled {
+    flex-wrap: wrap;
+  }
+
+  .main-actions {
+    flex: 1 1 140px;
+  }
+
+  .secondary-actions {
+    flex: 0 0 auto;
+    gap: var(--sp-sm);
+  }
+
+  .secondary-actions .btn-icon {
+    width: 44px;
+    height: 44px;
   }
 }
 

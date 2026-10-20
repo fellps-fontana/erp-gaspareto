@@ -87,7 +87,11 @@
       <p>Nenhum pedido encontrado.</p>
     </div>
 
-    <div *ngFor="let order of orders; trackBy: trackByOrder" class="order-card" [ngClass]="order.status">
+    <div *ngFor="let order of orders; trackBy: trackByOrder" class="order-card" [ngClass]="order.status"
+      tabindex="0" role="button" [attr.aria-label]="'Ver detalhes do pedido ' + order.orderNumber"
+      (click)="viewDetails(order)"
+      (keydown.enter)="onCardKeydown($event, order)"
+      (keydown.space)="onCardKeydown($event, order)">
       <div class="card-header-styled">
         <div class="header-left-group">
           <span class="order-number">#{{ order.orderNumber }}</span>
@@ -172,7 +176,7 @@
         </ul>
       </div>
 
-      <div class="card-footer-styled">
+      <div class="card-footer-styled" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
         <div class="main-actions">
           <button *ngIf="getNextActionLabel(order.status)" class="btn-primary-action"
             [disabled]="isProcessingAction" (click)="advanceStatus(order)">
@@ -183,19 +187,6 @@
           </button>
         </div>
         <div class="secondary-actions">
-          <button class="btn-icon view" (click)="viewDetails(order)" title="Ver Detalhes">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-          </button>
-          <button *ngIf="order.status === 'pending' || order.status === 'open'"
-            class="btn-icon edit" (click)="editOrder(order)" title="Editar Pedido">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-          </button>
           <button *ngIf="canScheduleInstallments(order)"
             class="btn-icon schedule" [disabled]="isProcessingAction"
             (click)="openInstallmentsModal(order)" title="Montar parcelas">
@@ -605,6 +596,8 @@
       </div>
 
       <div class="modal-footer">
+        <button class="btn-secondary" *ngIf="canEditOrder(selectedOrderDetails)"
+          (click)="editFromDetails(selectedOrderDetails)">Editar</button>
         <button class="btn-secondary" *ngIf="canScheduleInstallments(selectedOrderDetails)"
           (click)="openInstallmentsFromDetails(selectedOrderDetails)">Montar parcelas</button>
         <button class="btn-secondary" (click)="closeDetails()">Fechar</button>

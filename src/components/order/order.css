@@ -430,26 +430,6 @@
   transition: all 0.2s;
 }
 
-.btn-icon.view {
-  background: var(--bg-soft);
-  color: var(--text-primary);
-}
-
-.btn-icon.view:hover {
-  background: var(--border-strong);
-}
-
-.btn-icon.edit {
-  background: rgba(0, 123, 255, 0.1);
-  color: var(--color-info);
-  border: 1px solid rgba(0, 123, 255, 0.3);
-}
-
-.btn-icon.edit:hover {
-  background: var(--color-info);
-  color: var(--text-inverse);
-}
-
 .btn-icon.cancel {
   background: rgba(220, 53, 69, 0.1);
   color: var(--color-danger);
@@ -1401,31 +1381,60 @@ textarea:focus {
 .cancel-option:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Abas Pedidos / A receber */
+/* Mesmo padrão visual das .report-tabs do product-inventory */
 .orders-tabs {
   display: flex;
-  gap: var(--sp-sm);
-  padding: 0 var(--sp-md) var(--sp-md);
+  gap: 6px;
+  margin: 0 var(--sp-md) var(--sp-md);
+  background: var(--bg-card);
+  padding: 5px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  width: fit-content;
 }
 
 .orders-tabs button {
-  padding: 10px var(--sp-md);
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-weight: 700;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 9px 18px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  font-size: 0.9rem;
+  transition: 0.2s;
+  white-space: nowrap;
 }
 
+.orders-tabs button:hover { color: var(--text-primary); }
+
 .orders-tabs button.active {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  font-weight: bold;
 }
 
 .tab-badge {
   margin-left: var(--sp-xs);
-  color: var(--color-danger);
+  padding: 2px var(--sp-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-danger);
+  color: var(--text-primary);
+  font-size: 0.75rem;
   font-weight: 700;
+}
+
+/* Card inteiro clicável (abre o detalhe) */
+.order-card {
+  cursor: pointer;
+}
+
+.order-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.card-footer-styled {
+  cursor: default;
 }
 
 /* Valor estimado ao lado do Resumo de Produção */

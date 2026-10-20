@@ -341,8 +341,16 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   openNewOrder() { this.clearForm(); this.isNewOrderOpen = true; }
 
+  private static readonly STATUS_EDITAVEIS: readonly Order['status'][] =
+    ['open', 'pending', 'preparing', 'ready', 'delivering'];
+
+  /** Pedido editável: ainda não entregue, finalizado nem cancelado. */
+  canEditOrder(order: Order): boolean {
+    return OrdersComponent.STATUS_EDITAVEIS.includes(order.status);
+  }
+
   editOrder(order: Order) {
-    if (order.status !== 'pending' && order.status !== 'open') {
+    if (!this.canEditOrder(order)) {
       this.notif.warning('Apenas pedidos pendentes podem ser editados.');
       return;
     }
@@ -977,6 +985,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   onConfirmYes() {
     this.confirmAction?.();
+  }
+
+  /** Enter/Espaço no card abre o detalhe — só quando o foco está no próprio card, não nos botões internos. */
+  onCardKeydown(event: Event, order: Order) {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    this.viewDetails(order);
+  }
+
+  editFromDetails(order: Order) {
+    this.closeDetails();
+    this.editOrder(order);
   }
 
   viewDetails(order: Order) {
