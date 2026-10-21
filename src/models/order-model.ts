@@ -65,4 +65,7 @@ export interface Order {
 
   vendedorId?: string;   // Opcional — pedido pode ficar sem vendedor (regra-de-negocio.md seção 5.2)
   vendedorName?: string; // Snapshot do nome no momento do vínculo
+
+  recurringOrderId?: string; // Pedido gerado por recorrência (seção 5.4); id do doc = rec_{recurringOrderId}_{yyyyMMdd}
+  occurrenceDate?: string;   // 'yyyy-MM-dd' da ocorrência
 }

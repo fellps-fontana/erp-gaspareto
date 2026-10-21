@@ -1147,3 +1147,185 @@ ARQUIVOS PERMITIDOS: src/services/order-service/order-payment-rules.ts, src/serv
 NAO FAZER: mexer em outras regras de parcelas
 RETORNO ESPERADO: suite verde + aprovacao do style
 HISTORICO: Bug reportado pelo usuario (N enorme travou a aba: Array.from sem teto). Limite 60 decidido pelo usuario. mike RED: 8 testes (5 falharam por assercao; caso 1e9 trocado por 100000 para nao travar o runner). levi GREEN: MAXIMO_DE_PARCELAS exportada, validarTamanhoDaAgenda em validarAgenda (cobre agenda livre e reajuste) e em validarQuantidadeDeParcelas (antes do Array.from) + piso de centavos. Kira inline na UI: [max] no input, mensagem de quantidade propria e PARCELAS_ACIMA_DO_LIMITE em MENSAGENS_PAGAMENTO. Suite 464 SUCCESS. style APROVADO em 1 rodada (obs nao bloqueante: "R$ 0,01" fixo em 2 mensagens). gon nao se aplica.
+
+## TASK-059 — Context: secao 5.4 Pedido recorrente, schema e stack
+STATUS: CONCLUIDA
+AGENT: killua
+DEPENDENCIAS:
+ESCOPO: Registrar a secao 5.4 (decisoes do usuario), a colecao recurringOrders no schema e a nota de Spark/HML no stack.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md; .claude/context/schema.dbml; .claude/context/stack.md
+CRITERIO DE ACEITE: secao 5.4 cobre as decisoes do usuario; schema.dbml tem recurringOrders e os 2 campos novos em orders; stack.md registra que HML nao roda Functions.
+ARQUIVOS PERMITIDOS: .claude/context/regra-de-negocio.md, .claude/context/schema.dbml, .claude/context/stack.md
+NAO FAZER: assumir resposta nao dada pelo usuario
+RETORNO ESPERADO: diff resumido
+HISTORICO: killua arquitetou (read-only); Kira aplicou o texto no context (killua nao escreve em .claude/). Usuario aceitou todas as recomendacoes e decidiu: geracao no cliente agora; Cloud Function agendada so quando a feature for para prod. Desvio do killua: customerId opcional no modelo (pedido pode nao ter cliente cadastrado). Esqueletos criados por Kira: src/models/recurring-order-model.ts, recurrence-rules.ts, recurring-order-build-rules.ts; Order ganhou recurringOrderId/occurrenceDate.
+
+## TASK-060 — [TDD RED] Regras de data da recorrencia
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-059
+ESCOPO: Escrever testes das funcoes de recurrence-rules.ts e confirmar RED por logica ausente.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secao 5.4); src/services/recurring-order-service/recurrence-rules.ts; src/models/recurring-order-model.ts
+CRITERIO DE ACEITE: cobre weekly/biweekly/monthly (dia 31 em mes curto, ancora em startDate)/weekdays, endDate inclusivo, janela com antecedencia/catch-up/generateFrom/lastGeneratedDate, teto por execucao, validarAgenda (4 codigos), idDaOcorrencia deterministico, hojeCivil/dataDoAgendamento locais; RED por NotImplemented, nao por compilacao.
+ARQUIVOS PERMITIDOS: src/services/recurring-order-service/recurrence-rules.spec.ts
+NAO FAZER: alterar o esqueleto; usar Date.now real
+RETORNO ESPERADO: lista de testes + saida do RED
+HISTORICO: mike: 50 testes em recurrence-rules.spec.ts (validarAgenda 15, hojeCivil 2, dataDoAgendamento 1, listarDatas 13, proxima 5, janela 12, id 2); RED 50/50 por NotImplemented. Ambiguidades levantadas (codigo p/ weekdays fora de 'weekdays', endDate recem-passado no catch-up, teto = 14 primeiras, apos < startDate) decididas por Kira derivando da regra aprovada e registradas na 5.4; caso extra do endDate recem-passado adicionado.
+
+## TASK-061 — [TDD GREEN] Implementar regras de data da recorrencia
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-060
+ESCOPO: Implementar recurrence-rules.ts ate o spec ficar GREEN.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secao 5.4); .claude/context/clean-code.md; src/services/recurring-order-service/recurrence-rules.ts; src/services/recurring-order-service/recurrence-rules.spec.ts (leitura)
+CRITERIO DE ACEITE: spec da TASK-060 verde; funcoes puras sem Date.now interno; constantes nomeadas.
+ARQUIVOS PERMITIDOS: src/services/recurring-order-service/recurrence-rules.ts
+NAO FAZER: editar o spec
+RETORNO ESPERADO: suite verde
+HISTORICO: levi: aritmetica civil em UTC (Date.UTC), local so em hojeCivil/dataDoAgendamento; ancoragem mensal local (adicionarMesesAncorado nao e exportado); laco limitado por teto/janela. 50/50 GREEN. style APROVADO em 1 rodada; polimento aplicado inline por Kira (FREQUENCIA_MENSAL, UM_DIA, cursor->dataMinima), 50/50 de novo.
+
+## TASK-062 — [TDD RED] Montar modelo e pedido da ocorrencia
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-061
+ESCOPO: Testar montarModeloDoPedido e montarPedidoDaOcorrencia.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secoes 5, 5.3, 5.4); src/services/recurring-order-service/recurring-order-build-rules.ts; src/models/order-model.ts; src/models/recurring-order-model.ts; src/services/order-service/order-payment-rules.ts (calcularTotalDoPedido); src/services/product-service/product-weight-rules.ts
+CRITERIO DE ACEITE: preco/custo do produto atual; peso com snapshot soldByWeight; produto ausente/outra empresa/sellPrice nao finito => ok:false; status pending; recurringOrderId/occurrenceDate/scheduledDate preenchidos; frete, endereco e vendedor do molde; modelo sem preco e generateFrom = startDate.
+ARQUIVOS PERMITIDOS: src/services/recurring-order-service/recurring-order-build-rules.spec.ts
+NAO FAZER: alterar o esqueleto
+RETORNO ESPERADO: lista de testes + saida do RED
+HISTORICO: mike: 25 testes RED; 6 ambiguidades (nome atual vs snapshot, soldByWeight divergente, preco 0/negativo, itens vazios/quantity invalida, pedido sem id, detail) decididas por Kira e registradas na 5.4 (bullet Detalhes); 'ITENS_INVALIDOS' adicionado ao union por Kira; +9 testes (34). Rodada 3 (achado do style): +10 testes de buyPrice (44).
+
+## TASK-063 — [TDD GREEN] Implementar montagem de modelo e pedido
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-062
+ESCOPO: Implementar recurring-order-build-rules.ts reusando calcularTotalDoPedido.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secoes 5, 5.3, 5.4); .claude/context/clean-code.md; src/services/recurring-order-service/recurring-order-build-rules.ts; src/services/recurring-order-service/recurring-order-build-rules.spec.ts (leitura); src/services/order-service/order-payment-rules.ts (leitura)
+CRITERIO DE ACEITE: spec da TASK-062 verde; nenhuma matematica de dinheiro duplicada.
+ARQUIVOS PERMITIDOS: src/services/recurring-order-service/recurring-order-build-rules.ts
+NAO FAZER: editar o spec
+RETORNO ESPERADO: suite verde
+HISTORICO: levi: montarModeloDoPedido/montarPedidoDaOcorrencia reusando validarAgenda e calcularTotalDoPedido; semUndefined p/ chaves opcionais; detail usa productName do modelo (nao vaza titulo de produto de outro tenant). style rodada 1 PRECISA CORRIGIR: buyPrice nao validado (custo NaN contaminaria lucro/comissao) + aspas/acentos -> 5.4 atualizada (preco OU custo invalido), mike RED +10, levi corrigiu. style rodada 2 APROVADO. 44/44 + 50/50.
+
+## TASK-064 — [TDD RED] RecurringOrderService (CRUD e geracao idempotente)
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-063
+ESCOPO: Testar o service contra o emulador.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secoes 5, 5.4, 10); src/services/recurring-order-service/recurring-order-service.ts; src/services/order-service/order-service.ts; src/services/order-service/order-service.spec.ts (referencia de setup)
+CRITERIO DE ACEITE: generateOccurrence cria pedido rec_..., orderNumber do contador e cursor na mesma transacao; 2a chamada => already-exists sem consumir numero; concorrencia gera 1 pedido; produto ausente => skipped-issue com cursor/lastIssue e contador intacto; pausado/encerrado => not-due; ultima ocorrencia => ended; resume grava generateFrom=hoje; queries por companyId.
+ARQUIVOS PERMITIDOS: src/services/recurring-order-service/recurring-order-service.spec.ts
+NAO FAZER: alterar o esqueleto
+RETORNO ESPERADO: lista de testes + saida do RED
+HISTORICO: mike: 26 testes contra emulador (createFromOrder 5, multi-tenant 2, generateOccurrence 9 incl. concorrencia Promise.all, generateDueOccurrences 4, maquina de estado 4, update 2); RED 26/26 (2 falsos verdes corrigidos com not.toBe('NotImplemented')). Decisoes Kira: resume/update de ended lancam Error sem codigo; skipped-issue nao incrementa generatedCount; perdedor da corrida = already-exists.
+
+## TASK-065 — [TDD GREEN] Implementar RecurringOrderService
+STATUS: PENDENTE
+AGENT: levi
+DEPENDENCIAS: TASK-064
+ESCOPO: Implementar o service: transacao leituras-antes-de-escritas, check de existencia, guarda de companyId.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secoes 5, 5.4, 10); .claude/context/clean-code.md; src/services/recurring-order-service/*; src/services/order-service/order-service.ts (leitura)
+CRITERIO DE ACEITE: spec da TASK-064 verde; nenhum getDoc+setDoc fora de transacao; erro sobe.
+ARQUIVOS PERMITIDOS: src/services/recurring-order-service/recurring-order-service.ts
+NAO FAZER: editar spec; alterar OrderService
+RETORNO ESPERADO: suite verde
+HISTORICO:
+
+## TASK-066 — [TDD RED] Regras do Firestore para recurringOrders
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-059
+ESCOPO: Estender o spec de rules (Jest) para recurringOrders.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secoes 5.4, 10, 13); firestore.rules; test/firestore.rules.spec.ts
+CRITERIO DE ACEITE: empresa A nao le nem escreve recurringOrders da B; create exige companyId do usuario; update nao muda companyId; super-admin no padrao das colecoes operacionais; RED porque a colecao nao esta na lista.
+ARQUIVOS PERMITIDOS: test/firestore.rules.spec.ts
+NAO FAZER: editar firestore.rules
+RETORNO ESPERADO: saida do RED
+HISTORICO: mike: describe recurringOrders em test/firestore.rules.spec.ts (16 casos; seed com withSecurityRulesDisabled para a leitura cross-tenant avaliar a regra). RED: 9 permitidos falhando por PERMISSION_DENIED; 7 negados ja passavam; 51 preexistentes verdes.
+
+## TASK-067 — [TDD GREEN] Incluir recurringOrders nas rules
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-066
+ESCOPO: Adicionar 'recurringOrders' em isOperationalCollection.
+FLUXO: Implementacao
+CONTEXTO A LER: firestore.rules; test/firestore.rules.spec.ts (leitura); .claude/context/regra-de-negocio.md (secao 10)
+CRITERIO DE ACEITE: npm run test:rules verde; nenhuma outra regra alterada.
+ARQUIVOS PERMITIDOS: firestore.rules
+NAO FAZER: afrouxar qualquer condicao
+RETORNO ESPERADO: suite de rules verde
+HISTORICO: levi: 'recurringOrders' adicionada em isOperationalCollection (unica linha). test:rules 67/67. gon pendente (revisao conjunta com o service na TASK-065).
+
+## TASK-068 — [TDD GREEN] Confirmar nucleo, service e rules
+STATUS: PENDENTE
+AGENT: mike
+DEPENDENCIAS: TASK-065, TASK-067
+ESCOPO: Rodar a suite completa (ng test no emulators:exec + test:rules) sem reescrever teste.
+FLUXO: Implementacao
+CONTEXTO A LER: specs das TASK-060/062/064/066
+CRITERIO DE ACEITE: suite inteira verde; relatorio de bug se falhar.
+ARQUIVOS PERMITIDOS: nenhum
+NAO FAZER: editar teste
+RETORNO ESPERADO: contagem de specs e status
+HISTORICO:
+
+## TASK-069 — UI Pedidos: "Repetir pedido", selo e gatilho de geracao
+STATUS: PENDENTE
+AGENT: hanzo
+DEPENDENCIAS: TASK-068
+ESCOPO: No detalhe, acao "Repetir pedido"; selo discreto no card do gerado; OrderComponent dispara generateDueOccurrences uma vez por sessao.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (5.4); .claude/context/identidade-visual.md; .claude/context/clean-code.md; src/components/order/order.ts|html|css; src/services/recurring-order-service/recurring-order-service.ts (leitura)
+CRITERIO DE ACEITE: nenhum botao novo no card; validacao via validarAgenda com notif.warning; selo so em pedido gerado; original com recorrencia mostra estado em vez de oferecer de novo.
+ARQUIVOS PERMITIDOS: src/components/order/order.ts, order.html, order.css, order_mobile.css, src/components/order-recurrence/*
+NAO FAZER: tocar services; fluxo de pagamento/parcelas
+RETORNO ESPERADO: arquivos tocados + decisoes de UX
+HISTORICO:
+
+## TASK-070 — UI Pedidos: pill "Recorrentes" e gestao dos modelos
+STATUS: PENDENTE
+AGENT: hanzo
+DEPENDENCIAS: TASK-069
+ESCOPO: Pill "Recorrentes" (so se existir modelo); lista com proxima data, pausar, retomar, encerrar, editar e aviso de lastIssue.
+FLUXO: Implementacao
+CONTEXTO A LER: igual a TASK-069
+CRITERIO DE ACEITE: pill ausente sem modelos; encerrado nao reabre; editar nao altera pedidos ja gerados; mobile incluso.
+ARQUIVOS PERMITIDOS: src/components/order/order.ts, order.html, order.css, order_mobile.css, src/components/order-recurrence/*
+NAO FAZER: tocar services
+RETORNO ESPERADO: arquivos tocados
+HISTORICO:
+
+## TASK-071 — UI Clientes: "Pedidos recorrentes deste cliente"
+STATUS: PENDENTE
+AGENT: hanzo
+DEPENDENCIAS: TASK-070
+ESCOPO: Lista de leitura dos modelos do cliente com atalho pausar/editar.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/identidade-visual.md; .claude/context/clean-code.md; componente de cliente (Kira identifica); src/services/recurring-order-service/recurring-order-service.ts (leitura)
+CRITERIO DE ACEITE: so leitura + 2 atalhos; some sem modelos; usa getByCustomer.
+ARQUIVOS PERMITIDOS: componente de cliente identificado pelo Kira + css
+NAO FAZER: gestao completa nessa tela
+RETORNO ESPERADO: arquivos tocados
+HISTORICO:
+
+## TASK-072 — Cloud Function agendada de geracao (somente PROD)
+STATUS: BLOQUEADA
+AGENT: killua
+DEPENDENCIAS: TASK-068
+ESCOPO: Arquitetar e implementar onSchedule diaria que reusa o nucleo e a mesma idempotencia.
+FLUXO: Implementacao
+CONTEXTO A LER: functions/src/index.ts; functions/package.json; .claude/context/regra-de-negocio.md (5.4, 13)
+CRITERIO DE ACEITE: definido na virada para prod
+ARQUIVOS PERMITIDOS: definido na virada para prod
+NAO FAZER: implementar antes da virada para prod
+RETORNO ESPERADO: desenho
+HISTORICO: Decisao do usuario (2026-10-21): a function entra so quando a feature for para producao, depois de testada em homolog com a geracao no cliente. Aviso do style (TASK-061): hojeCivil usa getters locais; servidor em UTC calcularia 'hoje' errado no fim da tarde BR — a Function precisa calcular hoje em America/Sao_Paulo.

@@ -341,6 +341,87 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
 - Valor estimado em Pedidos: total / pago / saldo sobre `filteredOrders$`
   (respeita filtros); pedidos que saíram do kanban não entram.
 
+## 5.4 Pedido recorrente (`recurringOrders`) — [CRÍTICA]
+
+Decisões do usuário (2026-10-20/21). Um **modelo** (`recurringOrders`, com
+`companyId`) gera pedidos comuns em `orders` numa agenda.
+
+### Onde vive
+- Nasce no **detalhe do pedido**, ação "Repetir pedido" (frequência, dias da
+  semana, 1ª data, fim opcional). Nenhum botão novo no card da lista.
+- Pedido gerado cai no kanban como pedido normal (`pending`), com selo discreto
+  de recorrente (`Order.recurringOrderId` preenchido).
+- Gestão de todos: pill "Recorrentes" ao lado de "Pedidos | A receber", só
+  aparece se existir algum modelo. Tela do cliente: só lista de leitura
+  "Pedidos recorrentes deste cliente" com atalho pausar/editar.
+
+### Agenda
+- Frequências: `weekly` (a cada 7 dias de `startDate`), `biweekly` (14 dias),
+  `monthly` (dia de `startDate`; mês sem o dia usa o último dia do mês; sempre
+  ancorado em `startDate`, nunca no resultado anterior), `weekdays` (toda semana
+  nos dias marcados, 0=domingo..6; sem "a cada N semanas").
+- `endDate` opcional e **inclusivo**. Datas da agenda são strings civis
+  `yyyy-MM-dd` no calendário local (BR), sem fuso.
+- O pedido original **não** conta como ocorrência: a 1ª gerada é `startDate`
+  (padrão no modal: a 1ª data da agenda depois da `scheduledDate` do original).
+- Validação: frequência do enum; `weekdays` só em `weekdays`, não vazio, valores
+  0..6; datas válidas; `endDate >= startDate`.
+
+### Geração (automática, idempotente)
+- **Mecanismo atual: no cliente**, ao abrir Pedidos (uma vez por sessão, com o
+  módulo pedidos ligado). Funciona igual em homolog e prod. A **Cloud Function
+  agendada** (gera sem ninguém abrir o app) entra **só em produção**, quando a
+  feature for para prod (decisão do usuário) — homolog é Spark e não roda
+  Functions. As duas usam o mesmo núcleo e a mesma idempotência.
+- Gera ocorrências com data `<= hoje + 2 dias` (antecedência). Catch-up: só
+  datas `>= hoje - 3 dias` (mais antigas são ignoradas), `>= generateFrom` e
+  depois de `lastGeneratedDate`; no máximo 14 por modelo por execução.
+  A janela é `[maior(generateFrom, lastGeneratedDate+1, hoje-3), menor(hoje+2,
+  endDate)]`; vazia → nada a gerar. Logo, `endDate` recém-passado ainda gera o
+  que ficou para trás dentro do catch-up (ex.: fim 09, hoje 10 → janela 07..09).
+  O teto de 14 pega as 14 primeiras datas da janela, em ordem crescente.
+  `weekdays` preenchido em frequência diferente de `weekdays` →
+  `DIAS_DA_SEMANA_INVALIDOS`. Próxima ocorrência depois de uma data anterior a
+  `startDate` é a própria `startDate`.
+- Pausar → não gera; **retomar** grava `generateFrom = hoje` (nunca gera o
+  período pausado). **Encerrar** é definitivo (não reabre). Sem próxima data
+  (passou do `endDate`) → modelo vira `ended` automaticamente.
+- Idempotência: id do pedido gerado = `rec_{recurringOrderId}_{yyyyMMdd}`;
+  criação em transação que lê o contador e o modelo e usa o **cursor**
+  (`lastGeneratedDate`, monotônico) como trava: data `<=` cursor → já gerada
+  (não escreve). Grava pedido + contador (`orderNumber`) + cursor
+  (`lastGeneratedDate`, `generatedCount`) juntos; corrida entre dispositivos
+  colide no doc do modelo e o perdedor relê o cursor. Não se lê doc
+  inexistente (as rules negam leitura sem `companyId`, e isso NÃO é afrouxado);
+  produtos atuais vêm de consulta filtrada por `companyId` antes da transação
+  (produto excluído simplesmente não volta → ocorrência pulada). Pedido gerado que
+  foi cancelado/excluído **não** é regenerado.
+
+### Conteúdo do pedido gerado
+- Itens do modelo (sem preço); **preço e custo atuais** do produto no momento da
+  geração. Produto por peso: kg fixo no modelo, preço por kg atual; total pela
+  mesma fórmula de Pedidos (`calcularTotalDoPedido`).
+- Produto do item excluído, de outra empresa ou com preço inválido → a
+  ocorrência inteira é **pulada** (cursor avança, `lastIssue` grava o motivo e a
+  UI avisa); sem consumir `orderNumber`. Falta de estoque **não** impede: o
+  estoque segue validado/baixado só na entrega (seção 5).
+- Detalhes (Kira, derivados de "dados atuais do produto", 2026-10-21; o
+  usuário pode revisar): nome do item = título **atual** do produto; se o
+  produto mudou entre unidade e peso desde o modelo (`soldByWeight` diverge), a
+  ocorrência é **pulada** (`PRODUTO_INDISPONIVEL`), porque a quantidade do
+  modelo perde o sentido; preço **ou custo** inválido = não finito (inclui
+  ausente) ou **negativo** (zero é aceito, como no cadastro manual) — custo
+  quebrado contaminaria lucro e comissão. Modelo exige itens não vazios com
+  `quantity` finita > 0 (senão `ITENS_INVALIDOS` na criação). `sourceOrderId`
+  só é gravado se o pedido tiver id. O `detail` do problema cita o nome do
+  produto.
+- Cliente, endereço, coordenadas, frete, tipo de entrega, observações e
+  vendedor vêm do modelo (snapshot; cliente excluído não impede). Comissão pela
+  regra normal (5.2).
+- Cada pedido gerado é independente: pagamentos/parcelas pela seção 5.3, por
+  pedido (sem mensalidade). Editar um gerado não muda o modelo; editar o modelo
+  só afeta ocorrências ainda não geradas.
+
 ## 6. Rotas de entrega
 
 - Consome pedidos pendentes/ativos (`OrderService.getPendingOrders`, status em
