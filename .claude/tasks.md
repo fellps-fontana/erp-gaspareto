@@ -1227,7 +1227,7 @@ RETORNO ESPERADO: lista de testes + saida do RED
 HISTORICO: mike: 26 testes contra emulador (createFromOrder 5, multi-tenant 2, generateOccurrence 9 incl. concorrencia Promise.all, generateDueOccurrences 4, maquina de estado 4, update 2); RED 26/26 (2 falsos verdes corrigidos com not.toBe('NotImplemented')). Decisoes Kira: resume/update de ended lancam Error sem codigo; skipped-issue nao incrementa generatedCount; perdedor da corrida = already-exists.
 
 ## TASK-065 — [TDD GREEN] Implementar RecurringOrderService
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-064
 ESCOPO: Implementar o service: transacao leituras-antes-de-escritas, check de existencia, guarda de companyId.
@@ -1237,7 +1237,7 @@ CRITERIO DE ACEITE: spec da TASK-064 verde; nenhum getDoc+setDoc fora de transac
 ARQUIVOS PERMITIDOS: src/services/recurring-order-service/recurring-order-service.ts
 NAO FAZER: editar spec; alterar OrderService
 RETORNO ESPERADO: suite verde
-HISTORICO:
+HISTORICO: levi: 1a versao lia orders/rec_... e products/{id} na transacao -> rules negam leitura de doc inexistente; levi propos afrouxar rules (oraculo de existencia cross-tenant) e Kira RECUSOU. Redesenho (5.4 atualizada): cursor lastGeneratedDate como trava de idempotencia, produtos por consulta filtrada por companyId fora da transacao (1x por rodada). mike ajustou helper do spec (consulta em vez de getDoc). style rodada 1 PRECISA CORRIGIR: modelo vencido nunca virava ended; erro engolido no lote; resume em active descartava ocorrencias; duplicacoes/logica pura no service -> mike +6 RED, levi corrigiu (agendaEsgotada, falhas?: string[] opcional p/ nao quebrar toEqual, resume so paused, itemDoModelo/MODELO_ATIVO unicos, funcoes de alteracao nas build-rules com null->deleteField so no service, update aceita endDate/weekdays null). style rodada 2 PRECISA CORRIGIR: agendaEsgotada ignorava hoje/catch-up (semanal 10-07/fim 10-15/hoje 10-21 ficava active) e sem unit test -> Kira unificou com proximaOcorrenciaPendente(agenda,cursor,hoje) (tambem usada pela UI); mike +17 RED; levi GREEN. style rodada 3 APROVADO (obs nao bloqueantes: dois caminhos de encerramento — camposDeFimDeAgenda e agendaEsgotada — unificar depois; linha >100). mike GREEN 153/153. gon APROVADO (riscos residuais: integridade client-side ja aceita — reset manual do cursor permitiria set sobre pedido existente; update sem validacao de tipo em campos texto/numero; counters sem nextOrderNumber falha isolado).
 
 ## TASK-066 — [TDD RED] Regras do Firestore para recurringOrders
 STATUS: CONCLUIDA
@@ -1263,7 +1263,7 @@ CRITERIO DE ACEITE: npm run test:rules verde; nenhuma outra regra alterada.
 ARQUIVOS PERMITIDOS: firestore.rules
 NAO FAZER: afrouxar qualquer condicao
 RETORNO ESPERADO: suite de rules verde
-HISTORICO: levi: 'recurringOrders' adicionada em isOperationalCollection (unica linha). test:rules 67/67. gon pendente (revisao conjunta com o service na TASK-065).
+HISTORICO: levi: 'recurringOrders' adicionada em isOperationalCollection (unica linha). test:rules 67/67. gon pendente (revisao conjunta com o service na TASK-065). gon APROVADO junto com a TASK-065.
 
 ## TASK-068 — [TDD GREEN] Confirmar nucleo, service e rules
 STATUS: PENDENTE

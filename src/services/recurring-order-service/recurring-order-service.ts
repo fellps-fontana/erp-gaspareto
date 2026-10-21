@@ -135,7 +135,7 @@ export class RecurringOrderService extends FirestoreBaseService {
     for (const modelo of await this.listarModelosAtivos()) {
       try {
         await this.gerarDevidasDoModelo(modelo, agora, resumo, companyId, produtos);
-        await this.encerrarSeEsgotada(modelo);
+        await this.encerrarSeEsgotada(modelo, hojeCivil(agora));
       } catch (erro) {
         falhas.push(modelo.id);
         console.error(`Falha ao gerar ocorrencias do pedido recorrente ${modelo.id}`, erro);
@@ -236,11 +236,11 @@ export class RecurringOrderService extends FirestoreBaseService {
   }
 
   /** Reavalia dentro da transacao: so grava 'ended' se a agenda continua esgotada. */
-  private async encerrarSeEsgotada(modelo: ModeloComId): Promise<void> {
+  private async encerrarSeEsgotada(modelo: ModeloComId, hoje: CivilDate): Promise<void> {
     const ref = doc(this.recurringOrdersCollection, modelo.id);
     await runTransaction(this.firestore, async (transaction) => {
       const atual = lerModelo(await transaction.get(ref));
-      if (atual.status === MODELO_ATIVO && agendaEsgotada(agendaDoModelo(atual), cursorDoModelo(atual))) {
+      if (atual.status === MODELO_ATIVO && agendaEsgotada(agendaDoModelo(atual), cursorDoModelo(atual), hoje)) {
         transaction.update(ref, { status: MODELO_ENCERRADO });
       }
     });

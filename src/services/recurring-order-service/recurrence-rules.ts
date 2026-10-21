@@ -109,9 +109,26 @@ export function proximaDataDeOcorrencia(
   return agenda.endDate !== undefined && proxima > agenda.endDate ? null : proxima;
 }
 
-/** True quando nao ha nenhuma ocorrencia depois do cursor (encerramento automatico da agenda). */
-export function agendaEsgotada(agenda: AgendaDeRecorrencia, cursor: CursorDeGeracao): boolean {
-  return proximaDataDeOcorrencia(agenda, aposOCursor(cursor)) === null;
+/**
+ * Primeira ocorrencia pendente: >= max(dia seguinte a lastGeneratedDate, generateFrom, hoje - 3),
+ * e <= endDate. null quando nao ha nenhuma. Mesma regra de catch-up da janela de geracao.
+ */
+export function proximaOcorrenciaPendente(
+  agenda: AgendaDeRecorrencia,
+  cursor: CursorDeGeracao,
+  hoje: CivilDate
+): CivilDate | null {
+  const proxima = primeiraOcorrenciaAPartirDe(agenda, inicioDaJanela(cursor, hoje));
+  return agenda.endDate !== undefined && proxima > agenda.endDate ? null : proxima;
+}
+
+/** True quando nao ha nenhuma ocorrencia pendente (encerramento automatico da agenda). */
+export function agendaEsgotada(
+  agenda: AgendaDeRecorrencia,
+  cursor: CursorDeGeracao,
+  hoje: CivilDate
+): boolean {
+  return proximaOcorrenciaPendente(agenda, cursor, hoje) === null;
 }
 
 /** `rec_{id}_{yyyyMMdd}` */
@@ -160,11 +177,6 @@ function ehDataCivilValida(data: CivilDate): boolean {
 
 function falhar(codigo: CodigoRecorrenciaInvalida, mensagem: string): never {
   throw new RecorrenciaInvalidaError(codigo, mensagem);
-}
-
-/** Ultimo dia coberto pelo cursor: o maior entre lastGeneratedDate e o dia anterior a generateFrom. */
-function aposOCursor(cursor: CursorDeGeracao): CivilDate {
-  return maiorData(cursor.lastGeneratedDate, somarDias(cursor.generateFrom, -UM_DIA));
 }
 
 function inicioDaJanela(cursor: CursorDeGeracao, hoje: CivilDate): CivilDate {

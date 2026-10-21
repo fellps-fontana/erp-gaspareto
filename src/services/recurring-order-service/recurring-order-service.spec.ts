@@ -646,6 +646,24 @@ describe('RecurringOrderService - Multi-tenant e regras do pedido recorrente (CR
       expect(resumo.criados).toBe(1, 'Ocorrencia de 10-21 gerada');
       expect((await lerModelo(recId))['status']).toBe('active', 'Ainda ha datas futuras: nao encerra');
     });
+
+    it('[RED] should encerrar modelo semanal com cursor 10-07 e endDate 10-15 quando hoje e 10-21, sem criar pedido', async () => {
+      const produtoId = await seedProduto('enc-esgotada-hoje');
+      await seedContador(1);
+      const recId = await seedModelo(produtoId, {
+        startDate: '2026-10-07',
+        generateFrom: '2026-10-07',
+        lastGeneratedDate: '2026-10-07',
+        generatedCount: 1,
+        endDate: '2026-10-15'
+      });
+
+      const resumo = await service.generateDueOccurrences(AGORA);
+
+      expect(resumo.criados).toBe(0, 'Nenhuma ocorrencia entre 10-08 e o endDate 10-15');
+      expect(await contarPedidosDoModelo(recId)).toBe(0, 'Nenhum pedido criado');
+      expect((await lerModelo(recId))['status']).toBe('ended', 'Agenda esgotada encerra no lote');
+    });
   });
 
   // ---------- Falha isolada por modelo (TASK-065, decisao 2) ----------

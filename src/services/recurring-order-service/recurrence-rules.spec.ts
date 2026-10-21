@@ -5,12 +5,14 @@ import {
   DIAS_DE_CATCH_UP,
   MAXIMO_DE_OCORRENCIAS_POR_EXECUCAO,
   RecorrenciaInvalidaError,
+  agendaEsgotada,
   calcularJanelaDeGeracao,
   dataDoAgendamento,
   hojeCivil,
   idDaOcorrencia,
   listarDatasDeOcorrencia,
   proximaDataDeOcorrencia,
+  proximaOcorrenciaPendente,
   validarAgenda,
 } from './recurrence-rules';
 
@@ -378,6 +380,158 @@ describe('recurrence-rules', () => {
 
     it('mantem dois digitos de dia e mes sem perder zero a esquerda', () => {
       expect(idDaOcorrencia('xyz', '2026-12-01')).toBe('rec_xyz_20261201');
+    });
+  });
+
+  describe('agendaEsgotada (hoje por parametro)', () => {
+    it('nunca esgota sem endDate', () => {
+      const semFim = { frequency: 'weekly' as const, startDate: '2026-10-07' };
+      expect(agendaEsgotada(semFim, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-07' }, '2026-10-21')).toBe(false);
+    });
+
+    it('esgota quando a proxima ocorrencia (10-14, 10-21) ja passou do endDate 10-15 com hoje 10-21', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-15' });
+      expect(agendaEsgotada(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-07' }, '2026-10-21')).toBe(true);
+    });
+
+    it('nao esgota quando a proxima ocorrencia cai dentro da janela e do endDate', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-30' });
+      // base = max(10-15, 10-07, 10-18) = 10-18; proxima = 10-21 <= 10-30
+      expect(agendaEsgotada(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-14' }, '2026-10-21')).toBe(false);
+    });
+
+    it('nao esgota com proxima data futura valida dentro do endDate (hoje 10-08)', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-30' });
+      expect(agendaEsgotada(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-07' }, '2026-10-08')).toBe(false);
+    });
+
+    it('esgota quando o endDate (10-20) e anterior a proxima ocorrencia (10-21)', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-20' });
+      expect(agendaEsgotada(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-14' }, '2026-10-21')).toBe(true);
+    });
+
+    it('esgota na retomada quando generateFrom (hoje 10-21) ja esta depois do endDate 10-15', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-15' });
+      expect(agendaEsgotada(semanal, { generateFrom: '2026-10-21' }, '2026-10-21')).toBe(true);
+    });
+
+    it('mensal ancorado em 31: cursor 02-28 e hoje 03-20 com endDate 03-15 esgota (proxima 03-31)', () => {
+      const mensal = agenda({ frequency: 'monthly', startDate: '2026-01-31', endDate: '2026-03-15' });
+      expect(agendaEsgotada(mensal, { generateFrom: '2026-01-31', lastGeneratedDate: '2026-02-28' }, '2026-03-20')).toBe(true);
+    });
+
+    it('mensal: cursor 01-31 e hoje 03-01 nao esgota, pois 02-28 entra no catch-up (hoje - 3 = 02-26)', () => {
+      const mensal = agenda({ frequency: 'monthly', startDate: '2026-01-31', endDate: '2026-03-15' });
+      expect(agendaEsgotada(mensal, { generateFrom: '2026-01-31', lastGeneratedDate: '2026-01-31' }, '2026-03-01')).toBe(false);
+    });
+
+    it('weekdays [1,3]: cursor 01-14, endDate 01-16 e hoje 01-20 esgota (proxima segunda 01-19)', () => {
+      const dias = agenda({ frequency: 'weekdays', weekdays: [1, 3], startDate: '2026-01-05', endDate: '2026-01-16' });
+      expect(agendaEsgotada(dias, { generateFrom: '2026-01-05', lastGeneratedDate: '2026-01-14' }, '2026-01-20')).toBe(true);
+    });
+
+    it('weekdays [1,3]: cursor 01-05, endDate 01-08 e hoje 01-07 nao esgota (quarta 01-07 cabe no endDate)', () => {
+      const dias = agenda({ frequency: 'weekdays', weekdays: [1, 3], startDate: '2026-01-05', endDate: '2026-01-08' });
+      expect(agendaEsgotada(dias, { generateFrom: '2026-01-05', lastGeneratedDate: '2026-01-05' }, '2026-01-07')).toBe(false);
+    });
+  });
+
+  describe('proximaOcorrenciaPendente', () => {
+    it('devolve a proxima data mesmo sem endDate (semanal start 10-07, base 10-18 -> 10-21)', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-07' }, '2026-10-21'))
+        .toBe('2026-10-21');
+    });
+
+    it('devolve null quando a proxima (10-21) passa do endDate 10-15 com hoje 10-21', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-15' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-07' }, '2026-10-21'))
+        .toBeNull();
+    });
+
+    it('devolve a proxima ocorrencia dentro da janela e do endDate (10-21)', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-30' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-14' }, '2026-10-21'))
+        .toBe('2026-10-21');
+    });
+
+    it('com hoje 10-08 devolve 10-14 (base = hoje, proxima futura valida)', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-30' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-07' }, '2026-10-08'))
+        .toBe('2026-10-14');
+    });
+
+    it('devolve null quando o endDate 10-20 e anterior a proxima 10-21', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-20' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-14' }, '2026-10-21'))
+        .toBeNull();
+    });
+
+    it('retomada (generateFrom = hoje 10-21) ignora o periodo pausado 10-14 e devolve 10-21', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-30' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-21' }, '2026-10-21')).toBe('2026-10-21');
+    });
+
+    it('retomada depois do endDate 10-15 devolve null', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-15' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-21' }, '2026-10-21')).toBeNull();
+    });
+
+    it('sem lastGeneratedDate devolve o startDate quando startDate 10-19 >= hoje-3 (10-18)', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-19' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-19' }, '2026-10-21')).toBe('2026-10-19');
+    });
+
+    it('sem lastGeneratedDate devolve startDate 10-18 quando ele e exatamente hoje-3', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-18' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-18' }, '2026-10-21')).toBe('2026-10-18');
+    });
+
+    it('pula ocorrencias anteriores a hoje-3: start 10-07 sem cursor devolve 10-21, nao 10-07 nem 10-14', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-30' });
+      expect(proximaOcorrenciaPendente(semanal, { generateFrom: '2026-10-07' }, '2026-10-21')).toBe('2026-10-21');
+    });
+
+    it('mensal ancorado em 31: cursor 02-28, hoje 03-20, endDate 03-15 -> null (proxima 03-31)', () => {
+      const mensal = agenda({ frequency: 'monthly', startDate: '2026-01-31', endDate: '2026-03-15' });
+      expect(proximaOcorrenciaPendente(mensal, { generateFrom: '2026-01-31', lastGeneratedDate: '2026-02-28' }, '2026-03-20'))
+        .toBeNull();
+    });
+
+    it('mensal: cursor 01-31, hoje 03-01 -> 02-28 (entra no catch-up a partir de 02-26)', () => {
+      const mensal = agenda({ frequency: 'monthly', startDate: '2026-01-31', endDate: '2026-03-15' });
+      expect(proximaOcorrenciaPendente(mensal, { generateFrom: '2026-01-31', lastGeneratedDate: '2026-01-31' }, '2026-03-01'))
+        .toBe('2026-02-28');
+    });
+
+    it('weekdays [1,3]: cursor 01-14, endDate 01-16, hoje 01-20 -> null (proxima segunda 01-19)', () => {
+      const dias = agenda({ frequency: 'weekdays', weekdays: [1, 3], startDate: '2026-01-05', endDate: '2026-01-16' });
+      expect(proximaOcorrenciaPendente(dias, { generateFrom: '2026-01-05', lastGeneratedDate: '2026-01-14' }, '2026-01-20'))
+        .toBeNull();
+    });
+
+    it('weekdays [1,3]: cursor 01-05, endDate 01-08, hoje 01-07 -> 01-07 (quarta cabe no endDate)', () => {
+      const dias = agenda({ frequency: 'weekdays', weekdays: [1, 3], startDate: '2026-01-05', endDate: '2026-01-08' });
+      expect(proximaOcorrenciaPendente(dias, { generateFrom: '2026-01-05', lastGeneratedDate: '2026-01-05' }, '2026-01-07'))
+        .toBe('2026-01-07');
+    });
+  });
+
+  describe('agendaEsgotada equivale a proximaOcorrenciaPendente === null', () => {
+    it('quando ha proxima data, agendaEsgotada e false', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-30' });
+      const cursor = { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-14' };
+      expect(agendaEsgotada(semanal, cursor, '2026-10-21')).toBe(
+        proximaOcorrenciaPendente(semanal, cursor, '2026-10-21') === null
+      );
+    });
+
+    it('quando nao ha proxima data, agendaEsgotada e true', () => {
+      const semanal = agenda({ frequency: 'weekly', startDate: '2026-10-07', endDate: '2026-10-15' });
+      const cursor = { generateFrom: '2026-10-07', lastGeneratedDate: '2026-10-07' };
+      expect(agendaEsgotada(semanal, cursor, '2026-10-21')).toBe(
+        proximaOcorrenciaPendente(semanal, cursor, '2026-10-21') === null
+      );
     });
   });
 });
