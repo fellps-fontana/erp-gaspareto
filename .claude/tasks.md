@@ -1266,7 +1266,7 @@ RETORNO ESPERADO: suite de rules verde
 HISTORICO: levi: 'recurringOrders' adicionada em isOperationalCollection (unica linha). test:rules 67/67. gon pendente (revisao conjunta com o service na TASK-065). gon APROVADO junto com a TASK-065.
 
 ## TASK-068 — [TDD GREEN] Confirmar nucleo, service e rules
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-065, TASK-067
 ESCOPO: Rodar a suite completa (ng test no emulators:exec + test:rules) sem reescrever teste.
@@ -1276,10 +1276,10 @@ CRITERIO DE ACEITE: suite inteira verde; relatorio de bug se falhar.
 ARQUIVOS PERMITIDOS: nenhum
 NAO FAZER: editar teste
 RETORNO ESPERADO: contagem de specs e status
-HISTORICO:
+HISTORICO: Kira rodou a suite completa (emulators:exec): Karma 617 SUCCESS; test:rules 67/67; ng build sem erro (so avisos de budget preexistentes, order.css > 20 kB).
 
 ## TASK-069 — UI Pedidos: "Repetir pedido", selo e gatilho de geracao
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-068
 ESCOPO: No detalhe, acao "Repetir pedido"; selo discreto no card do gerado; OrderComponent dispara generateDueOccurrences uma vez por sessao.
@@ -1289,10 +1289,10 @@ CRITERIO DE ACEITE: nenhum botao novo no card; validacao via validarAgenda com n
 ARQUIVOS PERMITIDOS: src/components/order/order.ts, order.html, order.css, order_mobile.css, src/components/order-recurrence/*
 NAO FAZER: tocar services; fluxo de pagamento/parcelas
 RETORNO ESPERADO: arquivos tocados + decisoes de UX
-HISTORICO:
+HISTORICO: hanzo: modal standalone src/components/order-recurrence/ (frequencia, dias, 1a data via proximaDataDeOcorrencia, fim opcional; validarAgenda + mensagens por codigo); selo Recorrente no card e detalhe; 'Repete: <freq>' no original; generateDueOccurrences 1x por sessao/empresa (Set estatico) sem bloquear. Decisao Kira (pergunta do style, 5.4): Repetir pedido nao aparece em pedido gerado e reaparece se so houver modelos encerrados.
 
 ## TASK-070 — UI Pedidos: pill "Recorrentes" e gestao dos modelos
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-069
 ESCOPO: Pill "Recorrentes" (so se existir modelo); lista com proxima data, pausar, retomar, encerrar, editar e aviso de lastIssue.
@@ -1302,10 +1302,10 @@ CRITERIO DE ACEITE: pill ausente sem modelos; encerrado nao reabre; editar nao a
 ARQUIVOS PERMITIDOS: src/components/order/order.ts, order.html, order.css, order_mobile.css, src/components/order-recurrence/*
 NAO FAZER: tocar services
 RETORNO ESPERADO: arquivos tocados
-HISTORICO:
+HISTORICO: hanzo: aba extraida em recurring-orders-tab.* + recurring-order-view.ts; pill so com modelos; proxima data via proximaOcorrenciaPendente (so ativo); lastIssue; pausar/retomar/encerrar (modal proprio)/editar (modal reaproveitado: agenda, remover fim -> endDate null, itens com validarPeso, frete, observacoes).
 
 ## TASK-071 — UI Clientes: "Pedidos recorrentes deste cliente"
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-070
 ESCOPO: Lista de leitura dos modelos do cliente com atalho pausar/editar.
@@ -1315,7 +1315,7 @@ CRITERIO DE ACEITE: so leitura + 2 atalhos; some sem modelos; usa getByCustomer.
 ARQUIVOS PERMITIDOS: componente de cliente identificado pelo Kira + css
 NAO FAZER: gestao completa nessa tela
 RETORNO ESPERADO: arquivos tocados
-HISTORICO:
+HISTORICO: hanzo: src/components/customer-recurring-orders/ embutido no 'Editar Cliente' (Gestao > Clientes); so leitura + pausar/retomar; proxima data via proximaOcorrenciaPendente. style UI (069-071) rodada 1 PRECISA CORRIGIR: duplicacao de rotulos/datas/erros com order-recurrence, @media no meio do CSS anulando alvo de 44px -> hanzo unificou (montarLinhaRecorrente, rotuloDaProximaData defensiva, notificarErroDoModelo) e moveu o @media. style rodada 2 APROVADO (obs: cliente mostra proxima data tambem em pausado, a aba nao).
 
 ## TASK-072 — Cloud Function agendada de geracao (somente PROD)
 STATUS: BLOQUEADA

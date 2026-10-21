@@ -664,6 +664,8 @@
           </ng-template>
         </ng-container>
 
+        <app-customer-recurring-orders *ngIf="clienteEmEdicao?.id as clienteId" [customerId]="clienteId"></app-customer-recurring-orders>
+
         <button class="btn-salvar" (click)="salvarCliente()" [disabled]="isLoading">{{ isLoading ? '⏳ Sincronizando...' : '✅ SALVAR' }}</button>
       </div>
 

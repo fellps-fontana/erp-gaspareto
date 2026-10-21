@@ -28,6 +28,7 @@ import { VendedorService } from '../../services/vendedor-service/vendedor-servic
 import { ComandaService } from '../../services/comanda-service/comanda-service';
 import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
 import { MapPickerComponent } from '../map-picker/map-picker';
+import { CustomerRecurringOrdersComponent } from '../customer-recurring-orders/customer-recurring-orders';
 import { filtrarPorTermo } from './busca-por-nome';
 import { calcularTotalItemPorPeso } from '../../services/product-service/product-weight-rules';
 import { MovimentoMes, PanoramaAnual, calcularAReceberTotal, calcularRecebidoNoPeriodo, listarMovimentoDoMes, montarPanoramaAnual } from '../../services/order-service/order-receivables-rules';
@@ -70,7 +71,7 @@ export interface HistoricoItem {
 @Component({
   selector: 'app-estoque',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MapPickerComponent],
+  imports: [CommonModule, FormsModule, RouterLink, MapPickerComponent, CustomerRecurringOrdersComponent],
   templateUrl: './product-inventory.html',
   styleUrls: ['./product-inventory.css', './product-inventory-mobile.css']
 })

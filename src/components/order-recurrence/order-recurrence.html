@@ -1,0 +1,66 @@
+<div class="modal-backdrop">
+  <div class="modal-content recurrence-modal" role="dialog" aria-modal="true" aria-labelledby="recurrenceTitle">
+    <h3 id="recurrenceTitle">{{ editing ? 'Editar pedido recorrente' : 'Repetir pedido' }}</h3>
+    <p *ngIf="!editing && order">Pedido #{{ order.orderNumber }} de <strong>{{ order.customerName }}</strong></p>
+    <p *ngIf="editing && model">Cliente: <strong>{{ model.customerName }}</strong>. A mudança vale só para os próximos pedidos; os já gerados não mudam.</p>
+
+    <div class="form-field">
+      <label for="recurrenceFrequency">Frequência</label>
+      <select id="recurrenceFrequency" [(ngModel)]="frequency" (ngModelChange)="onFrequencyChange()">
+        <option *ngFor="let f of frequencias" [value]="f.value">{{ f.label }}</option>
+      </select>
+    </div>
+
+    <div class="form-field" *ngIf="usaDiasDaSemana">
+      <label id="recurrenceWeekdaysLabel">Dias da semana</label>
+      <div class="weekday-picker" role="group" aria-labelledby="recurrenceWeekdaysLabel">
+        <label class="weekday-option" *ngFor="let d of diasDaSemana" [class.active]="weekdays.includes(d.value)">
+          <input type="checkbox" [checked]="weekdays.includes(d.value)" (change)="toggleWeekday(d.value)">
+          {{ d.label }}
+        </label>
+      </div>
+    </div>
+
+    <div class="recurrence-dates">
+      <div class="form-field" *ngIf="!editing">
+        <label for="recurrenceStart">1ª data</label>
+        <input id="recurrenceStart" type="date" [(ngModel)]="startDate" (ngModelChange)="onStartDateInput()">
+      </div>
+      <div class="form-field">
+        <label for="recurrenceEnd">Fim (opcional)</label>
+        <input id="recurrenceEnd" type="date" [(ngModel)]="endDate">
+        <button type="button" class="link-action" *ngIf="editing && endDate" (click)="clearEndDate()">Remover data de fim</button>
+      </div>
+    </div>
+
+    <ng-container *ngIf="editing">
+      <div class="form-field">
+        <label>Itens</label>
+        <div class="edit-item" *ngFor="let item of items; let i = index">
+          <span class="edit-item-name">{{ item.productName }}</span>
+          <input type="number" [attr.step]="item.soldByWeight ? 0.001 : 1" min="0"
+            [(ngModel)]="item.quantity" [attr.aria-label]="'Quantidade de ' + item.productName">
+          <span class="edit-item-unit">{{ item.soldByWeight ? 'kg' : 'un' }}</span>
+          <button type="button" class="btn-remove" (click)="removeItem(i)" [attr.aria-label]="'Remover ' + item.productName">✕</button>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label for="recurrenceShipping">Frete (R$)</label>
+        <input id="recurrenceShipping" type="number" min="0" step="0.01" [(ngModel)]="shippingCost">
+      </div>
+
+      <div class="form-field">
+        <label for="recurrenceObs">Observações</label>
+        <textarea id="recurrenceObs" rows="2" [(ngModel)]="observations"></textarea>
+      </div>
+    </ng-container>
+
+    <div class="modal-actions">
+      <button type="button" (click)="closed.emit()" [disabled]="processing">Cancelar</button>
+      <button type="button" class="btn-confirm" (click)="save()" [disabled]="processing">
+        {{ processing ? 'Salvando...' : (editing ? 'Salvar alterações' : 'Repetir pedido') }}
+      </button>
+    </div>
+  </div>
+</div>

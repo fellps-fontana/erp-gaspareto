@@ -290,6 +290,19 @@
   color: var(--text-secondary);
 }
 
+/* Selo de pedido recorrente (seção 5.4): discreto, cor informativa */
+.recurring-tag {
+  display: inline-block;
+  margin: 0 var(--sp-sm) var(--sp-sm) 0;
+  padding: 2px var(--sp-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
+  border-radius: var(--radius-pill);
+}
+
 /* Delivery Info Styled */
 .delivery-info-styled {
   display: flex;

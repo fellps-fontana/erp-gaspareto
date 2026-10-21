@@ -39,6 +39,9 @@
       A receber
       <span class="tab-badge" *ngIf="(quantidadeVencidas$ | async) as vencidas">({{ vencidas }} {{ vencidas === 1 ? 'vencida' : 'vencidas' }})</span>
     </button>
+    <button role="tab" *ngIf="recurringModels.length > 0"
+      [class.active]="activeTab === 'recorrentes'" [attr.aria-selected]="activeTab === 'recorrentes'"
+      (click)="activeTab = 'recorrentes'">Recorrentes</button>
   </nav>
 
   <!-- A RECEBER -->
@@ -46,6 +49,21 @@
     [orders]="(orders$ | async) ?? []"
     (receive)="onReceiveInstallment($event)"
     (openOrder)="openOrderFromReceivables($event)"></app-order-receivables>
+
+  <!-- RECORRENTES -->
+  <app-recurring-orders-tab *ngIf="activeTab === 'recorrentes'"
+    [models]="recurringModels"
+    [processing]="isProcessingAction"
+    (pause)="pauseRecurring($event)"
+    (resume)="resumeRecurring($event)"
+    (end)="endRecurring($event)"
+    (edit)="openRecurringEdit($event)"></app-recurring-orders-tab>
+
+  <app-order-recurrence *ngIf="editingRecurring"
+    [model]="editingRecurring"
+    [processing]="isProcessingAction"
+    (edited)="onRecurringEdited($event)"
+    (closed)="closeRecurringEdit()"></app-order-recurrence>
 
   <ng-container *ngIf="activeTab === 'pedidos'">
   <div class="summary-row">
@@ -112,6 +130,7 @@
       <div class="card-body-styled">
         <h3 class="customer-name">{{ order.customerName }}</h3>
         <span class="vendedor-tag" *ngIf="order.vendedorName">🧑‍💼 {{ order.vendedorName }}</span>
+        <span class="recurring-tag" *ngIf="isRecurringGenerated(order)" title="Pedido gerado por recorrência">🔁 Recorrente</span>
 
         <div class="scheduled-date-badge" *ngIf="order.scheduledDate && order.status !== 'delivered' && order.status !== 'finished'">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -508,6 +527,8 @@
           <div class="customer-info">
             <h2>{{ selectedOrderDetails.customerName }}</h2>
             <span class="vendedor-tag" *ngIf="selectedOrderDetails.vendedorName">🧑‍💼 {{ selectedOrderDetails.vendedorName }}</span>
+            <span class="recurring-tag" *ngIf="isRecurringGenerated(selectedOrderDetails)" title="Pedido gerado por recorrência">🔁 Recorrente</span>
+            <span class="recurring-tag" *ngIf="recurringModelOf(selectedOrderDetails)">🔁 Repete: {{ recurrenceLabelOf(selectedOrderDetails) }}</span>
             <div class="phone-row" *ngIf="selectedOrderDetails.customerPhone">
               <span class="phone">{{ selectedOrderDetails.customerPhone }}</span>
               <button class="btn-whatsapp" (click)="openWhatsApp(selectedOrderDetails.customerPhone!)"
@@ -590,8 +611,17 @@
           (click)="editFromDetails(selectedOrderDetails)">Editar</button>
         <button class="btn-secondary" *ngIf="canScheduleInstallments(selectedOrderDetails)"
           (click)="openInstallmentsFromDetails(selectedOrderDetails)">Montar parcelas</button>
+        <button class="btn-secondary" *ngIf="canRepeatOrder(selectedOrderDetails)"
+          (click)="openRecurrenceModal(selectedOrderDetails)">Repetir pedido</button>
       </div>
     </div>
   </div>
+
+  <!-- MODAL REPETIR PEDIDO (por cima do detalhe, que continua aberto) -->
+  <app-order-recurrence *ngIf="isRecurrenceModalOpen && recurrenceOrder"
+    [order]="recurrenceOrder"
+    [processing]="isProcessingAction"
+    (saved)="onRecurrenceSaved($event)"
+    (closed)="closeRecurrenceModal()"></app-order-recurrence>
 
 </div>

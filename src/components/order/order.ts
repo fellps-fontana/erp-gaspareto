@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, effect, inject, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -42,12 +42,21 @@ import { mensagemDoErroDePagamento, MENSAGENS_PAGAMENTO } from './payment-error-
 import { OrderInstallmentsComponent } from '../order-installments/order-installments';
 import { OrderReceivablesComponent, RecebiParcelaEvent } from '../order-receivables/order-receivables';
 import { ResumoValores, calcularDiasAtraso, montarAbaAReceber, resumirValoresPedidos } from '../../services/order-service/order-receivables-rules';
+import { OrderRecurrenceComponent } from '../order-recurrence/order-recurrence';
+import { RecurringOrdersTabComponent } from '../order-recurrence/recurring-orders-tab';
+import { notificarErroDeRecorrencia, notificarErroDoModelo } from '../order-recurrence/recurrence-errors';
+import { descreverRecorrencia } from '../order-recurrence/recurrence-labels';
+import { RecurringOrder } from '../../models/recurring-order-model';
+import { RecurringOrderService } from '../../services/recurring-order-service/recurring-order-service';
+import { AgendaDeRecorrencia } from '../../services/recurring-order-service/recurrence-rules';
+import { AlteracaoDoModelo } from '../../services/recurring-order-service/recurring-order-build-rules';
+import { TenantService } from '../../services/tenant-service/tenant-service';
 import { Timestamp } from 'firebase/firestore';
 
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule, OrderReceivablesComponent, OrderInstallmentsComponent],
+  imports: [CommonModule, FormsModule, OrderReceivablesComponent, OrderInstallmentsComponent, OrderRecurrenceComponent, RecurringOrdersTabComponent],
   templateUrl: './order.html',
   styleUrls: ['./order.css', './order_mobile.css', './order_details.css']
 })
@@ -59,6 +68,18 @@ export class OrdersComponent implements OnInit, OnDestroy {
   private router          = inject(Router);
   private notif           = inject(NotificationService);
   readonly config         = inject(ConfigService);
+  private recurringService = inject(RecurringOrderService);
+  private tenantService    = inject(TenantService);
+
+  /** Empresas cuja geracao de recorrentes ja rodou nesta sessao (uma vez por sessao). */
+  private static readonly empresasComGeracaoDisparada = new Set<string>();
+
+  constructor() {
+    effect(() => {
+      const companyId = this.tenantService.companyId();
+      if (companyId) untracked(() => this.iniciarRecorrencias(companyId));
+    });
+  }
 
   // ── STREAMS ──────────────────────────────────────────────────────
   products$!: Observable<Product[]>;
@@ -72,7 +93,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   valorEstimado$!: Observable<ResumoValores>;
 
   // ── ABAS ──────────────────────────────────────────────────────────
-  activeTab: 'pedidos' | 'receber' = 'pedidos';
+  activeTab: 'pedidos' | 'receber' | 'recorrentes' = 'pedidos';
 
   // ── FILTROS ───────────────────────────────────────────────────────
   private _filterStatus: 'all' | 'pending' | 'delivered' = 'all';
@@ -162,6 +183,13 @@ export class OrdersComponent implements OnInit, OnDestroy {
   /** Edição de itens aguardando o reajuste das parcelas para gravar tudo numa única chamada. */
   private pendingOrderUpdate: { orderId: string; data: Partial<Order> } | null = null;
 
+  // ── PEDIDO RECORRENTE (seção 5.4) ──────────────────────────────────
+  isRecurrenceModalOpen = false;
+  recurrenceOrder: Order | null = null;
+  recurringModels: RecurringOrder[] = [];
+  editingRecurring: RecurringOrder | null = null;
+  private recurringSub?: Subscription;
+
   // ── CANCELAMENTO COM PAGAMENTOS ───────────────────────────────────
   isCancelPaymentsModalOpen = false;
   cancelOrderWithPayments: Order | null = null;
@@ -198,6 +226,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.customerSub?.unsubscribe();
     this.vendedorSub?.unsubscribe();
+    this.recurringSub?.unsubscribe();
   }
 
   loadData() {
@@ -954,6 +983,130 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   // =================================================================
+  // PEDIDO RECORRENTE
+  // =================================================================
+
+  /** Com a empresa conhecida: acompanha os modelos e dispara a geração uma vez por sessão. */
+  private iniciarRecorrencias(companyId: string) {
+    this.recurringSub?.unsubscribe();
+    this.recurringSub = this.recurringService.getRecurringOrders().pipe(
+      catchError(err => {
+        console.error('OrdersComponent: Erro ao carregar pedidos recorrentes', err);
+        return of([] as RecurringOrder[]);
+      })
+    ).subscribe(models => {
+      this.recurringModels = models;
+      if (models.length === 0 && this.activeTab === 'recorrentes') this.activeTab = 'pedidos';
+    });
+
+    if (OrdersComponent.empresasComGeracaoDisparada.has(companyId)) return;
+    OrdersComponent.empresasComGeracaoDisparada.add(companyId);
+    void this.gerarRecorrentesDevidos();
+  }
+
+  /** Não bloqueia a tela: roda solta e só avisa o resultado. */
+  private async gerarRecorrentesDevidos() {
+    try {
+      const { criados, pulados, falhas } = await this.recurringService.generateDueOccurrences();
+      if (criados > 0) this.notif.success(`${criados} pedido(s) recorrente(s) gerado(s)`);
+      if (pulados > 0 || (falhas?.length ?? 0) > 0) {
+        this.notif.warning('Alguns pedidos recorrentes não puderam ser gerados. Confira os produtos.');
+      }
+    } catch (error) {
+      console.error('OrdersComponent: Erro ao gerar pedidos recorrentes', error);
+      this.notif.warning('Não foi possível gerar os pedidos recorrentes agora.');
+    }
+  }
+
+  /** Pedido gerado por recorrência (selo no card e no detalhe). */
+  isRecurringGenerated(order: Order): boolean { return !!order.recurringOrderId; }
+
+  /** Modelo vigente (ativo ou pausado) que tem este pedido como original; encerrado não conta. */
+  recurringModelOf(order: Order): RecurringOrder | undefined {
+    return order.id
+      ? this.recurringModels.find(m =>
+          m.sourceOrderId === order.id && (m.status === 'active' || m.status === 'paused'))
+      : undefined;
+  }
+
+  recurrenceLabelOf(order: Order): string {
+    const modelo = this.recurringModelOf(order);
+    return modelo ? descreverRecorrencia(modelo) : '';
+  }
+
+  canRepeatOrder(order: Order): boolean {
+    return !!order.id && !order.recurringOrderId && !this.recurringModelOf(order);
+  }
+
+  openRecurrenceModal(order: Order) {
+    this.recurrenceOrder = order;
+    this.isRecurrenceModalOpen = true;
+  }
+
+  closeRecurrenceModal() {
+    this.isRecurrenceModalOpen = false;
+    this.recurrenceOrder = null;
+  }
+
+  async onRecurrenceSaved(agenda: AgendaDeRecorrencia) {
+    const order = this.recurrenceOrder;
+    if (!order) return;
+    this.isProcessingAction = true;
+    try {
+      await this.recurringService.createFromOrder(order, agenda);
+      this.notif.success('🔁 Pedido recorrente criado.');
+      this.closeRecurrenceModal();
+    } catch (error) {
+      notificarErroDeRecorrencia(this.notif, error);
+    } finally {
+      this.isProcessingAction = false;
+    }
+  }
+
+  // ── ABA RECORRENTES: ações sobre o modelo ─────────────────────────
+
+  pauseRecurring(model: RecurringOrder) {
+    void this.runRecurringAction(() => this.recurringService.pause(model.id!), 'Pedido recorrente pausado.');
+  }
+
+  resumeRecurring(model: RecurringOrder) {
+    void this.runRecurringAction(() => this.recurringService.resume(model.id!), 'Pedido recorrente retomado.');
+  }
+
+  endRecurring(model: RecurringOrder) {
+    void this.runRecurringAction(() => this.recurringService.end(model.id!), 'Pedido recorrente encerrado.');
+  }
+
+  openRecurringEdit(model: RecurringOrder) { this.editingRecurring = model; }
+
+  closeRecurringEdit() { this.editingRecurring = null; }
+
+  async onRecurringEdited(alteracao: AlteracaoDoModelo) {
+    const model = this.editingRecurring;
+    if (!model?.id) return;
+    const ok = await this.runRecurringAction(
+      () => this.recurringService.update(model.id!, alteracao),
+      'Pedido recorrente atualizado.'
+    );
+    if (ok) this.closeRecurringEdit();
+  }
+
+  /** Executa a ação no service; devolve true quando gravou. Erros viram aviso em português. */
+  private async runRecurringAction(action: () => Promise<void>, successMessage: string): Promise<boolean> {
+    this.isProcessingAction = true;
+    try {
+      await action();
+      this.notif.success(successMessage);
+      return true;
+    } catch (error) {
+      notificarErroDoModelo(this.notif, error);
+      return false;
+    } finally {
+      this.isProcessingAction = false;
+    }
+  }
+
+  // =================================================================
   // HELPERS UI
   // =================================================================
 
@@ -1009,7 +1162,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   onEscape() {
     if (!this.isDetailsModalOpen) return;
     const outroModalAberto = this.isPaymentModalOpen || this.isInstallmentsModalOpen
-      || this.isCancelPaymentsModalOpen || this.isConfirmModalOpen || this.isNewOrderOpen;
+      || this.isCancelPaymentsModalOpen || this.isConfirmModalOpen || this.isNewOrderOpen
+      || this.isRecurrenceModalOpen;
     if (outroModalAberto) return;
     this.closeDetails();
   }

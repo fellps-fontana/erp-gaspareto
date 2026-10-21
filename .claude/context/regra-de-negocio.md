@@ -351,6 +351,9 @@ Decisões do usuário (2026-10-20/21). Um **modelo** (`recurringOrders`, com
   semana, 1ª data, fim opcional). Nenhum botão novo no card da lista.
 - Pedido gerado cai no kanban como pedido normal (`pending`), com selo discreto
   de recorrente (`Order.recurringOrderId` preenchido).
+- "Repetir pedido" (Kira, 2026-10-21): não aparece em pedido gerado por
+  recorrência; aparece no original enquanto ele não tiver modelo `active` ou
+  `paused` (se só houver modelos encerrados, pode repetir de novo).
 - Gestão de todos: pill "Recorrentes" ao lado de "Pedidos | A receber", só
   aparece se existir algum modelo. Tela do cliente: só lista de leitura
   "Pedidos recorrentes deste cliente" com atalho pausar/editar.
