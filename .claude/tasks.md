@@ -1003,7 +1003,7 @@ HISTORICO: 2026-10-22 — hanzo: ExpenseCategoryManagerComponent (@Input categor
 
 
 ## TASK-054 — Tela Despesas (/contas): mês, cards, grupos, ações e filtros
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-040, TASK-042, TASK-046, TASK-052, TASK-053
 ESCOPO: criar `ExpensesComponent` substituindo BillsComponent na rota /contas (título "Despesas"): navegação ◀ mês ▶, cards Vencidas / A pagar no mês / Pago no mês, lista agrupada Vencidas / A vencer / Pagas, botões "Paguei" e "Chegou", filtros, form/categorias via componentes filhos, catch-up de recorrência no ngOnInit, e ajustes de rótulo no menu.
@@ -1013,7 +1013,8 @@ CRITERIO DE ACEITE: (1) cards e grupos vêm exclusivamente de ExpenseReportServi
 ARQUIVOS PERMITIDOS: src/components/expenses/expenses.ts, src/components/expenses/expenses.html, src/components/expenses/expenses.css, src/components/expenses/expenses-mobile.css, src/app/app.routes.ts, src/components/home/home.html
 NAO FAZER: não apagar o BillsComponent (TASK-061); não calcular totais/datas inline; não mexer em product-inventory; não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivos + `ng build` sem erro + descrição do fluxo. Gate: style.
-HISTORICO:
+HISTORICO: 2026-10-22 — hanzo: ExpensesComponent em /contas (mesmo guard e data.module contas; home "DESPESAS"); navegacao por mes; cards e grupos so via groupForMonth, lista via applyFilters; Paguei (modal, data default hoje), Chegou (so custo_producao), Encerrar recorrencia e Excluir com modal; botao Editar (adicao do executor, aceita: §7.4 lista editar); ensureDefaults antes de liberar Nova Despesa; catch-up no init. style PRECISA CORRIGIR (1 rodada): 44px nos botoes restantes no mobile, subscription criada apos await, categoriasProntas liberado com seed falho, literal Sem categoria duplicado, edicao sem id caindo em criacao. 2a revisao APROVADO; Kira adicionou .btn-voltar aos 44px inline. Aceito: "hoje" fixo com a pagina aberta. gon nao se aplica. BillsComponent segue no repo ate a TASK-061.
+
 
 ## TASK-055 — [TDD RED] Balanço: gastosPeriodo/resultadoFinal por despesas (competência)
 STATUS: CONCLUIDA

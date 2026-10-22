@@ -1,0 +1,249 @@
+<div class="expenses-page">
+  <div class="expenses-header">
+    <div class="header-left">
+      <button type="button" class="btn-voltar" [routerLink]="['/']">⬅ Início</button>
+      <div>
+        <h1>Despesas</h1>
+        <p>Gestão de despesas por competência de vencimento</p>
+      </div>
+    </div>
+    <div class="header-actions" *ngIf="view === 'lista'">
+      <button type="button" class="btn-secundario" (click)="abrirCategorias()">Categorias</button>
+      <button
+        type="button"
+        class="btn-novo"
+        [disabled]="!categoriasProntas"
+        (click)="abrirNovaDespesa()"
+      >
+        + Nova Despesa
+      </button>
+    </div>
+  </div>
+
+  <app-expense-form
+    *ngIf="view === 'formulario'"
+    [categories]="categorias"
+    [expense]="despesaEmEdicao"
+    (saved)="salvarDespesa($event)"
+    (cancelled)="voltarParaLista()"
+  ></app-expense-form>
+
+  <app-expense-category-manager
+    *ngIf="view === 'categorias'"
+    [categoryIdsInUse]="categoryIdsInUse"
+    (closed)="voltarParaLista()"
+  ></app-expense-category-manager>
+
+  <ng-container *ngIf="view === 'lista'">
+    <!-- NAVEGAÇÃO DE MÊS -->
+    <div class="month-nav">
+      <button type="button" class="btn-mes" aria-label="Mês anterior" (click)="mudarMes(-1)">
+        ◀
+      </button>
+      <span class="month-label">{{ rotuloMes }}</span>
+      <button type="button" class="btn-mes" aria-label="Próximo mês" (click)="mudarMes(1)">
+        ▶
+      </button>
+      <button type="button" class="btn-hoje" *ngIf="!ehMesCorrente" (click)="irParaMesCorrente()">
+        Mês atual
+      </button>
+    </div>
+
+    <!-- CARDS (ignoram filtros) -->
+    <div class="cards-kpi">
+      <div class="card kpi-vencidas">
+        <span class="kpi-label">Vencidas</span>
+        <strong class="kpi-value">R$ {{ grupos.totals.vencidas | number: '1.2-2' }}</strong>
+        <small class="kpi-meta">{{ grupos.vencidas.length }} despesa(s)</small>
+      </div>
+      <div class="card kpi-a-pagar">
+        <span class="kpi-label">A pagar no mês</span>
+        <strong class="kpi-value">R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong>
+        <small class="kpi-meta">{{ grupos.aVencer.length }} despesa(s)</small>
+      </div>
+      <div class="card kpi-pago">
+        <span class="kpi-label">Pago no mês</span>
+        <strong class="kpi-value">R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong>
+        <small class="kpi-meta">{{ grupos.pagas.length }} despesa(s)</small>
+      </div>
+    </div>
+
+    <!-- FILTROS (só a lista) -->
+    <div class="filters">
+      <div class="filter-group">
+        <label for="filtro-categoria">Categoria</label>
+        <select
+          id="filtro-categoria"
+          [(ngModel)]="filtroCategoria"
+          (ngModelChange)="aoMudarFiltro()"
+        >
+          <option value="">Todas</option>
+          <option *ngFor="let c of categorias" [value]="c.id">{{ c.name }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="filtro-status">Status</label>
+        <select id="filtro-status" [(ngModel)]="filtroStatus" (ngModelChange)="aoMudarFiltro()">
+          <option value="todos">Todos</option>
+          <option value="a_pagar">A pagar</option>
+          <option value="pago">Pago</option>
+        </select>
+      </div>
+      <label class="filter-check">
+        <input
+          type="checkbox"
+          [(ngModel)]="filtroAPagarJaRecebida"
+          (ngModelChange)="aoMudarFiltro()"
+        />
+        A pagar e já recebida
+      </label>
+      <label class="filter-check">
+        <input type="checkbox" [(ngModel)]="filtroRevisar" (ngModelChange)="aoMudarFiltro()" />
+        Revisar migração
+      </label>
+      <button type="button" class="btn-limpar" *ngIf="filtrosAtivos" (click)="limparFiltros()">
+        Limpar filtros
+      </button>
+    </div>
+
+    <p class="vazio" *ngIf="totalVisivel === 0">Nenhuma despesa encontrada neste mês.</p>
+
+    <!-- GRUPOS -->
+    <section class="group" *ngFor="let g of gruposVisiveis" [ngClass]="'group-' + g.key">
+      <ng-container *ngIf="g.items.length > 0">
+        <h2 class="group-title">
+          {{ g.title }} <span class="group-count">{{ g.items.length }}</span>
+        </h2>
+
+        <div class="expense-card" *ngFor="let e of g.items">
+          <div class="expense-info">
+            <span class="expense-name">{{ e.description }}</span>
+            <div class="expense-meta">
+              <span class="chip chip-categoria" [class.chip-producao]="ehCustoProducao(e)">
+                {{ nomeCategoria(e.categoryId) }}
+              </span>
+              <span class="chip" [class.chip-vencida]="estaVencida(e)">
+                Vence {{ formatarData(e.dueDate) }}
+              </span>
+              <span class="chip chip-pago" *ngIf="e.paidDate">
+                Pago {{ formatarData(e.paidDate) }}
+              </span>
+              <span class="chip" *ngIf="e.paymentMethod">{{ paymentLabels[e.paymentMethod] }}</span>
+              <span class="chip" *ngIf="e.supplier">{{ e.supplier }}</span>
+              <span class="chip chip-recebida" *ngIf="e.goodsReceivedDate">
+                Chegou {{ formatarData(e.goodsReceivedDate) }}
+              </span>
+              <span class="chip chip-origem" *ngIf="e.origin === 'parcelamento'">
+                Parcela {{ e.installmentNumber }}/{{ e.installmentTotal }}
+              </span>
+              <span class="chip chip-origem" *ngIf="e.origin === 'recorrencia'">Recorrente</span>
+              <span
+                class="chip chip-revisar"
+                *ngIf="e.migracaoRevisar"
+                [title]="e.migracaoMotivo ?? ''"
+              >
+                Revisar migração
+              </span>
+            </div>
+          </div>
+
+          <div class="expense-valor">R$ {{ e.value | number: '1.2-2' }}</div>
+
+          <div class="expense-actions">
+            <button
+              type="button"
+              class="btn-paguei"
+              *ngIf="e.status === 'a_pagar'"
+              (click)="abrirPagamento(e)"
+            >
+              Paguei
+            </button>
+            <button
+              type="button"
+              class="btn-chegou"
+              *ngIf="podeMarcarChegada(e)"
+              (click)="marcarChegada(e)"
+            >
+              Chegou
+            </button>
+            <button type="button" class="btn-acao" (click)="editar(e)">Editar</button>
+            <button
+              type="button"
+              class="btn-acao"
+              *ngIf="podeEncerrarSerie(e)"
+              (click)="abrirEncerramento(e)"
+            >
+              Encerrar recorrência
+            </button>
+            <button type="button" class="btn-acao btn-excluir" (click)="abrirExclusao(e)">
+              Excluir
+            </button>
+          </div>
+        </div>
+      </ng-container>
+    </section>
+  </ng-container>
+
+  <!-- MODAL DE PAGAMENTO -->
+  <div class="modal-overlay" *ngIf="despesaParaPagar" (click)="fecharPagamento()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <h2>Registrar pagamento</h2>
+      <div class="modal-info">
+        <strong>{{ despesaParaPagar.description }}</strong>
+        <p>R$ {{ despesaParaPagar.value | number: '1.2-2' }}</p>
+      </div>
+      <div class="modal-field">
+        <label for="data-pagamento">Data do pagamento *</label>
+        <input id="data-pagamento" type="date" [(ngModel)]="dataPagamento" />
+      </div>
+      <div class="modal-field">
+        <label for="forma-pagamento">Forma de pagamento (opcional)</label>
+        <select id="forma-pagamento" [(ngModel)]="formaPagamento">
+          <option value="">Não informar</option>
+          <option *ngFor="let m of paymentMethods" [value]="m.value">{{ m.label }}</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancelar" (click)="fecharPagamento()">CANCELAR</button>
+        <button type="button" class="btn-confirmar" (click)="confirmarPagamento()">
+          CONFIRMAR
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE EXCLUSÃO -->
+  <div class="modal-overlay" *ngIf="despesaParaExcluir" (click)="fecharExclusao()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-icon">⚠️</div>
+      <h2>Excluir Despesa?</h2>
+      <div class="modal-info">
+        <p>Você está prestes a excluir:</p>
+        <strong>{{ despesaParaExcluir.description }}</strong>
+        <p class="modal-aviso">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancelar" (click)="fecharExclusao()">CANCELAR</button>
+        <button type="button" class="btn-perigo" (click)="confirmarExclusao()">SIM, EXCLUIR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE ENCERRAMENTO DE RECORRÊNCIA -->
+  <div class="modal-overlay" *ngIf="despesaParaEncerrar" (click)="fecharEncerramento()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-icon">🔄</div>
+      <h2>Encerrar recorrência?</h2>
+      <div class="modal-info">
+        <strong>{{ despesaParaEncerrar.description }}</strong>
+        <p>Novas ocorrências deixarão de ser geradas. As já existentes são mantidas.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancelar" (click)="fecharEncerramento()">CANCELAR</button>
+        <button type="button" class="btn-perigo" (click)="confirmarEncerramento()">
+          SIM, ENCERRAR
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
