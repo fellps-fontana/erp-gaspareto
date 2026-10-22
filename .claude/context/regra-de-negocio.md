@@ -342,9 +342,10 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   pagamento com o valor da parcela preenchido e editável.
 - Relatório > sub-aba "A receber" (panorama anual): 12 meses empilhados
   recebido / previsto / vencido não pago; cards Recebido no ano, A receber no
-  ano, Vencido total; clique no mês abre as parcelas. Vendas/Balanço ganham
-  cards Recebido no período e A receber. Todos usam as MESMAS funções de cálculo
-  da aba de Pedidos.
+  ano, Vencido total; clique no mês abre as parcelas. Decisão (2026-10-22): as
+  abas Vendas e Balanço NÃO exibem cards de Recebido no período / A receber; o
+  acompanhamento de recebíveis fica só nesta sub-aba e na aba A receber de
+  Pedidos. Todos usam as MESMAS funções de cálculo da aba de Pedidos.
 - Valor estimado em Pedidos: total / pago / saldo sobre `filteredOrders$`
   (respeita filtros); pedidos que saíram do kanban não entram.
 

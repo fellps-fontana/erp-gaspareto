@@ -145,16 +145,6 @@
           </small>
         </div>
 
-        <div class="card kpi-success">
-          <span class="kpi-label">Recebido no Período</span>
-          <strong class="kpi-value kpi-value-success">R$ {{ recebidoNoPeriodo | number:'1.2-2' }}</strong>
-          <small class="kpi-meta">pagamentos no período, de todos os pedidos (ignora filtros de produto, origem, cliente e forma)</small>
-        </div>
-        <div class="card kpi-info">
-          <span class="kpi-label">A Receber</span>
-          <strong class="kpi-value kpi-value-info">R$ {{ aReceberTotal | number:'1.2-2' }}</strong>
-          <small class="kpi-meta">parcelas em aberto de todos os pedidos (ignora filtros de produto, origem, cliente e forma)</small>
-        </div>
       </div>
 
       <!-- GRÁFICOS -->
@@ -315,16 +305,6 @@
             <small class="kpi-meta" *ngIf="relatorioBalanco.faturamento > 0">
               Margem líquida: {{ margemLiquida | number:'1.0-0' }}%
             </small>
-          </div>
-          <div class="card kpi-success">
-            <span class="kpi-label">Recebido no Período</span>
-            <strong class="kpi-value kpi-value-success">R$ {{ recebidoNoPeriodo | number:'1.2-2' }}</strong>
-            <small class="kpi-meta">pagamentos de pedidos no período</small>
-          </div>
-          <div class="card kpi-info">
-            <span class="kpi-label">A Receber</span>
-            <strong class="kpi-value kpi-value-info">R$ {{ aReceberTotal | number:'1.2-2' }}</strong>
-            <small class="kpi-meta">parcelas previstas em aberto</small>
           </div>
         </div>
 
