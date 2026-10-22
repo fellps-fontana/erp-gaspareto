@@ -1,0 +1,23 @@
+@media (max-width: 600px) {
+  .expense-form {
+    padding: var(--sp-md);
+  }
+
+  .row {
+    flex-direction: column;
+  }
+
+  .modo-tabs button {
+    padding: var(--sp-sm);
+    font-size: 0.85rem;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .btn-cancelar,
+  .btn-salvar {
+    width: 100%;
+  }
+}

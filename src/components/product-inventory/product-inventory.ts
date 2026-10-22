@@ -26,8 +26,7 @@ const CARDS_VAZIOS: CardsRelatorio = { faturamento: 0, custoTotal: 0, lucro: 0, 
 // Models e Services
 import { Product } from '../../models/product-model';
 import { Customer } from '../../models/customer-model';
-import { Bill } from '../../models/bill-model';
-import { PurchaseProduct } from '../../models/purchase-product-model';
+import { Expense, ExpenseCategory } from '../../models/expense-model';
 import { Order } from '../../models/order-model';
 import { Vendedor, ComissaoVendedorResultado } from '../../models/vendedor-model';
 import { PaymentMethod, PAYMENT_METHOD_LABELS } from '../../models/sell-model';
@@ -35,8 +34,15 @@ import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
 import { CustomerService } from '../../services/customer-service/customer-service';
-import { BillService } from '../../services/bill-service/bill-service';
-import { PurchaseProductService } from '../../services/purchase-product-service/purchase-product-service';
+import { ExpenseService } from '../../services/expense-service/expense-service';
+import { ExpenseCategoryService } from '../../services/expense-category-service/expense-category-service';
+import { ExpenseRecurrenceService } from '../../services/expense-recurrence-service/expense-recurrence-service';
+import { ExpenseScheduleService } from '../../services/expense-schedule-service/expense-schedule-service';
+import { TenantService } from '../../services/tenant-service/tenant-service';
+import {
+  CategoryBreakdownRow,
+  ExpenseReportService,
+} from '../../services/expense-report-service/expense-report-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { ConfigService } from '../../services/config/config.service';
 import { OrderService } from '../../services/order-service/order-service';
@@ -44,6 +50,8 @@ import { VendedorService } from '../../services/vendedor-service/vendedor-servic
 import { ComandaService } from '../../services/comanda-service/comanda-service';
 import { GeocodingService } from '../../services/geocoding-service/geocoding-service';
 import { MapPickerComponent } from '../map-picker/map-picker';
+import { ExpenseReportPanelComponent } from '../expense-report-panel/expense-report-panel';
+import { GastosBreakdownModalComponent } from '../gastos-breakdown-modal/gastos-breakdown-modal';
 import { CustomerRecurringOrdersComponent } from '../customer-recurring-orders/customer-recurring-orders';
 import { filtrarPorTermo } from './busca-por-nome';
 import { calcularTotalItemPorPeso } from '../../services/product-service/product-weight-rules';
@@ -93,7 +101,15 @@ export interface HistoricoItem {
 @Component({
   selector: 'app-estoque',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MapPickerComponent, CustomerRecurringOrdersComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    MapPickerComponent,
+    CustomerRecurringOrdersComponent,
+    ExpenseReportPanelComponent,
+    GastosBreakdownModalComponent,
+  ],
   templateUrl: './product-inventory.html',
   styleUrls: ['./product-inventory.css', './product-inventory-mobile.css']
 })
@@ -102,8 +118,8 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   private geocodingService = inject(GeocodingService);
 
   // Controle das Abas
-  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' | 'vendedores' = 'relatorio';
-  reportTab: 'vendas' | 'contas' | 'balanco' | 'receber' | 'vendedores' = 'vendas';
+  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'historico' | 'vendedores' = 'relatorio';
+  reportTab: 'vendas' | 'despesas' | 'balanco' | 'receber' | 'vendedores' = 'vendas';
 
   // Controle de Visualização do Formulário
   exibirFormularioNovo: boolean = false;
@@ -195,27 +211,14 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     novoPrecoCusto: 0
   };
 
-  // --- CONTAS A PAGAR ---
-  bills: Bill[] = [];
-  filtroContasStatus: 'todos' | 'pendente' | 'recebido' | 'pago' = 'todos';
-
-  // --- PRODUTOS DE COMPRA ---
-  purchaseProducts: PurchaseProduct[] = [];
-  exibirFormularioCompra: boolean = false;
-  produtoCompraEmEdicao: PurchaseProduct | null = null;
-  isDeleteCompraModalOpen: boolean = false;
-  produtoCompraToDelete: PurchaseProduct | null = null;
-  novoProdutoCompra: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'> = {
-    name: '',
-    defaultValue: 0,
-    recurring: false,
-    recurrencePeriod: undefined
-  };
+  // --- DESPESAS (substitui Contas a Pagar; competencia por dueDate, ver ExpenseReportService) ---
+  despesas: Expense[] = [];
+  categoriasDespesa: ExpenseCategory[] = [];
+  isGastosModalOpen = false;
 
   // --- BUSCA NAS LISTAS (estado de UI; filtro puro em busca-por-nome.ts) ---
   buscaCliente = '';
   buscaProduto = '';
-  buscaCompra = '';
 
   get customersFiltrados(): Customer[] {
     return filtrarPorTermo(this.customers, this.buscaCliente, c => [c.name, c.phone]);
@@ -223,10 +226,6 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
 
   get productsFiltrados(): Product[] {
     return filtrarPorTermo(this.products, this.buscaProduto, p => [p.title]);
-  }
-
-  get purchaseProductsFiltrados(): PurchaseProduct[] {
-    return filtrarPorTermo(this.purchaseProducts, this.buscaCompra, p => [p.name]);
   }
 
   // --- CLIENTES ---
@@ -308,8 +307,10 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     private purchaseService: PurchaseService,
     private saleService: SaleService,
     private customerService: CustomerService,
-    private billService: BillService,
-    private purchaseProductService: PurchaseProductService,
+    private expenseService: ExpenseService,
+    private expenseCategoryService: ExpenseCategoryService,
+    private expenseRecurrenceService: ExpenseRecurrenceService,
+    private tenantService: TenantService,
     private orderService: OrderService,
     private comandaService: ComandaService,
     private vendedorService: VendedorService,
@@ -320,7 +321,6 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     // 0. Se a aba/sub-aba ativa for de um módulo desativado, volta para o relatório
     this.config.modules$.subscribe(m => {
       if ((this.activeTab === 'clientes' && !m.clientes) ||
-          (this.activeTab === 'compras' && !m.compras) ||
           (this.activeTab === 'vendedores' && !m.vendedores)) {
         this.selecionarAbaPrincipal('relatorio');
       }
@@ -350,15 +350,14 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
       this.recalcularSeHaVendas(); // nome do cliente entra nos modais
     });
 
-    // 5. Carrega contas a pagar em tempo real
-    this.billService.getBills().subscribe(data => {
-      this.bills = data;
+    // 5. Carrega despesas e categorias em tempo real
+    this.expenseService.getExpenses().subscribe((data) => {
+      this.despesas = data;
     });
-
-    // 6. Carrega produtos de compra em tempo real
-    this.purchaseProductService.getPurchaseProducts().subscribe(data => {
-      this.purchaseProducts = data;
+    this.expenseCategoryService.getCategories().subscribe((data) => {
+      this.categoriasDespesa = data;
     });
+    this.gerarRecorrenciasAteHoje();
 
     // 7. Carrega e combina Histórico Geral (PDV + Pedidos + Comandas)
     combineLatest([
@@ -574,32 +573,47 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   }
 
   // ==========================================================
-  // GETTERS: CONTAS A PAGAR (aba relatorio sub-tab)
+  // GETTERS: DESPESAS (aba relatorio sub-tab)
   // ==========================================================
 
-  get totalContasPendentes(): number {
-    return this.bills.filter(b => b.status === 'pendente').reduce((s, b) => s + b.value, 0);
-  }
-
-  get totalContasRecebidas(): number {
-    return this.bills.filter(b => b.status === 'recebido').reduce((s, b) => s + b.value, 0);
-  }
-
+  /** Card Gastos = despesas operacionais com dueDate no periodo (competencia, D5). */
   get gastosPeriodo(): number {
-    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
-    const fim = new Date(this.filtroDataFim + 'T23:59:59');
-    return this.bills
-      .filter(b => b.status === 'pago' && b.paidAt)
-      .filter(b => {
-        const d = (b.paidAt as any)?.toDate ? (b.paidAt as any).toDate() : new Date(b.paidAt as any);
-        return d >= inicio && d <= fim;
-      })
-      .reduce((s, b) => s + b.value, 0);
+    return ExpenseReportService.sumOperacionalPorVencimento(
+      this.despesas,
+      this.categoriasDespesa,
+      this.filtroDataInicio,
+      this.filtroDataFim,
+    );
+  }
+
+  /** Informativo: custo de producao do periodo, ja incluso no CMV (D1). Nao entra no Resultado. */
+  get custoProducaoPeriodo(): number {
+    return ExpenseReportService.sumCustoProducaoPorVencimento(
+      this.despesas,
+      this.categoriasDespesa,
+      this.filtroDataInicio,
+      this.filtroDataFim,
+    );
+  }
+
+  /** Breakdown por categoria operacional do periodo (modal Gastos), maior total primeiro. */
+  get gastosPorCategoria(): CategoryBreakdownRow[] {
+    return ExpenseReportService.breakdownPorCategoria(
+      this.despesas,
+      this.categoriasDespesa,
+      this.filtroDataInicio,
+      this.filtroDataFim,
+      'despesa_operacional',
+    );
   }
 
   /** Balanço olha só o período: faturamento e CMV vêm de relatorioBalanco, não dos filtros da aba Vendas. */
   get resultadoFinal(): number {
-    return this.relatorioBalanco.faturamento - this.relatorioBalanco.custoTotal - this.gastosPeriodo;
+    return ExpenseReportService.calcResultado(
+      this.relatorioBalanco.faturamento,
+      this.relatorioBalanco.custoTotal,
+      this.gastosPeriodo,
+    );
   }
 
   /** Subtotal "= Lucro Bruto" da Composição do Resultado (faturamento - CMV do período). */
@@ -613,40 +627,28 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     return faturamento > 0 ? (this.resultadoFinal / faturamento) * 100 : 0;
   }
 
-  get billsFiltradosRelatorio(): Bill[] {
-    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
-    const fim = new Date(this.filtroDataFim + 'T23:59:59');
-    let filtered = this.bills.filter(b => {
-      const d = (b.createdAt as any)?.toDate ? (b.createdAt as any).toDate() : new Date();
-      return d >= inicio && d <= fim;
-    });
-    if (this.filtroContasStatus !== 'todos') {
-      filtered = filtered.filter(b => b.status === this.filtroContasStatus);
+  /** Catch-up de recorrencias (D2): UMA chamada por carregamento; falha vira aviso, nao derruba a tela. */
+  private async gerarRecorrenciasAteHoje(): Promise<void> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      return;
     }
-    return filtered;
-  }
-
-  async avancarStatusBill(bill: Bill) {
-    if (!bill.id || bill.status === 'pago') return;
-    const next: Bill['status'] = bill.status === 'pendente' ? 'recebido' : 'pago';
     try {
-      await this.billService.updateBillStatus(bill.id, next);
+      await this.expenseRecurrenceService.generateDueOccurrences(
+        companyId,
+        ExpenseScheduleService.toDateKey(new Date()),
+      );
     } catch {
-      this.notif.error('Erro ao atualizar status da conta.');
+      this.notif.warning('Não foi possível gerar as recorrências de despesas. ⚠️');
     }
   }
 
-  billStatusLabel(status: Bill['status']): string {
-    const labels: Record<Bill['status'], string> = {
-      pendente: 'Pendente', recebido: 'Recebido', pago: 'Pago'
-    };
-    return labels[status];
+  abrirGastosModal() {
+    this.isGastosModalOpen = true;
   }
 
-  formatBillDate(ts: any): string {
-    if (!ts) return '';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString('pt-BR');
+  fecharGastosModal() {
+    this.isGastosModalOpen = false;
   }
 
   openDeleteModal(product: Product) {
@@ -1478,104 +1480,6 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
 
   trackByPedido(index: number, pedido: Order): string {
     return pedido.id || index.toString();
-  }
-
-  // ==========================================================
-  // ABA 4: COMPRAS (PRODUTOS DE COMPRA)
-  // ==========================================================
-
-  abrirNovoCompra() {
-    this.produtoCompraEmEdicao = null;
-    this.novoProdutoCompra = { name: '', defaultValue: 0, recurring: false, recurrencePeriod: undefined };
-    this.exibirFormularioCompra = true;
-  }
-
-  abrirEdicaoCompra(p: PurchaseProduct) {
-    this.produtoCompraEmEdicao = p;
-    this.novoProdutoCompra = {
-      name: p.name,
-      defaultValue: p.defaultValue,
-      recurring: p.recurring,
-      recurrencePeriod: p.recurrencePeriod
-    };
-    this.exibirFormularioCompra = true;
-  }
-
-  fecharFormularioCompra() {
-    this.exibirFormularioCompra = false;
-    this.produtoCompraEmEdicao = null;
-  }
-
-  async salvarProdutoCompra() {
-    if (!this.novoProdutoCompra.name.trim() || this.novoProdutoCompra.defaultValue <= 0) {
-      this.notif.warning('Preencha nome e valor.');
-      return;
-    }
-    const data: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'> = {
-      name: this.novoProdutoCompra.name.trim(),
-      defaultValue: Number(this.novoProdutoCompra.defaultValue),
-      recurring: this.novoProdutoCompra.recurring,
-      ...(this.novoProdutoCompra.recurring && this.novoProdutoCompra.recurrencePeriod
-        ? { recurrencePeriod: this.novoProdutoCompra.recurrencePeriod }
-        : {})
-    };
-    try {
-      if (this.produtoCompraEmEdicao?.id) {
-        await this.purchaseProductService.updatePurchaseProduct(this.produtoCompraEmEdicao.id, data);
-        this.notif.success('Produto atualizado!');
-      } else {
-        const newId = await this.purchaseProductService.addPurchaseProduct(data);
-        await this.gerarBillDeProdutoCompra({ id: newId, ...data } as PurchaseProduct);
-        this.notif.success('Produto cadastrado e fatura gerada!');
-      }
-      this.fecharFormularioCompra();
-    } catch {
-      this.notif.error('Erro ao salvar produto de compra.');
-    }
-  }
-
-  async gerarBillDeProdutoCompra(p: PurchaseProduct) {
-    const recPeriodMap: Record<string, 'semanal' | 'mensal'> = { weekly: 'semanal', monthly: 'mensal' };
-    await this.billService.addBill({
-      name: p.name,
-      value: p.defaultValue,
-      status: 'pendente',
-      recurring: p.recurring,
-      ...(p.recurring && p.recurrencePeriod ? { recurrencePeriod: recPeriodMap[p.recurrencePeriod!] } : {}),
-      purchaseProductId: p.id
-    });
-    this.resetFiltroContasStatusSeNecessario();
-  }
-
-  private resetFiltroContasStatusSeNecessario() {
-    if (this.filtroContasStatus === 'recebido' || this.filtroContasStatus === 'pago') {
-      this.filtroContasStatus = 'todos';
-    }
-  }
-
-  openDeleteCompraModal(p: PurchaseProduct) {
-    this.produtoCompraToDelete = p;
-    this.isDeleteCompraModalOpen = true;
-  }
-
-  closeDeleteCompraModal() {
-    this.isDeleteCompraModalOpen = false;
-    this.produtoCompraToDelete = null;
-  }
-
-  async confirmDeleteCompra() {
-    if (!this.produtoCompraToDelete?.id) return;
-    try {
-      await this.purchaseProductService.deletePurchaseProduct(this.produtoCompraToDelete.id);
-      this.notif.success('Produto removido!');
-      this.closeDeleteCompraModal();
-    } catch {
-      this.notif.error('Erro ao excluir produto de compra.');
-    }
-  }
-
-  recurrenceLabel(period?: 'weekly' | 'monthly'): string {
-    return period === 'weekly' ? 'Semanal' : period === 'monthly' ? 'Mensal' : '';
   }
 
   // ==========================================================

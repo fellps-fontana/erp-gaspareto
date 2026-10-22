@@ -1,0 +1,64 @@
+@media (max-width: 600px) {
+  .expenses-page {
+    padding: var(--sp-md);
+  }
+
+  .expenses-header {
+    flex-direction: column;
+  }
+
+  .header-left {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .btn-novo,
+  .btn-secundario {
+    width: 100%;
+  }
+
+  .cards-kpi {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters select {
+    width: 100%;
+  }
+
+  .expense-card {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-valor {
+    text-align: left;
+  }
+
+  .expense-actions button {
+    flex: 1 1 45%;
+    min-height: 44px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .btn-voltar,
+  .btn-mes,
+  .btn-hoje,
+  .btn-novo,
+  .btn-secundario,
+  .btn-limpar,
+  .modal-actions button {
+    min-height: 44px;
+  }
+}

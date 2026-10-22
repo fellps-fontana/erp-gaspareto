@@ -1329,3 +1329,420 @@ ARQUIVOS PERMITIDOS: definido na virada para prod
 NAO FAZER: implementar antes da virada para prod
 RETORNO ESPERADO: desenho
 HISTORICO: Decisao do usuario (2026-10-21): a function entra so quando a feature for para producao, depois de testada em homolog com a geracao no cliente. Aviso do style (TASK-061): hojeCivil usa getters locais; servidor em UTC calcularia 'hoje' errado no fim da tarde BR — a Function precisa calcular hoje em America/Sao_Paulo.
+
+<!-- Modulo Despesas: tasks originalmente TASK-035..064 na branch do modulo; renumeradas para TASK-073..102 no merge com homologacao (colisao com Pedidos). -->
+
+## TASK-073 — Aplicar alteração de context do módulo Despesas
+STATUS: CONCLUIDA
+AGENT: killua
+DEPENDENCIAS: vazio
+ESCOPO: aplicar em .claude/context o texto aprovado do módulo Despesas (skill alterar-context): regra-de-negocio.md (§1, §2, §5.2, §7, §8, §10, §11, §12 e nova §14), schema.dbml (diff) e stack.md (coleções, rules, runner node:test).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro, monolitico), .claude/context/schema.dbml, .claude/context/stack.md, C:/Users/Felps/.claude/skills/alterar-context/SKILL.md; o bloco "Context (A)" entregue pelo killua na rodada de arquitetura (Kira cola no briefing).
+CRITERIO DE ACEITE: (1) §7 e §8 substituídas, §11 sem `compras`, §14 criada, com D1-D7 registradas em 7.6 e [CRÍTICA] em 7, 8 e 14; (2) schema.dbml tem expenses/expenseCategories/expenseSeries e marca bills/purchaseProducts como LEGADO; (3) nenhuma outra seção alterada além das listadas e nenhuma referência residual a "Produtos de compra"/"aba Compras" como existentes (grep).
+ARQUIVOS PERMITIDOS: .claude/context/regra-de-negocio.md, .claude/context/schema.dbml, .claude/context/stack.md
+NAO FAZER: não decidir regra nova; não reabrir D1-D7; não tocar em código; não editar .claude/tasks.md. Itens marcados [CONFIRMAR] ficam marcados.
+RETORNO ESPERADO: relatório da skill (antes/depois por seção, índice de dependência n/a por ser monolítico, agents afetados).
+HISTORICO: 2026-10-22 — texto de context redigido pelo killua (arquitetura do modulo, decisoes D1-D7 do usuario) e aplicado pelo Kira em regra-de-negocio.md (§1, §2, §5.2, §7, §8, §10, §11, §12, nova §14), schema.dbml (3 tabelas novas, bills/purchaseProducts LEGADO, nota stale de "purchase-products" corrigida — o nome real no codigo e purchaseProducts) e stack.md (colecoes, rules, runner node:test). Itens [CONFIRMAR] mantidos para a TASK-101.
+
+## TASK-074 — Models, defaults e esqueletos de assinatura do módulo Despesas
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-073
+ESCOPO: criar os arquivos de model/defaults e os esqueletos compiláveis (corpo `throw new Error('not implemented')`) exatamente como entregues pelo killua, sem lógica.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro), .claude/context/schema.dbml, .claude/context/clean-code.md, bloco "Esqueletos" da rodada de arquitetura (Kira cola no briefing), src/services/firestore-base.service.ts, src/models/sell-model.ts
+CRITERIO DE ACEITE: (1) `npx tsc --noEmit -p tsconfig.app.json` sem erro novo; (2) os 5 arquivos .ts de service/lib existem com as assinaturas idênticas às do esqueleto; (3) nenhuma lógica real (todos os corpos lançam 'not implemented'), exceto `defaultCategoryId` e as constantes de dados.
+ARQUIVOS PERMITIDOS: src/models/expense-model.ts, src/models/expense-category-defaults.ts, src/services/expense-schedule-service/expense-schedule-service.ts, src/services/expense-report-service/expense-report-service.ts, src/services/expense-service/expense-service.ts, src/services/expense-category-service/expense-category-service.ts, src/services/expense-recurrence-service/expense-recurrence-service.ts, scripts/lib/expense-migration-core.mjs
+NAO FAZER: não implementar lógica; não alterar assinatura; não tocar em bills/purchase-product; não editar .claude/tasks.md.
+RETORNO ESPERADO: lista de arquivos criados + saída do tsc.
+HISTORICO: 2026-10-22 — Kira criou os 8 arquivos de esqueleto exatamente como entregues pelo killua (acao estrutural, Secao 5 passo 2). Validacao de tipos registrada no chat.
+
+## TASK-075 — [TDD RED] ExpenseScheduleService + ExpenseReportService (funções puras)
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-074
+ESCOPO: escrever os testes (Karma/Jasmine, lógica pura sem emulador) das duas classes estáticas e confirmar RED por lógica ausente.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7.1-7.4 e §8), src/services/expense-schedule-service/expense-schedule-service.ts, src/services/expense-report-service/expense-report-service.ts, src/models/expense-model.ts, src/models/expense-category-defaults.ts, src/services/bill-recurrence-service/bill-recurrence-service.spec.ts (describe de lógica pura como referência de estilo)
+CRITERIO DE ACEITE: (1) Schedule: split 100/3 = [33.33,33.33,33.34]; soma exata para totais com centavos quebrados (ex.: 0,10/3; 99,99/7; 1000/12), N=1, N=120, N=0/121/1.5 e total<=0 lançam; datas de parcela 31/jan -> 28/fev -> 31/mar, ano bissexto (29/fev), virada de ano; occurrenceDates mensal dia 31 e semanal, com generatedThrough null e preenchido, upTo no fim do mês, upTo < âncora -> []; toDateKey estável independente do fuso da máquina (datas 23:30 e 00:30 de São Paulo); (2) Report: groupForMonth — cards e listas derivam do mesmo agrupamento (total do card = soma da lista), vencida de mês anterior aparece em `vencidas`, a vencer só do mês e >= hoje, paga por paidDate; isOverdue no limite (dueDate == hoje não é vencida); sumOperacionalPorVencimento ignora custo_producao e conta pago e a_pagar, limites inclusivos start/end; categoria órfã = operacional; breakdown por categoria; monthlyTotals com 12 buckets e zeros; calcResultado = fat − cmv − operacionais com soma em centavos (sem 0.1+0.2); (3) execução mostra RED por 'not implemented' (não por erro de compilação).
+ARQUIVOS PERMITIDOS: src/services/expense-schedule-service/expense-schedule-service.spec.ts, src/services/expense-report-service/expense-report-service.spec.ts
+NAO FAZER: não editar os services; não escrever teste que dependa de Firestore; não editar .claude/tasks.md.
+RETORNO ESPERADO: lista de testes + saída do runner confirmando RED válido + comando de execução (`npx ng test --include='**/expense-*-service.spec.ts' --browsers=ChromeHeadless --watch=false`).
+HISTORICO: 2026-10-22 — mike: 33+35 testes (schedule/report), RED 68/68 por not implemented; helper exige mensagem != not implemented nos casos de lancamento. Rodada de correcao pos-style: +13 testes applyFilters e +1 orfa "Sem categoria". Spec do report fechou com 48 its, schedule 34 (contagem real do runner). Prettier aplicado pelo Kira.
+
+
+## TASK-076 — Implementar ExpenseScheduleService
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-075
+ESCOPO: implementar todos os métodos de ExpenseScheduleService até os testes da TASK-075 ficarem GREEN (aritmética em centavos inteiros; datas via componentes Y/M/D, nunca Date local sem fuso).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7.2, §7.3), src/services/expense-schedule-service/expense-schedule-service.ts, src/services/expense-schedule-service/expense-schedule-service.spec.ts (somente leitura), src/models/expense-model.ts, .claude/context/clean-code.md
+CRITERIO DE ACEITE: (1) todos os testes de expense-schedule-service.spec.ts passam; (2) nenhuma dependência de Angular/Firestore no arquivo; (3) nenhum `new Date()` implícito de "hoje" dentro dos métodos (entrada explícita).
+ARQUIVOS PERMITIDOS: src/services/expense-schedule-service/expense-schedule-service.ts
+NAO FAZER: não alterar o spec nem assinaturas; não tocar em outros arquivos; não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivo implementado + saída do runner (GREEN do spec desta classe).
+HISTORICO: 2026-10-22 — levi: GREEN 34/34. style APROVADO com ressalvas; Kira mandou fechar: assertTotalValid (Number.isFinite — NaN gerava parcelas NaN), assertDateKeyValid em anchor/upTo/generatedThrough (evita laco infinito com dado ruim do Firestore), mensagens de erro em portugues acentuado. 2a revisao style: APROVADO.
+
+
+## TASK-077 — Implementar ExpenseReportService
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-075
+ESCOPO: implementar todos os métodos de ExpenseReportService até os testes da TASK-075 ficarem GREEN (um único agrupamento alimenta cards e listas; somas em centavos).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7.4, §8.2), src/services/expense-report-service/expense-report-service.ts, src/services/expense-report-service/expense-report-service.spec.ts (somente leitura), src/models/expense-model.ts, .claude/context/clean-code.md
+CRITERIO DE ACEITE: (1) todos os testes de expense-report-service.spec.ts passam; (2) sem dependência de Angular/Firestore; (3) nenhum critério de data duplicado: `groupForMonth` é usado pelos totals.
+ARQUIVOS PERMITIDOS: src/services/expense-report-service/expense-report-service.ts
+NAO FAZER: não alterar o spec nem assinaturas; não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivo implementado + saída do runner.
+HISTORICO: 2026-10-22 — levi: GREEN 34/34 inicial. style PRECISA CORRIGIR (1 rodada): prettier, orfa exibia categoryId cru -> SEM_CATEGORIA_LABEL, helpers de data duplicados -> reuso de ExpenseScheduleService, comentario enganoso, find duplicado/copia quadratica -> Map. applyFilters sem teste -> mike cobriu. Final 48/48; 2a revisao style: APROVADO.
+
+
+## TASK-078 — [TDD GREEN] Confirmar ExpenseScheduleService + ExpenseReportService
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-076, TASK-077
+ESCOPO: rodar os dois specs puros (sem reescrever) e confirmar GREEN ou devolver relatório de bug.
+FLUXO: Implementacao
+CONTEXTO A LER: src/services/expense-schedule-service/expense-schedule-service.spec.ts, src/services/expense-report-service/expense-report-service.spec.ts
+CRITERIO DE ACEITE: (1) 100% dos testes das duas classes passam; (2) suíte Karma completa sem regressão vs. contagem anterior (reportar nº exato antes/depois); (3) em caso de falha, relatório com teste, esperado vs. obtido e suspeita.
+ARQUIVOS PERMITIDOS: nenhum (somente execução)
+NAO FAZER: não editar specs nem código; não editar .claude/tasks.md.
+RETORNO ESPERADO: contagem exata de SUCCESS/FAILED e veredito GREEN ou relatório de bug.
+HISTORICO: 2026-10-22 — mike: GREEN 68/68 (schedule+report). Criterio (2) suite completa adiado para TASK-085 (emulador ocupado pela TASK-086). Pos-correcao: 82/82 confirmado pelo style.
+
+
+## TASK-079 — [TDD RED] ExpenseService + ExpenseCategoryService (emulador, isolamento)
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-078
+ESCOPO: escrever specs de integração (Firestore/Auth Emulator, helpers existentes) dos dois services e confirmar RED por lógica ausente.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7.1, §7.2, §8.1, §10), src/services/expense-service/expense-service.ts, src/services/expense-category-service/expense-category-service.ts, src/models/expense-model.ts, src/models/expense-category-defaults.ts, src/services/test-helpers.ts, src/services/bill-service/bill-service.spec.ts (padrão de isolamento com 2 usuários)
+CRITERIO DE ACEITE: (1) ExpenseService: getExpenses só retorna da empresa da sessão (segundo usuário/empresa seeda dado estrangeiro); addExpense injeta companyId, status 'a_pagar', origin 'manual'; todas as escritas lançam com companyId nulo; addInstallments grava N docs com soma exata, vencimentos corretos, mesmo installmentGroupId, atomicamente; markAsPaid grava paidDate/paymentMethod e lança se já pago; markGoodsReceived; (2) ExpenseCategoryService: ensureDefaults cria 12 com ids `${companyId}_${systemKey}`, tipos corretos (2 custo_producao, 10 operacionais) e é idempotente (2 chamadas = 12 docs, sem sobrescrever uma categoria renomeada); addCategory exige type; renameCategory não altera type (lança se tentar); deleteCategory lança com expense OU série vinculada e funciona sem vínculo; setArchived; isolamento entre empresas; (3) RED por 'not implemented' (não por PERMISSION_DENIED de fixture nem erro de compilação; ids de fixture únicos — lição da TASK-032).
+ARQUIVOS PERMITIDOS: src/services/expense-service/expense-service.spec.ts, src/services/expense-category-service/expense-category-service.spec.ts
+NAO FAZER: não editar services nem test-helpers; não usar IDs fixos de documento; não editar .claude/tasks.md.
+RETORNO ESPERADO: lista de testes + saída RED + comando (emuladores Firestore+Auth no ar).
+HISTORICO: 2026-10-22 — mike: 41 testes RED (isolamento, companyId nulo, parcelamento, markAsPaid, ensureDefaults, deleteCategory). Corrigiu 6 falsos positivos (toBeRejected aceitava not implemented -> expectRejeicaoDeRegra). Licao: rules negam getDoc E query por documentId() de doc inexistente -> prova de exclusao por listagem da empresa. Rodadas de correcao pos-style/gon: +3 (patch protegido, seed unico), +22 (validacao de entrada, input sujo, categoria da empresa), +8 (goodsReceivedDate, valor < 1 centavo). Setup passou a usar categoria real da empresa. Final 76 testes.
+
+
+## TASK-080 — Implementar ExpenseService + ExpenseCategoryService
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-079
+ESCOPO: implementar os dois services até os specs da TASK-079 ficarem GREEN (padrão BillService/TenantService; `runTransaction` em markAsPaid; batch em addInstallments).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7.1, §7.2, §8.1, §10), src/services/expense-service/expense-service.ts, src/services/expense-category-service/expense-category-service.ts, os dois .spec.ts (somente leitura), src/services/bill-service/bill-service.ts (padrão), src/services/tenant-service/tenant-service.ts, src/services/expense-schedule-service/expense-schedule-service.ts, src/models/expense-model.ts, src/models/expense-category-defaults.ts, .claude/context/clean-code.md
+CRITERIO DE ACEITE: (1) specs das TASK-079 passam; (2) `getExpenses` filtra por companyId e ordena por dueDate desc; (3) nenhuma escrita sem guarda de companyId; valores numéricos normalizados com Number(...).
+ARQUIVOS PERMITIDOS: src/services/expense-service/expense-service.ts, src/services/expense-category-service/expense-category-service.ts
+NAO FAZER: não alterar specs; não alterar firestore.rules (TASK-082); não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivos implementados + saída do runner. Gate: style + gon (isolamento).
+HISTORICO: 2026-10-22 — levi: ExpenseService + ExpenseCategoryService. style 4 rodadas, gon 2 rodadas. Achados e decisoes: (1) updateExpense gravava status/paidDate em runtime -> CAMPOS_GERENCIADOS_PELO_SERVICE (inclui proveniencia) filtrado em create e update; (2) ensureDefaults ressuscitava padrao excluida -> SEED UNICO (decisao do Kira: so cria as 12 se a empresa nao tem nenhuma categoria); (3) gon: valor/data sem validacao nos caminhos simples, input sujo na criacao, categoryId de outra empresa -> modulo novo src/services/expense-validation (assertExpenseValue >= 1 centavo, assertDateKey com ano 2000..2100, assertRecurrencePeriod, stripUndefined, omitFields); categoria validada (existe, da empresa, nao arquivada na criacao; no update so quando muda); permission-denied -> "Categoria inválida para esta empresa." (sem oraculo de existencia); (4) goodsReceivedDate validado nos 3 caminhos. migracaoRevisar/migracaoMotivo editaveis por design. Convencao reforcada: comentario sem acento (briefing do Kira errou uma vez). Aceitos/registrados: corrida minima no seed; checagem de vinculo de deleteCategory fora de transacao; valor com >2 casas gravado cru; sem teto maximo de valor; duplicacao de helpers de categoria com recurrence -> task de Melhoria. Runner final 110/110 (76 + schedule 34).
+
+
+## TASK-081 — [TDD RED] firestore.rules para expenses/expenseCategories/expenseSeries
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-074
+ESCOPO: estender test/firestore.rules.spec.ts cobrindo as 3 coleções novas (isolamento por companyId, super-admin, update sem trocar companyId, anônimo negado) e confirmar RED.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §10, §13), test/firestore.rules.spec.ts, firestore.rules
+CRITERIO DE ACEITE: (1) para cada uma das 3 coleções: leitura/criação/atualização/exclusão da própria empresa permitidas; de outra empresa negadas; sem auth negadas; update que troca companyId negado; super-admin com bypass igual às demais coleções operacionais; (2) as listas de coleções operacionais existentes (linhas ~284 e ~310) ganham as 3 novas e MANTÊM bills/purchaseProducts; (3) RED porque as rules atuais ainda não conhecem as coleções (falha de permissão), com `npm run test:rules` mostrando só os novos casos falhando.
+ARQUIVOS PERMITIDOS: test/firestore.rules.spec.ts
+NAO FAZER: não editar firestore.rules; não remover casos existentes; não editar .claude/tasks.md.
+RETORNO ESPERADO: casos adicionados + saída de `npm run test:rules` com RED válido.
+HISTORICO: 2026-10-22 — mike: 42 casos novos (14 x 3 colecoes) + 3 colecoes nas 2 listas existentes do spec. RED: 15 falhas/99 por PERMISSION_DENIED. Casos negativos passavam pelo motivo errado ate a TASK-082.
+
+
+## TASK-082 — firestore.rules e índices das coleções de Despesas
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-081
+ESCOPO: adicionar 'expenses', 'expenseCategories', 'expenseSeries' em isOperationalCollection e o índice composto de expenses (companyId ASC, dueDate DESC) em firestore.indexes.json, mantendo bills e purchaseProducts.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §10, §12), firestore.rules, firestore.indexes.json, test/firestore.rules.spec.ts (somente leitura)
+CRITERIO DE ACEITE: (1) `npm run test:rules` 100% GREEN (casos novos e antigos); (2) firestore.indexes.json contém o novo índice e continua com os 3 anteriores; (3) nenhuma outra regra alterada (diff só na lista e no JSON).
+ARQUIVOS PERMITIDOS: firestore.rules, firestore.indexes.json
+NAO FAZER: não executar deploy; não remover bills/purchaseProducts; não editar o spec; não editar .claude/tasks.md.
+RETORNO ESPERADO: diff + saída do test:rules. Gate: style + gon (autorização).
+HISTORICO: 2026-10-22 — levi: 3 colecoes em isOperationalCollection (firestore.rules:26) + indice expenses(companyId ASC, dueDate DESC). test:rules 99/99. style APROVADO. gon APROVADO; achado baixo registrado como melhoria futura: squatting de id deterministico de categoria padrao (`${companyId}_${systemKey}`) por outro tenant que conheca o companyId — blindagem possivel exigindo docId com prefixo companyId_ na criacao de expenseCategories. Informativo: sem checagem de papel nas colecoes de despesas (igual as demais operacionais).
+
+
+## TASK-083 — [TDD RED] ExpenseRecurrenceService (catch-up idempotente)
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-080, TASK-082
+ESCOPO: escrever specs de integração do ExpenseRecurrenceService e confirmar RED.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7.3), src/services/expense-recurrence-service/expense-recurrence-service.ts, src/services/expense-schedule-service/expense-schedule-service.ts, src/models/expense-model.ts, src/services/test-helpers.ts, src/services/bill-recurrence-service/bill-recurrence-service.spec.ts (padrão), firestore.rules
+CRITERIO DE ACEITE: (1) catch-up gera TODAS as ocorrências perdidas até o fim do mês corrente (mensal: âncora dia 31 -> dias 30/28/31 corretos; semanal: +7k dias); (2) rodar duas vezes seguidas e duas chamadas concorrentes (Promise.all) não duplicam (contagem de docs = esperado) e avançam generatedThrough; (3) ocorrência apagada pelo usuário não é recriada; (4) série `active=false` não gera; endSeries mantém ocorrências já geradas; (5) createSeries grava série + 1ª ocorrência com id `${seriesId}_${dueDate}`; (6) isolamento: série de outra empresa nunca é processada; companyId vazio lança; (7) RED por 'not implemented'; fixtures com ids únicos.
+ARQUIVOS PERMITIDOS: src/services/expense-recurrence-service/expense-recurrence-service.spec.ts
+NAO FAZER: não editar o service; não editar test-helpers; não editar .claude/tasks.md.
+RETORNO ESPERADO: lista de testes + saída RED.
+HISTORICO: 2026-10-22 — mike: 17 testes RED iniciais; rodadas pos-style/gon: +13 (endSeries ownership/encerrada, lote >399, getSeries, validacao de createSeries, serie envenenada), +limites (ancora 24 meses, faixa de ano, teto 399/chamada, template sujo, companyId alheio), +6 (today invalido, anchorDate corrompido). Fixtures passaram a usar categoria real da empresa e HOJE_REFERENCIA fixo (eliminada bomba-relogio de 2028). Final 46 testes.
+
+
+## TASK-084 — Implementar ExpenseRecurrenceService
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-083
+ESCOPO: implementar o service até GREEN: catch-up em runTransaction sobre o doc da série, geração em lotes de no máximo 400 escritas por transação, ids determinísticos.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7.3, §10), src/services/expense-recurrence-service/expense-recurrence-service.ts, src/services/expense-recurrence-service/expense-recurrence-service.spec.ts (somente leitura), src/services/expense-schedule-service/expense-schedule-service.ts, src/services/tenant-service/tenant-service.ts, src/models/expense-model.ts, .claude/context/clean-code.md
+CRITERIO DE ACEITE: (1) specs da TASK-083 passam; (2) leitura de séries sempre com where companyId + active; (3) nenhuma geração fora de transação; falhas sobem (throw), sem engolir erro.
+ARQUIVOS PERMITIDOS: src/services/expense-recurrence-service/expense-recurrence-service.ts
+NAO FAZER: não alterar o spec; não usar Cloud Functions; não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivo implementado + saída do runner. Gate: style + gon.
+HISTORICO: 2026-10-22 — levi: ExpenseRecurrenceService. style 4 rodadas, gon 2 rodadas. R1 style: endSeries sem ownership (CRITICA §10), serie ruim derrubava as demais -> decisao do Kira: processa todas, acumula falhas e relanca erro agregado. createSeries sem validacao -> reusa expense-validation. R1 gon (ALTA): ancora arbitrariamente antiga gerava ~100k docs por carregamento -> Kira decidiu limites e registrou em regra §7.3 "Limites" (ano 2000..2100, ancora <= 24 meses, 1 lote de 399 por serie por chamada, revalidacao do template, companyId so da sessao). R3 style: today obrigatorio e validado, anchorDate corrompido -> mensagem de dominio. Aceitos: today do catch-up vem do chamador (UI deve usar relogio local); texto livre sem limite (padrao do projeto); escrita de expenseSeries por qualquer papel da empresa (decisao de produto). Divida -> TASK-102.
+
+
+## TASK-085 — [TDD GREEN] Services, recurrence e rules de Despesas
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-080, TASK-082, TASK-084
+ESCOPO: rodar (sem reescrever) os specs das TASK-079/043/045 e a suíte completa; confirmar GREEN ou devolver relatório de bug.
+FLUXO: Implementacao
+CONTEXTO A LER: src/services/expense-service/expense-service.spec.ts, src/services/expense-category-service/expense-category-service.spec.ts, src/services/expense-recurrence-service/expense-recurrence-service.spec.ts, test/firestore.rules.spec.ts
+CRITERIO DE ACEITE: (1) os três specs de service e `npm run test:rules` em GREEN; (2) suíte Karma completa dentro de `firebase emulators:exec` sem regressão (reportar contagem exata; a falha pré-existente AppComponent/SwUpdate, se ainda existir, é reportada à parte); (3) relatório de bug se houver falha.
+ARQUIVOS PERMITIDOS: nenhum (somente execução)
+NAO FAZER: não editar specs nem código; não editar .claude/tasks.md.
+RETORNO ESPERADO: contagem exata e veredito.
+HISTORICO: 2026-10-22 — Verificacao consolidada na rodada final da TASK-099 (levi, sem reescrever specs): suite Karma completa no emulador 408/408 SUCCESS (era 428 antes da remocao dos specs legados), test:rules 99/99, test:migration 68/68, ng build producao ok. Sem falha AppComponent/SwUpdate. Specs de expense/category (76) e recurrence (46) inclusos.
+
+
+## TASK-086 — [TDD RED] Núcleo e script da migração bills/purchaseProducts -> expenses
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-074
+ESCOPO: escrever os testes node:test do núcleo puro e um teste de integração do script contra o Firestore Emulator (Admin SDK), confirmando RED.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7, §8.1, §14), scripts/lib/expense-migration-core.mjs, src/models/expense-model.ts, src/models/expense-category-defaults.ts, scripts/seed-demo.mjs (formato real dos bills legados), scripts/backfill-companyid.mjs (padrão Admin SDK/dry-run/--apply)
+CRITERIO DE ACEITE: (1) status: pendente->a_pagar; recebido->a_pagar+goodsReceivedDate; pago->pago+paidDate (+goodsReceivedDate se receivedAt); (2) D3: sem dueDate usa paidAt/receivedAt/createdAt e marca migracaoRevisar; datas em America/Sao_Paulo (Timestamp 02:30Z do dia seguinte cai no dia anterior em SP); (3) categoria pela precedência da §14: "Compra: X" -> Compra de mercadoria; bill com purchaseProductId usa nome do produto; "Aluguel do ponto" -> Aluguel; "Conta de energia" -> Energia/Água/Gás; "Taxa da maquininha" -> Taxas de cartão; sem casamento -> Outros + revisar; recebido sem casamento -> Compra de mercadoria + revisar; (4) purchaseProduct recurring -> série `mig_pp_<id>` com period traduzido, anchorDate = menor dueDate, generatedThrough = maior dueDate dos bills ligados, e os bills ligados recebem seriesId; recurring=false -> sem série; bill recorrente manual -> despesa simples + revisar; (5) idempotência: planMigration com existingIds preenchido pula tudo e reporta `skipped`; script no emulador: 2ª execução cria 0 docs e não sobrescreve doc editado; (6) dry-run padrão não escreve; `--rollback` apaga só origin=='migracao'/mig_pp_*; legado nunca é alterado; (7) script recusa projeto != hologaerp e bill sem companyId é ignorado e reportado; (8) paridade: DEFAULT_CATEGORY_DEFS do core == DEFAULT_EXPENSE_CATEGORIES do app (comparação textual do .ts); (9) RED por 'not implemented'/script ausente.
+ARQUIVOS PERMITIDOS: test/expense-migration-core.test.mjs, test/migrate-bills-to-expenses.emulator.test.mjs, package.json (somente adicionar scripts `test:migration` e `test:migration:emulator`)
+NAO FAZER: não editar scripts/ nem src/; não rodar contra projeto real; não editar .claude/tasks.md.
+RETORNO ESPERADO: lista de testes + saída RED + comandos de execução.
+HISTORICO: 2026-10-22 — mike: test/expense-migration-core.test.mjs (53 testes; RED 52 por not implemented, 1 de paridade de categorias passa por construcao — guarda de regressao) + test/migrate-bills-to-expenses.emulator.test.mjs (7; RED por script ausente) + scripts npm test:migration/test:migration:emulator. Contrato de report nao estava no esqueleto: Kira fixou formato no briefing da TASK-087 (byStatus, byCategory, revisar, skipped, created + ids ignorados no stdout).
+
+
+## TASK-087 — Implementar núcleo e script de migração (hml only)
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-086
+ESCOPO: implementar scripts/lib/expense-migration-core.mjs e criar scripts/migrate-bills-to-expenses.mjs (Admin SDK; dry-run padrão; --apply; --rollback; --company=<id> opcional; recusa projeto != hologaerp; suporta FIRESTORE_EMULATOR_HOST) até os testes da TASK-086 ficarem GREEN.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §14), scripts/lib/expense-migration-core.mjs, test/expense-migration-core.test.mjs e test/migrate-bills-to-expenses.emulator.test.mjs (somente leitura), scripts/backfill-companyid.mjs (padrão), src/models/expense-model.ts, .claude/context/clean-code.md
+CRITERIO DE ACEITE: (1) `npm run test:migration` e `npm run test:migration:emulator` GREEN; (2) ids determinísticos com `create()` (ALREADY_EXISTS = pulado, nunca sobrescreve); (3) relatório final com contagens (por status, por categoria, migracaoRevisar, pulados, sem companyId); (4) o script não altera nem apaga bills/purchaseProducts e o cabeçalho documenta uso, pré-requisitos e rollback.
+ARQUIVOS PERMITIDOS: scripts/lib/expense-migration-core.mjs, scripts/migrate-bills-to-expenses.mjs, package.json (somente scripts npm `migrate:expenses:hml`)
+NAO FAZER: não habilitar produção (projetosfelipe-9e458); não alterar os testes; não rodar contra projeto real; não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivos + saída dos dois runners. Gate: style + gon (script que escreve dado de cliente).
+HISTORICO: 2026-10-22 — levi: core + script (Admin SDK, dry-run padrao, --apply, --rollback, --company, guard hologaerp antes do initializeApp; projectId fixo). style: 3 rodadas. R1 PRECISA CORRIGIR: serie aplicava regras de bill ("Compra:" e receivedAt) na categoria; bill sem data abortava o run inteiro; "cartao" isolado capturava "Fatura cartao de credito"; constantes duplicadas entre core e script; project_id da service account nao validado. Kira decidiu tambem: rollback apaga ocorrencias geradas de series mig_pp_*. mike escreveu RED (+12 core, +2 emulador) antes da correcao. R2: serie sem bills e sem defaultValue gravava template.value NaN (mike +2 RED) + sentinela U+F8FF cru -> escape. R3 APROVADO. Decisao registrada: palavras-chave genericas compra/compras removidas de matchCategoryKey (falso positivo em series); bills livres "compra fornecedor X" sem prefixo caem em Outros+revisar (ou compra_mercadoria+revisar se receivedAt) — aceito pela §14. report.skipped numerico + skippedByKind (teste prevaleceu sobre o briefing do Kira); report.unmigratable {kind,id,motivo}. gon APROVADO; obs baixas: companyId legado nao validado como id seguro (defesa em profundidade), rollback apaga despesas migradas mesmo editadas/pagas depois (documentado no cabecalho; decisao de produto), FIRESTORE_EMULATOR_HOST nao restrito a loopback.
+
+
+## TASK-088 — [TDD GREEN] Confirmar migração
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-087
+ESCOPO: rodar (sem reescrever) os testes de migração e o emulador; confirmar GREEN ou relatório de bug.
+FLUXO: Implementacao
+CONTEXTO A LER: test/expense-migration-core.test.mjs, test/migrate-bills-to-expenses.emulator.test.mjs
+CRITERIO DE ACEITE: (1) ambos GREEN; (2) 2ª execução do script no emulador cria 0 docs e `--rollback` deixa bills/purchaseProducts intactos (conferência de contagem); (3) relatório de bug se falhar.
+ARQUIVOS PERMITIDOS: nenhum (somente execução)
+NAO FAZER: não editar testes nem código; não editar .claude/tasks.md.
+RETORNO ESPERADO: contagens e veredito.
+HISTORICO: 2026-10-22 — mike: GREEN core 53/53 + emulador 7/7 na 1a rodada; apos as correcoes do style o executor/mike confirmaram core 68/68 e emulador 9/9 (2a execucao cria 0 docs, rollback restrito, legado intacto).
+
+
+## TASK-089 — [MANUAL / USUARIO] Deploy de rules+índices e migração em homolog (hologaerp)
+STATUS: PENDENTE
+AGENT: usuario (manual; Kira apenas orienta, não executa)
+DEPENDENCIAS: TASK-085, TASK-088
+ESCOPO: publicar rules/índices no hml, rodar a migração em dry-run, conferir o relatório e só então aplicar com --apply.
+FLUXO: Implementacao
+CONTEXTO A LER: scripts/migrate-bills-to-expenses.mjs (cabeçalho), firestore.rules, firestore.indexes.json, .claude/context/regra-de-negocio.md (inteiro; §14)
+CRITERIO DE ACEITE: (1) `npm run deploy:rules:staging` concluído e índice de expenses com status "Enabled" no console; (2) dry-run revisado (contagens por status/categoria, lista de migracaoRevisar); (3) `--apply` rodado; 2ª execução reporta 0 criados; amostra de 5 bills conferida no console contra os expenses gerados.
+ARQUIVOS PERMITIDOS: nenhum (operação manual em hml)
+NAO FAZER: nada em produção (projetosfelipe-9e458); não apagar bills/purchaseProducts.
+RETORNO ESPERADO: o usuário confirma no chat + cola o relatório do script.
+HISTORICO:
+
+## TASK-090 — Componente ExpenseForm (única / parcelada / recorrente)
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-078
+ESCOPO: criar componente standalone `expense-form` (template-driven, ngModel) para criar/editar despesa com modo único, parcelado (N, preview das parcelas via ExpenseScheduleService.buildInstallments) e recorrente (semanal/mensal), emitindo o payload por @Output.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7.1-7.3, §8.1), .claude/context/identidade-visual.md, .claude/context/clean-code.md, src/models/expense-model.ts, src/services/expense-schedule-service/expense-schedule-service.ts, src/components/bills/bills.html, src/components/bills/bills.css
+CRITERIO DE ACEITE: (1) campos: descrição, valor, categoria (só não arquivadas), vencimento obrigatório, fornecedor, forma de pagamento, observação, "mercadoria recebida em"; validação early-return com notif.warning; (2) modo parcelado mostra preview "N x R$" com a soma exata e datas; modo recorrente mostra aviso se a âncora for > 24 meses no passado; parcelado e recorrente são excludentes; (3) usa tokens/variáveis CSS da identidade visual (dark/light) e tem layout mobile (`expense-form-mobile.css`).
+ARQUIVOS PERMITIDOS: src/components/expense-form/expense-form.ts, src/components/expense-form/expense-form.html, src/components/expense-form/expense-form.css, src/components/expense-form/expense-form-mobile.css
+NAO FAZER: não chamar Firestore/services de escrita (só emite evento); não calcular parcela fora do ExpenseScheduleService; não editar outros arquivos; não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivos + contrato de @Input/@Output + `ng build` sem erro.
+HISTORICO: 2026-10-22 — hanzo: ExpenseFormComponent (unica/parcelada/recorrente; preview via buildInstallments; aviso ancora > 24 meses). style PRECISA CORRIGIR (1 rodada): ngOnChanges sobrescrevia digitacao quando categories reemitia e nao resetava em expense=null (MEDIA); getter de preview recalculado 5x/ciclo; "24 meses" hardcoded; outputs com nome nativo -> saved/cancelled. 2a revisao: APROVADO. Obs: aviso de ancora usa fuso America/Sao_Paulo (toDateKey) e a §7.1 fala em "data local do navegador" — divergencia so de texto, cliente opera no Brasil.
+
+
+## TASK-091 — Componente ExpenseCategoryManager
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-080
+ESCOPO: criar componente standalone `expense-category-manager` para listar categorias com tag de tipo, criar nova (nome + escolha obrigatória do tipo), renomear, arquivar/desarquivar e excluir (só se sem vínculo; erro do service vira notif.warning clara).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §8.1), .claude/context/identidade-visual.md, .claude/context/clean-code.md, src/services/expense-category-service/expense-category-service.ts, src/models/expense-model.ts
+CRITERIO DE ACEITE: (1) tipo só escolhido na criação e exibido (somente leitura) depois; (2) categoria com vínculo mostra só "Arquivar" (sem "Excluir"), com texto explicando o porquê; (3) chama ensureDefaults ao abrir; mobile ok.
+ARQUIVOS PERMITIDOS: src/components/expense-category-manager/expense-category-manager.ts, src/components/expense-category-manager/expense-category-manager.html, src/components/expense-category-manager/expense-category-manager.css
+NAO FAZER: não alterar o service; não editar outros arquivos; não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivos + `ng build` sem erro.
+HISTORICO: 2026-10-22 — hanzo: ExpenseCategoryManagerComponent (@Input categoryIdsInUse: ReadonlySet<string> calculado pelo pai; @Output closed; exporta EXPENSE_CATEGORY_TYPE_LABELS). style PRECISA CORRIGIR (1 rodada): corrida — criar categoria antes do seed terminar impedia o seed unico para sempre -> form travado ate ensureDefaults + 1o snapshot; window confirm() -> modal padrao do projeto com CSS local (bills sera apagado na 061). 2a revisao APROVADO. Obs nao bloqueante: erro no stream getCategories deixa o form travado (tratar com error: no subscribe numa task futura). Mobile via @media no proprio .css (restricao de arquivos).
+
+
+## TASK-092 — Tela Despesas (/contas): mês, cards, grupos, ações e filtros
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-078, TASK-080, TASK-084, TASK-090, TASK-091
+ESCOPO: criar `ExpensesComponent` substituindo BillsComponent na rota /contas (título "Despesas"): navegação ◀ mês ▶, cards Vencidas / A pagar no mês / Pago no mês, lista agrupada Vencidas / A vencer / Pagas, botões "Paguei" e "Chegou", filtros, form/categorias via componentes filhos, catch-up de recorrência no ngOnInit, e ajustes de rótulo no menu.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7, §8.1), .claude/context/identidade-visual.md, .claude/context/clean-code.md, src/components/bills/bills.ts, src/components/bills/bills.html, src/components/bills/bills.css, src/components/expense-form/expense-form.ts, src/components/expense-category-manager/expense-category-manager.ts, src/services/expense-service/expense-service.ts, src/services/expense-report-service/expense-report-service.ts, src/services/expense-recurrence-service/expense-recurrence-service.ts, src/services/expense-category-service/expense-category-service.ts, src/app/app.routes.ts, src/components/home/home.html
+CRITERIO DE ACEITE: (1) cards e grupos vêm exclusivamente de ExpenseReportService.groupForMonth (nenhuma soma/critério de data inline no componente); cards ignoram filtros, lista aplica ExpenseReportService.applyFilters (categoria, status, "a pagar e já recebida", "revisar migração"); (2) "Paguei" abre confirmação com data (default hoje) e forma de pagamento opcional; "Chegou" aparece só para categoria custo_producao sem goodsReceivedDate; encerrar recorrência disponível em despesa de série; excluir com modal; (3) rota /contas aponta para ExpensesComponent com o mesmo guard/data.module 'contas'; título e card do menu da home dizem "Despesas"; hoje = ExpenseScheduleService.toDateKey(new Date()); erros de escrita em try/catch com notif; (4) layout mobile (`expenses-mobile.css`) com cards empilhados e botões acessíveis.
+ARQUIVOS PERMITIDOS: src/components/expenses/expenses.ts, src/components/expenses/expenses.html, src/components/expenses/expenses.css, src/components/expenses/expenses-mobile.css, src/app/app.routes.ts, src/components/home/home.html
+NAO FAZER: não apagar o BillsComponent (TASK-099); não calcular totais/datas inline; não mexer em product-inventory; não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivos + `ng build` sem erro + descrição do fluxo. Gate: style.
+HISTORICO: 2026-10-22 — hanzo: ExpensesComponent em /contas (mesmo guard e data.module contas; home "DESPESAS"); navegacao por mes; cards e grupos so via groupForMonth, lista via applyFilters; Paguei (modal, data default hoje), Chegou (so custo_producao), Encerrar recorrencia e Excluir com modal; botao Editar (adicao do executor, aceita: §7.4 lista editar); ensureDefaults antes de liberar Nova Despesa; catch-up no init. style PRECISA CORRIGIR (1 rodada): 44px nos botoes restantes no mobile, subscription criada apos await, categoriasProntas liberado com seed falho, literal Sem categoria duplicado, edicao sem id caindo em criacao. 2a revisao APROVADO; Kira adicionou .btn-voltar aos 44px inline. Aceito: "hoje" fixo com a pagina aberta. gon nao se aplica. BillsComponent segue no repo ate a TASK-099.
+
+
+## TASK-093 — [TDD RED] Balanço: gastosPeriodo/resultadoFinal por despesas (competência)
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-078, TASK-080
+ESCOPO: ampliar product-inventory.spec.ts com testes dos getters de Balanço/Despesas do ProductInventory (mocks de ExpenseService/ExpenseCategoryService/ExpenseRecurrenceService) e confirmar RED contra a implementação atual (baseada em bills).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §8), src/components/product-inventory/product-inventory.spec.ts, src/components/product-inventory/product-inventory.ts (linhas ~515-560, somente leitura), src/services/expense-report-service/expense-report-service.ts, src/models/expense-model.ts
+CRITERIO DE ACEITE: contrato de membros do componente a testar — `despesas`, `categoriasDespesa`, `get gastosPeriodo()` (soma operacional por dueDate no período), `get custoProducaoPeriodo()`, `get gastosPorCategoria()`, `get resultadoFinal()` = faturamento − custoTotal − gastosPeriodo; casos: despesa operacional a_pagar conta; despesa paga fora do período por dueDate NÃO conta mesmo paga dentro; custo_producao não entra no Resultado nem no Gastos mas aparece em `custoProducaoPeriodo`; (2) o spec existente continua compilando com os providers novos; (3) RED por comportamento (getters ainda leem bills).
+ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.spec.ts
+NAO FAZER: não editar o componente; não remover provider de BillService/PurchaseProductService ainda; não editar .claude/tasks.md.
+RETORNO ESPERADO: testes + saída RED.
+HISTORICO: 2026-10-22 — mike: 12 testes RED em product-inventory.spec.ts (sem emulador): gastosPeriodo por dueDate em qualquer status, limites inclusivos, custo_producao fora, orfa operacional, centavos; custoProducaoPeriodo; resultadoFinal; gastosPorCategoria. Semeou bill pago de 999 no periodo para o RED ser honesto. Mocks de ExpenseService/Category/Recurrence adicionados; BillService/PurchaseProductService mantidos.
+
+
+## TASK-094 — product-inventory.ts: lógica de Despesas/Balanço e remoção da aba Compras
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-093
+ESCOPO: no product-inventory.ts, trocar bills/purchaseProducts por despesas: assinar ExpenseService/ExpenseCategoryService, chamar o catch-up de recorrência, implementar os getters do contrato da TASK-093 via ExpenseReportService, `reportTab: 'vendas'|'despesas'|'balanco'|'vendedores'`, `isGastosModalOpen` + abrir/fechar, e remover aba/estado/métodos de Compras e Contas a Pagar.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7, §8), src/components/product-inventory/product-inventory.ts, src/components/product-inventory/product-inventory.spec.ts (somente leitura), src/services/expense-report-service/expense-report-service.ts, src/services/expense-service/expense-service.ts, src/services/expense-category-service/expense-category-service.ts, src/services/expense-recurrence-service/expense-recurrence-service.ts, .claude/context/clean-code.md
+CRITERIO DE ACEITE: (1) testes da TASK-093 GREEN e suíte do componente sem regressão; (2) `activeTab` sem 'compras', sem `m.compras`, sem imports/injeções de Bill/PurchaseProduct, sem `gerarBillDeProdutoCompra`, `resetFiltroContasStatusSeNecessario`, `filtroContasStatus`, `billsFiltradosRelatorio`; (3) nenhuma soma/critério de data inline: tudo via ExpenseReportService; `confirmarCompra` (entrada de estoque) preservado intacto.
+ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.ts
+NAO FAZER: não editar .html/.css (TASK-097); não alterar o spec; não alterar PurchaseService; não editar .claude/tasks.md.
+RETORNO ESPERADO: diff + saída do runner. Gate: style.
+HISTORICO: 2026-10-22 — levi: getters gastosPeriodo/custoProducaoPeriodo/gastosPorCategoria/resultadoFinal via ExpenseReportService; assinatura de despesas/categorias; reportTab + "despesas"; isGastosModalOpen; catch-up gerarRecorrenciasAteHoje no init (companyId da sessao, erro -> notif.warning generico). AJUSTE DO KIRA: remocao dos membros de Compras/Contas adiada para depois da TASK-097 (strictTemplates — html ainda os usa); lista de obsoletos no retorno do levi (bills, purchaseProducts, produtoCompra*, gerarBillDeProdutoCompra, filtroContasStatus, billsFiltradosRelatorio, totalContas*, avancarStatusBill, billStatusLabel, formatBillDate, recurrenceLabel, *Compra* modal/form, activeTab compras, reportTab contas, injecoes BillService/PurchaseProductService). Bloqueio intermediario: TenantService sem provider no spec -> mike adicionou mock + 2 RED do catch-up. Runner 37/37. style APROVADO; ressalvas: subscriptions sem cleanup (padrao do componente inteiro — task futura), reformat do spec veio do prettier do mike na 055.
+
+
+## TASK-095 — [TDD GREEN] Balanço por despesas
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-094
+ESCOPO: rodar (sem reescrever) o spec do ProductInventory e a suíte completa; confirmar GREEN ou relatório de bug.
+FLUXO: Implementacao
+CONTEXTO A LER: src/components/product-inventory/product-inventory.spec.ts
+CRITERIO DE ACEITE: (1) testes da TASK-093 GREEN; (2) suíte completa sem regressão (contagem exata antes/depois).
+ARQUIVOS PERMITIDOS: nenhum (somente execução)
+NAO FAZER: não editar spec nem código; não editar .claude/tasks.md.
+RETORNO ESPERADO: contagem e veredito.
+HISTORICO: 2026-10-22 — product-inventory.spec 37/37 confirmado em varias rodadas (levi TASK-094/059) e dentro da suite completa 408/408 da TASK-099.
+
+
+## TASK-096 — Componentes do relatório de Despesas (pizza, barras 12 meses, modal Gastos)
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-078
+ESCOPO: criar `expense-report-panel` (pizza por categoria no período + barras dos 12 meses, Chart.js) e `gastos-breakdown-modal` (breakdown operacional + bloco separado "já incluso no CMV" só informativo), recebendo dados por @Input.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §8.2), .claude/context/identidade-visual.md, .claude/context/clean-code.md, src/services/expense-report-service/expense-report-service.ts, src/models/expense-model.ts, src/components/product-inventory/product-inventory.ts (linhas ~680-830: padrão de render/destroy de Chart.js)
+CRITERIO DE ACEITE: (1) painel usa ExpenseReportService.breakdownPorCategoria e monthlyTotals (nenhuma agregação própria); pizza mostra tag de tipo; Charts destruídos no ngOnDestroy/ngOnChanges; (2) modal lista só categorias operacionais com total e %, e um bloco visualmente distinto rotulado "já incluso no CMV" com o custo de produção; (3) cores da paleta da identidade; dark/light; mobile ok.
+ARQUIVOS PERMITIDOS: src/components/expense-report-panel/expense-report-panel.ts, src/components/expense-report-panel/expense-report-panel.html, src/components/expense-report-panel/expense-report-panel.css, src/components/gastos-breakdown-modal/gastos-breakdown-modal.ts, src/components/gastos-breakdown-modal/gastos-breakdown-modal.html, src/components/gastos-breakdown-modal/gastos-breakdown-modal.css
+NAO FAZER: não editar product-inventory; não consultar Firestore (só @Input); não editar .claude/tasks.md.
+RETORNO ESPERADO: arquivos + contrato de @Input/@Output + `ng build` sem erro.
+HISTORICO: 2026-10-22 — hanzo: ExpenseReportPanelComponent (rosca por categoria + barras 12 meses empilhadas por tipo) e GastosBreakdownModalComponent (operacional + bloco "Ja incluso no CMV"). style PRECISA CORRIGIR (1 rodada): prettier, sufixo Component, output close->closed + Esc. 2a revisao: APROVADO. Tolerado: cores de eixo/grade do Chart.js fixas p/ tema escuro (mesmo precedente do product-inventory).
+
+
+## TASK-097 — product-inventory.html/.css: sub-aba Despesas, Balanço e modal Gastos
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-094, TASK-095, TASK-096
+ESCOPO: no template, remover a aba Compras e a sub-aba Contas a Pagar, adicionar a sub-aba "Despesas" (expense-report-panel), tornar o card Gastos clicável abrindo gastos-breakdown-modal, e ajustar rótulos do Balanço ("Gastos (despesas operacionais por vencimento)").
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §8), .claude/context/identidade-visual.md, .claude/context/clean-code.md, src/components/product-inventory/product-inventory.html, src/components/product-inventory/product-inventory.css, src/components/product-inventory/product-inventory.ts (somente leitura), src/components/expense-report-panel/expense-report-panel.ts, src/components/gastos-breakdown-modal/gastos-breakdown-modal.ts
+CRITERIO DE ACEITE: (1) nenhuma referência no html a `compras`, `produtoCompra*`, `bills`, `reportTab === 'contas'`; (2) fórmula do Balanço mostra Faturamento − CMV − Despesas operacionais = Resultado, com nota "custos de produção já estão no CMV"; (3) `ng build` sem erro de template (strictTemplates) e mobile preservado.
+ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.html, src/components/product-inventory/product-inventory.css
+NAO FAZER: não editar o .ts nem o spec; não alterar a aba Estoque/entrada 📦; não editar .claude/tasks.md.
+RETORNO ESPERADO: diff + `ng build` sem erro. Gate: style.
+HISTORICO: 2026-10-22 — hanzo: removidas aba Compras, modal de produto de compra e sub-aba Contas a Pagar do template; sub-aba Despesas com app-expense-report-panel; card Gastos clicavel (click/Enter/Espaco) + app-gastos-breakdown-modal (closed); formula Faturamento − CMV − Despesas operacionais + nota CMV. Componente standalone exigiu imports no .ts (fora dos arquivos permitidos): Kira fez o ajuste minimo (2 imports). Build ok; spec 37/37. style APROVADO; prettier tolerado (arquivos ja eram nao formatados — formatar = ~6k linhas de ruido; debito separado). Obs: membros orfaos no .ts (totalContas*, reportTab contas etc.) vao na TASK-099.
+
+
+## TASK-098 — Remover módulo `compras` do ModuleConfig e de Configurações
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-092, TASK-097
+ESCOPO: remover `compras` do ModuleConfig/DEFAULT_MODULES e o toggle em Configurações, e renomear o rótulo do módulo `contas` para "Despesas" (descrição "Despesas e contas a pagar"), garantindo que documentos antigos com `compras` não quebrem o merge.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §11), src/models/company-config.ts, src/components/config/config.ts, src/components/config/config.html, src/services/config/config.service.ts, src/components/product-inventory/product-inventory.spec.ts (mocks com compras: true)
+CRITERIO DE ACEITE: (1) `grep -r "compras" src` sem ocorrência funcional (exceto comentário de legado e a coleção `purchases`); (2) config mostra "Despesas" e não mostra "Compras"; (3) `loadCompanyModules` com doc contendo `compras: true` legado carrega sem erro e sem recriar a chave; build e suíte sem regressão.
+ARQUIVOS PERMITIDOS: src/models/company-config.ts, src/components/config/config.ts, src/components/config/config.html, src/services/config/config.service.ts, src/components/product-inventory/product-inventory.spec.ts (somente remover `compras` dos mocks)
+NAO FAZER: não migrar companies/*; não tocar nas regras de gestao/clientes obrigatórios; não editar .claude/tasks.md.
+RETORNO ESPERADO: diff + build + suíte.
+HISTORICO: 2026-10-22 — levi: compras removido de ModuleConfig/DEFAULT_MODULES e do toggle de Configuracoes; rotulo contas -> "Despesas"; mocks do spec sem compras; remocao minima de m.compras no product-inventory.ts (autorizada pelo Kira). Doc legado com compras: true fica inerte (spread apos DEFAULT_MODULES). style APROVADO; lacuna baixa: sem spec de ConfigService para o doc legado (config.service fora dos arquivos permitidos).
+
+
+## TASK-099 — Remover código legado de Contas a Pagar e Produtos de Compra
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-092, TASK-097, TASK-098
+ESCOPO: apagar BillsComponent, BillService, BillRecurrenceService, PurchaseProductService, seus specs e models, e os providers/imports órfãos; manter intactos bills/purchaseProducts no banco, em firestore.rules, firestore.indexes.json e scripts/backfill-companyid.mjs.
+FLUXO: Melhoria
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7, §14), src/components/bills/bills.ts, src/services/bill-service/bill-service.ts, src/services/bill-recurrence-service/bill-recurrence-service.ts, src/services/purchase-product-service/purchase-product-service.ts, src/models/bill-model.ts, src/models/purchase-product-model.ts, src/app/app.routes.ts, src/components/product-inventory/product-inventory.spec.ts, src/services/test-helpers.ts
+CRITERIO DE ACEITE: (1) `grep -rn "BillService\|BillRecurrenceService\|PurchaseProductService\|bill-model\|purchase-product-model\|BillsComponent" src` sem resultados; (2) `ng build` produção sem erro e suíte completa dentro de `firebase emulators:exec` 100% verde (exceto falha pré-existente AppComponent/SwUpdate, se persistir, reportada à parte) + `npm run test:rules` + `npm run test:migration` verdes; (3) `PurchaseService` e a coleção `purchases` intactos.
+ARQUIVOS PERMITIDOS: src/components/bills/ (remover), src/services/bill-service/ (remover), src/services/bill-recurrence-service/ (remover), src/services/purchase-product-service/ (remover), src/models/bill-model.ts (remover), src/models/purchase-product-model.ts (remover), src/components/product-inventory/product-inventory.spec.ts, src/app/app.routes.ts
+NAO FAZER: não remover bills/purchaseProducts de firestore.rules nem de firestore.indexes.json (rollback preservado até a purga em produção); não tocar em scripts/backfill-companyid.mjs; não editar .claude/tasks.md.
+RETORNO ESPERADO: lista de arquivos removidos + saída de build e suítes.
+HISTORICO: 2026-10-22 — levi: limpeza de todos os membros de Compras/Contas no product-inventory.ts e spec (confirmarCompra, PurchaseService e getters de despesas preservados). rm negado ao agent -> Kira removeu os arquivos legados via git rm (bills/, bill-service, bill-recurrence-service, purchase-product-service, bill-model, purchase-product-model). grep limpo; firestore.rules e indexes intactos (rollback). Suite 408/408, rules 99/99, migration 68/68, build prod ok. style APROVADO; Kira removeu comentario residual "Compras" em busca-por-nome.ts.
+
+
+## TASK-100 — seed-demo no novo modelo de Despesas
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-085
+ESCOPO: atualizar scripts/seed-demo.mjs para semear categorias padrão, despesas (a pagar, vencida, paga, parcelada, mercadoria recebida), séries recorrentes e `expenseCategories`, em vez de bills/purchaseProducts, mantendo alvo emulator/hml e recusa de PROD.
+FLUXO: Melhoria
+CONTEXTO A LER: scripts/seed-demo.mjs, .claude/context/regra-de-negocio.md (inteiro; §7, §8), src/models/expense-model.ts, src/models/expense-category-defaults.ts
+CRITERIO DE ACEITE: (1) seed no emulador gera categorias com ids `${companyId}_${systemKey}`, despesas de todos os estados (incl. vencida, a vencer, paga, recebida, uma parcelada 3x e uma série semanal/mensal com generatedThrough) com datas date-only; (2) reexecução continua idempotente como o seed atual; (3) recusa PROD preservada.
+ARQUIVOS PERMITIDOS: scripts/seed-demo.mjs
+NAO FAZER: não rodar contra hml sem pedido do usuário; não alterar a migração; não editar .claude/tasks.md.
+RETORNO ESPERADO: diff + saída da execução no emulador.
+HISTORICO: 2026-10-22 — levi: seed-demo grava 12 categorias (ids deterministicos lidos de expense-category-defaults.ts), 20 despesas em todos os estados, parcelada 3x (333,33/333,33/333,34), 2 series com ocorrencias `${seriesId}_${dueDate}` e generatedThrough coerente; datas relativas a hoje em America/Sao_Paulo; sem bills/purchaseProducts; recusa de PROD intacta. Validado no emulador (2a execucao aborta sem duplicar). style APROVADO; Kira removeu compras: true residual do DEFAULT_MODULES do seed. Nao rodado em hml.
+
+
+## TASK-101 — [MANUAL / USUARIO] Validação do módulo Despesas com a cliente em homolog
+STATUS: PENDENTE
+AGENT: usuario (manual; Kira apenas orienta, não executa)
+DEPENDENCIAS: TASK-089, TASK-099, TASK-100
+ESCOPO: publicar o hosting em hml (`npm run deploy:hosting:staging`) e validar com a cliente os fluxos de Despesas, Relatório e Balanço sobre os dados migrados.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (inteiro; §7, §8, §14), docs/bills.md
+CRITERIO DE ACEITE: checklist aprovado pela cliente: (1) filtro "revisar migração" lista as despesas marcadas e a cliente corrige categorias; (2) cards Vencidas / A pagar no mês / Pago no mês batem com as listas em 3 meses diferentes; (3) criar despesa única, parcelada (soma = total) e recorrente (reabrir a tela 2x não duplica); Paguei/Chegou funcionam; categoria com despesa só arquiva; (4) Resultado do Balanço = Faturamento − CMV − Despesas operacionais; Gastos abre o modal com "já incluso no CMV" separado; confirmar com a cliente as respostas dos pontos [CONFIRMAR] (reversão de pagamento, categoria de recebido sem casamento, forma de pagamento boleto/transferência, "Vencidas" global); (5) mobile conferido no celular da cliente.
+ARQUIVOS PERMITIDOS: nenhum
+NAO FAZER: nada em produção; Kira não faz PR para main nem deploy de produção nesta fila.
+RETORNO ESPERADO: o usuário confirma no chat (aprovado/ajustes); ajustes viram novas tasks.
+HISTORICO:
+
+## TASK-102 — Extrair helpers duplicados dos services de Despesas
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-084, TASK-094
+ESCOPO: eliminar a duplicacao entre expense-service, expense-category-service e expense-recurrence-service (leitura/validacao de categoria da empresa, deteccao de permission-denied, constantes de colecao e guarda de sessao) e o codigo morto de faixa de ano no recurrence, sem mudar comportamento.
+FLUXO: Melhoria
+CONTEXTO A LER: .claude/context/clean-code.md, .claude/context/regra-de-negocio.md (inteiro; §7, §8.1, §10), src/services/expense-service/expense-service.ts, src/services/expense-category-service/expense-category-service.ts, src/services/expense-recurrence-service/expense-recurrence-service.ts, src/services/expense-validation/expense-validation.ts, os specs dos tres services (somente leitura)
+CRITERIO DE ACEITE: (1) lerCategoriaDaEmpresa/assertCategoriaAtiva/ehNegacaoDePermissao/CODIGO_PERMISSAO_NEGADA/COLECAO_*/MSG_SEM_EMPRESA existem em um unico lugar; (2) assertDataDeNegocio e constantes ANO_* removidos do recurrence (assertDateKey ja cobre a faixa); (3) erro agregado do catch-up passa a carregar resultado parcial (RecurrenceCatchUpError com partial + failures) mantendo a mensagem; todos os specs dos tres services GREEN sem alteracao de assercao.
+ARQUIVOS PERMITIDOS: os tres services, src/services/expense-validation/expense-validation.ts, novo src/services/expense-firestore-guards/expense-firestore-guards.ts
+NAO FAZER: nao mudar comportamento nem mensagens verificadas pelos specs; nao alterar specs; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff resumido + saida dos runners. Gate: style.
+HISTORICO: 2026-10-22 — levi: novo src/services/expense-firestore-guards (COLECAO_*, MSG_CATEGORIA_*, exigirCompanyId com mensagem do chamador, lerCategoriaDaEmpresa, assertCategoriaAtiva, ehNegacaoDePermissao) usado pelos 3 services; assertDataDeNegocio/ANO_* removidos do recurrence; RecurrenceCatchUpError com partial + failures (mesma message). +79/-152 linhas + modulo novo. expense-*.spec 204/204. style APROVADO; sugestoes futuras (nao bloqueantes): helper unico "categoria ativa da empresa" nos guards, renomear pasta para expense-firestore-helpers (colide com src/guards), esclarecer partial.seriesProcessed.
