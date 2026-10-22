@@ -879,7 +879,7 @@ HISTORICO: 2026-10-22 — levi: 3 colecoes em isOperationalCollection (firestore
 
 
 ## TASK-045 — [TDD RED] ExpenseRecurrenceService (catch-up idempotente)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-042, TASK-044
 ESCOPO: escrever specs de integração do ExpenseRecurrenceService e confirmar RED.
@@ -889,10 +889,11 @@ CRITERIO DE ACEITE: (1) catch-up gera TODAS as ocorrências perdidas até o fim 
 ARQUIVOS PERMITIDOS: src/services/expense-recurrence-service/expense-recurrence-service.spec.ts
 NAO FAZER: não editar o service; não editar test-helpers; não editar .claude/tasks.md.
 RETORNO ESPERADO: lista de testes + saída RED.
-HISTORICO:
+HISTORICO: 2026-10-22 — mike: 17 testes RED iniciais; rodadas pos-style/gon: +13 (endSeries ownership/encerrada, lote >399, getSeries, validacao de createSeries, serie envenenada), +limites (ancora 24 meses, faixa de ano, teto 399/chamada, template sujo, companyId alheio), +6 (today invalido, anchorDate corrompido). Fixtures passaram a usar categoria real da empresa e HOJE_REFERENCIA fixo (eliminada bomba-relogio de 2028). Final 46 testes.
+
 
 ## TASK-046 — Implementar ExpenseRecurrenceService
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-045
 ESCOPO: implementar o service até GREEN: catch-up em runTransaction sobre o doc da série, geração em lotes de no máximo 400 escritas por transação, ids determinísticos.
@@ -902,7 +903,8 @@ CRITERIO DE ACEITE: (1) specs da TASK-045 passam; (2) leitura de séries sempre 
 ARQUIVOS PERMITIDOS: src/services/expense-recurrence-service/expense-recurrence-service.ts
 NAO FAZER: não alterar o spec; não usar Cloud Functions; não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivo implementado + saída do runner. Gate: style + gon.
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: ExpenseRecurrenceService. style 4 rodadas, gon 2 rodadas. R1 style: endSeries sem ownership (CRITICA §10), serie ruim derrubava as demais -> decisao do Kira: processa todas, acumula falhas e relanca erro agregado. createSeries sem validacao -> reusa expense-validation. R1 gon (ALTA): ancora arbitrariamente antiga gerava ~100k docs por carregamento -> Kira decidiu limites e registrou em regra §7.3 "Limites" (ano 2000..2100, ancora <= 24 meses, 1 lote de 399 por serie por chamada, revalidacao do template, companyId so da sessao). R3 style: today obrigatorio e validado, anchorDate corrompido -> mensagem de dominio. Aceitos: today do catch-up vem do chamador (UI deve usar relogio local); texto livre sem limite (padrao do projeto); escrita de expenseSeries por qualquer papel da empresa (decisao de produto). Divida -> TASK-064.
+
 
 ## TASK-047 — [TDD GREEN] Services, recurrence e rules de Despesas
 STATUS: PENDENTE
@@ -1130,4 +1132,17 @@ CRITERIO DE ACEITE: checklist aprovado pela cliente: (1) filtro "revisar migraç
 ARQUIVOS PERMITIDOS: nenhum
 NAO FAZER: nada em produção; Kira não faz PR para main nem deploy de produção nesta fila.
 RETORNO ESPERADO: o usuário confirma no chat (aprovado/ajustes); ajustes viram novas tasks.
+HISTORICO:
+
+## TASK-064 — Extrair helpers duplicados dos services de Despesas
+STATUS: PENDENTE
+AGENT: levi
+DEPENDENCIAS: TASK-046, TASK-056
+ESCOPO: eliminar a duplicacao entre expense-service, expense-category-service e expense-recurrence-service (leitura/validacao de categoria da empresa, deteccao de permission-denied, constantes de colecao e guarda de sessao) e o codigo morto de faixa de ano no recurrence, sem mudar comportamento.
+FLUXO: Melhoria
+CONTEXTO A LER: .claude/context/clean-code.md, .claude/context/regra-de-negocio.md (inteiro; §7, §8.1, §10), src/services/expense-service/expense-service.ts, src/services/expense-category-service/expense-category-service.ts, src/services/expense-recurrence-service/expense-recurrence-service.ts, src/services/expense-validation/expense-validation.ts, os specs dos tres services (somente leitura)
+CRITERIO DE ACEITE: (1) lerCategoriaDaEmpresa/assertCategoriaAtiva/ehNegacaoDePermissao/CODIGO_PERMISSAO_NEGADA/COLECAO_*/MSG_SEM_EMPRESA existem em um unico lugar; (2) assertDataDeNegocio e constantes ANO_* removidos do recurrence (assertDateKey ja cobre a faixa); (3) erro agregado do catch-up passa a carregar resultado parcial (RecurrenceCatchUpError com partial + failures) mantendo a mensagem; todos os specs dos tres services GREEN sem alteracao de assercao.
+ARQUIVOS PERMITIDOS: os tres services, src/services/expense-validation/expense-validation.ts, novo src/services/expense-firestore-guards/expense-firestore-guards.ts
+NAO FAZER: nao mudar comportamento nem mensagens verificadas pelos specs; nao alterar specs; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff resumido + saida dos runners. Gate: style.
 HISTORICO:

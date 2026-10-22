@@ -42,12 +42,17 @@ function idUnico(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// "Hoje" fixo para createSeries nos testes (nunca depende do relogio).
+const HOJE_REFERENCIA: DateKey = '2026-10-22';
+
 // Serie semeada direto no Firestore (fixture), sem passar pelo service sob teste.
+// A categoria do template e uma categoria REAL da mesma empresa (o catch-up revalida).
 async function semearSerie(
   contexto: EmulatorTestContext,
   companyId: string,
   parcial: Record<string, unknown> = {},
 ): Promise<string> {
+  const categoriaId = await semearCategoria(contexto, companyId);
   const ref = await addDoc(collection(contexto.firestore, 'expenseSeries'), {
     companyId,
     active: true,
@@ -56,7 +61,7 @@ async function semearSerie(
     template: {
       description: `Serie ${idUnico()}`,
       value: 99.9,
-      categoryId: 'cat_serie',
+      categoryId: categoriaId,
     },
     createdAt: Timestamp.now(),
     ...parcial,
@@ -137,14 +142,28 @@ async function contarDocs(
   return snap.size;
 }
 
+// createSeries recebe `today` explicito (decisao do Kira, §7.3 Limites): nenhum
+// teste depende do relogio. A chamada passa por cast para o spec nao depender
+// da assinatura exata do service enquanto ela evolui.
+type CreateSeriesComHoje = (
+  input: NewExpenseInput,
+  period: ExpenseRecurrencePeriod,
+  today: DateKey,
+) => Promise<{ seriesId: string; firstExpenseId: string }>;
+
+function createSeriesComHoje(service: ExpenseRecurrenceService): CreateSeriesComHoje {
+  return (service as unknown as { createSeries: CreateSeriesComHoje }).createSeries.bind(service);
+}
+
 // Rejeicao de createSeries que tambem prova que nada foi gravado (serie nem ocorrencia).
 async function expectCriarSerieRejeitadaSemGravar(
   service: ExpenseRecurrenceService,
   contexto: EmulatorTestSetup,
   input: NewExpenseInput,
   period: ExpenseRecurrencePeriod,
+  today: DateKey = HOJE_REFERENCIA,
 ): Promise<void> {
-  await expectRejeicaoDeRegra(() => service.createSeries(input, period));
+  await expectRejeicaoDeRegra(() => createSeriesComHoje(service)(input, period, today));
   const empresa = contexto.mockCompanyId as string;
   expect(await contarDocs(contexto, 'expenseSeries', empresa))
     .withContext('nenhuma serie gravada')
@@ -298,10 +317,11 @@ describe('ExpenseRecurrenceService - catch-up (REGRA CRITICA, emulador Firestore
 
     it('[RED] ocorrencia gerada nasce a_pagar, origin=recorrencia, com o template da serie', async () => {
       const empresa = setup.mockCompanyId as string;
+      const categoriaInternet = await semearCategoria(setup, empresa);
       const serieId = await semearSerie(setup, empresa, {
         anchorDate: '2026-03-15',
         period: 'mensal',
-        template: { description: 'Internet fixa', value: 120, categoryId: 'cat_internet' },
+        template: { description: 'Internet fixa', value: 120, categoryId: categoriaInternet },
       });
 
       await service.generateDueOccurrences(empresa, '2026-03-20');
@@ -313,7 +333,7 @@ describe('ExpenseRecurrenceService - catch-up (REGRA CRITICA, emulador Firestore
       expect(primeira.origin).toBe('recorrencia');
       expect(primeira.description).toBe('Internet fixa');
       expect(primeira.value).toBe(120);
-      expect(primeira.categoryId).toBe('cat_internet');
+      expect(primeira.categoryId).toBe(categoriaInternet);
       expect(primeira.companyId).toBe(empresa);
     });
   });
@@ -440,6 +460,7 @@ describe('ExpenseRecurrenceService - catch-up (REGRA CRITICA, emulador Firestore
       const resultado = await service.createSeries(
         novaSerieInput(categoriaId, { dueDate: '2026-03-15' }),
         'mensal',
+        HOJE_REFERENCIA,
       );
 
       expect(resultado.seriesId).withContext('seriesId preenchido').toBeTruthy();
@@ -454,6 +475,7 @@ describe('ExpenseRecurrenceService - catch-up (REGRA CRITICA, emulador Firestore
           value: 150.5,
         }),
         'mensal',
+        HOJE_REFERENCIA,
       );
       const serie = await lerSerie(setup, resultado.seriesId);
 
@@ -472,6 +494,7 @@ describe('ExpenseRecurrenceService - catch-up (REGRA CRITICA, emulador Firestore
       const resultado = await service.createSeries(
         novaSerieInput(categoriaId, { dueDate: '2026-03-15' }),
         'mensal',
+        HOJE_REFERENCIA,
       );
       const ocorrencias = await ocorrenciasDaSerie(setup, empresa, resultado.seriesId);
 
@@ -602,20 +625,28 @@ describe('ExpenseRecurrenceService - lote grande (CRITICA)', () => {
       .withContext('mais de 400 ocorrencias: exige mais de um lote de transacao')
       .toBeGreaterThan(400);
 
-    const primeira = await service.generateDueOccurrences(empresa, '2026-10-22');
+    // Teto de 399 por carregamento (§7.3 Limites): itera ate uma rodada gerar 0.
+    const RODADAS_MAXIMAS = 10;
+    let total = 0;
+    for (let rodada = 0; rodada < RODADAS_MAXIMAS; rodada++) {
+      const resultado = await service.generateDueOccurrences(empresa, '2026-10-22');
+      if (resultado.generated === 0) {
+        break;
+      }
+      total += resultado.generated;
+    }
+    const sobra = await service.generateDueOccurrences(empresa, '2026-10-22');
     const ocorrencias = await ocorrenciasDaSerie(setup, empresa, serieId);
     const ids = ocorrencias.map((o) => o.id);
 
-    expect(primeira.generated).withContext('contagem exata da 1a rodada').toBe(esperadas.length);
+    expect(total).withContext('soma das rodadas = contagem total exata').toBe(esperadas.length);
+    expect(sobra.generated).withContext('rodada final nao gera nada').toBe(0);
     expect(ocorrencias.length).withContext('contagem exata de docs').toBe(esperadas.length);
     expect(new Set(ids).size).withContext('ids unicos').toBe(ids.length);
     expect(datasDe(ocorrencias)).toEqual([...esperadas].sort());
     expect((await lerSerie(setup, serieId))?.['generatedThrough'])
       .withContext('generatedThrough = ultima data <= fim do mes')
       .toBe(esperadas[esperadas.length - 1]);
-
-    const segunda = await service.generateDueOccurrences(empresa, '2026-10-22');
-    expect(segunda.generated).withContext('2a rodada nao gera nada').toBe(0);
   }, 120000);
 });
 
@@ -770,7 +801,11 @@ describe('ExpenseRecurrenceService - serie envenenada (CRITICA)', () => {
       companyId: empresa,
       active: true,
       period: 'mensal',
-      template: { description: 'Serie', value: 10, categoryId: 'cat_x' },
+      template: {
+        description: 'Serie',
+        value: 10,
+        categoryId: await semearCategoria(setup, empresa),
+      },
       createdAt: Timestamp.now(),
     };
     await setDoc(doc(setup.firestore, 'expenseSeries', envenenadaId), {
@@ -794,5 +829,340 @@ describe('ExpenseRecurrenceService - serie envenenada (CRITICA)', () => {
     expect((await lerSerie(setup, envenenadaId))?.['generatedThrough'])
       .withContext('serie envenenada nao recebe marca-d agua')
       .toBeUndefined();
+  });
+});
+
+describe('ExpenseRecurrenceService - createSeries limite de 24 meses e faixa de ano (CRITICA)', () => {
+  let service: ExpenseRecurrenceService;
+  let setup: EmulatorTestSetup;
+  let categoriaId: string;
+
+  beforeEach(async () => {
+    setup = await setupFirestoreEmulatorTest();
+    service = configurarServico(setup);
+    categoriaId = await semearCategoria(setup, setup.mockCompanyId as string);
+  });
+
+  afterEach(async () => {
+    await setup.cleanup();
+  });
+
+  it('[RED] createSeries rejeita ancora mais de 24 meses no passado (21/10/2024 com hoje 22/10/2026)', async () => {
+    await expectCriarSerieRejeitadaSemGravar(
+      service,
+      setup,
+      novaSerieInput(categoriaId, { dueDate: '2024-10-21' }),
+      'mensal',
+      '2026-10-22',
+    );
+  });
+
+  it('[RED] createSeries aceita ancora exatamente 24 meses atras (22/10/2024 com hoje 22/10/2026)', async () => {
+    const empresa = setup.mockCompanyId as string;
+    const resultado = await createSeriesComHoje(service)(
+      novaSerieInput(categoriaId, { dueDate: '2024-10-22' }),
+      'mensal',
+      '2026-10-22',
+    );
+
+    expect(resultado.firstExpenseId).toBe(`${resultado.seriesId}_2024-10-22`);
+    expect(await contarDocs(setup, 'expenseSeries', empresa))
+      .withContext('serie gravada no limite')
+      .toBe(1);
+  });
+
+  it('[RED] createSeries rejeita dueDate 31/12/1999 (ano abaixo de 2000)', async () => {
+    await expectCriarSerieRejeitadaSemGravar(
+      service,
+      setup,
+      novaSerieInput(categoriaId, { dueDate: '1999-12-31' }),
+      'mensal',
+      '1999-12-31',
+    );
+  });
+
+  it('[RED] createSeries rejeita dueDate 01/01/2101 (ano acima de 2100)', async () => {
+    await expectCriarSerieRejeitadaSemGravar(
+      service,
+      setup,
+      novaSerieInput(categoriaId, { dueDate: '2101-01-01' }),
+      'mensal',
+      '2026-10-22',
+    );
+  });
+});
+
+describe('ExpenseRecurrenceService - teto por carregamento (CRITICA)', () => {
+  let service: ExpenseRecurrenceService;
+  let setup: EmulatorTestSetup;
+
+  beforeEach(async () => {
+    setup = await setupFirestoreEmulatorTest();
+    service = configurarServico(setup);
+  });
+
+  afterEach(async () => {
+    await setup.cleanup();
+  });
+
+  it('[RED] 1a chamada gera exatamente 399 ocorrencias; a 2a gera o proximo lote; sem duplicata', async () => {
+    const empresa = setup.mockCompanyId as string;
+    const serieId = await semearSerie(setup, empresa, {
+      anchorDate: '2018-10-01',
+      period: 'semanal',
+    });
+    const esperadas = ExpenseScheduleService.occurrenceDates(
+      '2018-10-01',
+      'semanal',
+      null,
+      '2026-10-31',
+    );
+    expect(esperadas.length).withContext('mais de 399 pendentes').toBeGreaterThan(399);
+
+    const primeira = await service.generateDueOccurrences(empresa, '2026-10-22');
+    expect(primeira.generated).withContext('teto de 399 na 1a chamada').toBe(399);
+    expect((await ocorrenciasDaSerie(setup, empresa, serieId)).length)
+      .withContext('399 docs apos a 1a chamada')
+      .toBe(399);
+    expect((await lerSerie(setup, serieId))?.['generatedThrough'])
+      .withContext('generatedThrough = 399a data')
+      .toBe(esperadas[398]);
+
+    const segunda = await service.generateDueOccurrences(empresa, '2026-10-22');
+    const ocorrencias = await ocorrenciasDaSerie(setup, empresa, serieId);
+    const ids = ocorrencias.map((o) => o.id);
+
+    expect(segunda.generated)
+      .withContext('2a chamada gera o restante')
+      .toBe(esperadas.length - 399);
+    expect(ocorrencias.length).toBe(esperadas.length);
+    expect(new Set(ids).size).withContext('ids unicos').toBe(ids.length);
+    expect(datasDe(ocorrencias)).toEqual([...esperadas].sort());
+  }, 120000);
+});
+
+describe('ExpenseRecurrenceService - template sujo e isolamento no catch-up (CRITICA)', () => {
+  let service: ExpenseRecurrenceService;
+  let setup: EmulatorTestSetup;
+
+  beforeEach(async () => {
+    setup = await setupFirestoreEmulatorTest();
+    service = configurarServico(setup);
+  });
+
+  afterEach(async () => {
+    await setup.cleanup();
+  });
+
+  // Serie invalida (aa_) e valida (zz_) gravadas direto: a invalida e lida primeiro,
+  // entao um service que aborta no 1o erro nao chega a valida.
+  async function expectTemplateSujoIsolado(
+    templateInvalido: Record<string, unknown>,
+  ): Promise<void> {
+    const empresa = setup.mockCompanyId as string;
+    const categoriaValida = await semearCategoria(setup, empresa);
+    const invalidaId = `aa_invalida_${idUnico()}`;
+    const validaId = `zz_valida_${idUnico()}`;
+    const base = {
+      companyId: empresa,
+      active: true,
+      period: 'mensal',
+      anchorDate: '2026-01-31',
+      createdAt: Timestamp.now(),
+    };
+    await setDoc(doc(setup.firestore, 'expenseSeries', invalidaId), {
+      ...base,
+      template: {
+        description: 'Ruim',
+        value: 10,
+        categoryId: categoriaValida,
+        ...templateInvalido,
+      },
+    });
+    await setDoc(doc(setup.firestore, 'expenseSeries', validaId), {
+      ...base,
+      template: { description: 'Boa', value: 99.9, categoryId: categoriaValida },
+    });
+
+    await expectRejeicaoDeRegra(() => service.generateDueOccurrences(empresa, '2026-03-10'));
+
+    expect((await ocorrenciasDaSerie(setup, empresa, invalidaId)).length)
+      .withContext('template sujo nao gera ocorrencia')
+      .toBe(0);
+    expect(datasDe(await ocorrenciasDaSerie(setup, empresa, validaId)))
+      .withContext('serie valida processada normalmente')
+      .toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
+  }
+
+  it('[RED] template.value NaN nao gera e nao bloqueia a serie valida', async () => {
+    await expectTemplateSujoIsolado({ value: NaN });
+  });
+
+  it('[RED] template.value 0 nao gera e nao bloqueia a serie valida', async () => {
+    await expectTemplateSujoIsolado({ value: 0 });
+  });
+
+  it('[RED] template.value negativo nao gera e nao bloqueia a serie valida', async () => {
+    await expectTemplateSujoIsolado({ value: -5 });
+  });
+
+  it('[RED] template.categoryId de outra empresa nao gera e nao bloqueia a serie valida', async () => {
+    const outra = await setupSecondUserContext();
+    try {
+      const categoriaAlheia = await semearCategoria(outra, outra.mockCompanyId as string);
+      await expectTemplateSujoIsolado({ categoryId: categoriaAlheia });
+    } finally {
+      await outra.cleanup();
+    }
+  });
+
+  it('[RED] generateDueOccurrences com companyId de outra empresa rejeita sem gerar nada em nenhuma empresa', async () => {
+    const outra = await setupSecondUserContext();
+    try {
+      const empresa = setup.mockCompanyId as string;
+      const empresaAlheia = outra.mockCompanyId as string;
+      const minhaSerie = await semearSerie(setup, empresa, {
+        anchorDate: '2026-01-31',
+        period: 'mensal',
+      });
+      const serieAlheia = await semearSerie(outra, empresaAlheia, {
+        anchorDate: '2026-01-31',
+        period: 'mensal',
+      });
+
+      await expectRejeicaoDeRegra(() =>
+        service.generateDueOccurrences(empresaAlheia, '2026-03-10'),
+      );
+
+      expect((await ocorrenciasDaSerie(setup, empresa, minhaSerie)).length)
+        .withContext('nenhuma ocorrencia na minha empresa')
+        .toBe(0);
+      expect((await ocorrenciasDaSerie(outra, empresaAlheia, serieAlheia)).length)
+        .withContext('nenhuma ocorrencia na empresa alheia')
+        .toBe(0);
+    } finally {
+      await outra.cleanup();
+    }
+  });
+});
+
+// Rejeicao de dominio: precisa lancar, nao ser o esqueleto e nao vazar erro de runtime.
+async function expectRejeicaoDeDominio(fn: () => Promise<unknown>): Promise<void> {
+  let lancou = false;
+  let mensagem = '';
+  try {
+    await promessaDe(fn);
+  } catch (erro) {
+    lancou = true;
+    mensagem = (erro as Error)?.message ?? '';
+  }
+  expect(lancou).withContext('a operacao deveria lancar').toBeTrue();
+  expect(mensagem)
+    .withContext('rejeicao vinda do esqueleto (not implemented)')
+    .not.toMatch(/not implemented/);
+  expect(mensagem)
+    .withContext('erro de runtime (TypeError) vazou em vez de mensagem de dominio')
+    .not.toMatch(/Cannot read properties|TypeError/);
+}
+
+describe('ExpenseRecurrenceService - today invalido (CRITICA)', () => {
+  let service: ExpenseRecurrenceService;
+  let setup: EmulatorTestSetup;
+
+  beforeEach(async () => {
+    setup = await setupFirestoreEmulatorTest();
+    service = configurarServico(setup);
+  });
+
+  afterEach(async () => {
+    await setup.cleanup();
+  });
+
+  async function expectTodayRejeitadoSemGerar(today: string): Promise<void> {
+    const empresa = setup.mockCompanyId as string;
+    const serieId = await semearSerie(setup, empresa, {
+      anchorDate: '2026-01-31',
+      period: 'mensal',
+    });
+
+    await expectRejeicaoDeRegra(() => service.generateDueOccurrences(empresa, today));
+
+    expect((await ocorrenciasDaSerie(setup, empresa, serieId)).length)
+      .withContext('nenhuma ocorrencia gerada com today invalido')
+      .toBe(0);
+    expect((await lerSerie(setup, serieId))?.['generatedThrough'])
+      .withContext('generatedThrough intocado')
+      .toBeUndefined();
+  }
+
+  it('[RED] today 2026-02-30 (data inexistente) rejeita e nao gera nada', async () => {
+    await expectTodayRejeitadoSemGerar('2026-02-30');
+  });
+
+  it('[RED] today "abc" (formato invalido) rejeita e nao gera nada', async () => {
+    await expectTodayRejeitadoSemGerar('abc');
+  });
+
+  it('[RED] today 1999-12-31 (fora da faixa 2000..2100) rejeita e nao gera nada', async () => {
+    await expectTodayRejeitadoSemGerar('1999-12-31');
+  });
+
+  it('[RED] today 2101-01-01 (fora da faixa 2000..2100) rejeita e nao gera nada', async () => {
+    await expectTodayRejeitadoSemGerar('2101-01-01');
+  });
+});
+
+describe('ExpenseRecurrenceService - anchorDate corrompido na serie (CRITICA)', () => {
+  let service: ExpenseRecurrenceService;
+  let setup: EmulatorTestSetup;
+
+  beforeEach(async () => {
+    setup = await setupFirestoreEmulatorTest();
+    service = configurarServico(setup);
+  });
+
+  afterEach(async () => {
+    await setup.cleanup();
+  });
+
+  // Serie corrompida (aa_) lida antes da valida (zz_): a valida precisa ser processada.
+  async function expectAnchorCorrompidoIsolado(
+    camposCorrompidos: Record<string, unknown>,
+    removerAnchor: boolean,
+  ): Promise<void> {
+    const empresa = setup.mockCompanyId as string;
+    const corrompidaId = `aa_corrompida_${idUnico()}`;
+    const validaId = `zz_valida_${idUnico()}`;
+    const categoriaValida = await semearCategoria(setup, empresa);
+    const base: Record<string, unknown> = {
+      companyId: empresa,
+      active: true,
+      period: 'mensal',
+      template: { description: 'Serie', value: 10, categoryId: categoriaValida },
+      createdAt: Timestamp.now(),
+    };
+    const corrompida: Record<string, unknown> = { ...base, ...camposCorrompidos };
+    if (removerAnchor) {
+      delete corrompida['anchorDate'];
+    }
+    await setDoc(doc(setup.firestore, 'expenseSeries', corrompidaId), corrompida);
+    await setDoc(doc(setup.firestore, 'expenseSeries', validaId), {
+      ...base,
+      anchorDate: '2026-01-31',
+    });
+
+    await expectRejeicaoDeDominio(() => service.generateDueOccurrences(empresa, '2026-03-10'));
+
+    expect(datasDe(await ocorrenciasDaSerie(setup, empresa, validaId)))
+      .withContext('serie valida processada normalmente')
+      .toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
+  }
+
+  it('[RED] serie sem anchorDate (campo removido) nao lanca TypeError e nao bloqueia a valida', async () => {
+    await expectAnchorCorrompidoIsolado({}, true);
+  });
+
+  it('[RED] serie com anchorDate numerico (123) nao lanca TypeError e nao bloqueia a valida', async () => {
+    await expectAnchorCorrompidoIsolado({ anchorDate: 123 }, false);
   });
 });
