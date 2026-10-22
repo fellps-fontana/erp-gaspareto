@@ -1,0 +1,102 @@
+<div class="category-manager">
+  <h2>Categorias de Despesa</h2>
+
+  <div class="nova-categoria">
+    <div class="form-group grow">
+      <label>Nome *</label>
+      <input
+        type="text"
+        name="novoNome"
+        [disabled]="carregando"
+        [(ngModel)]="novoNome"
+        placeholder="Ex: Contabilidade"
+        (keyup.enter)="criar()"
+      />
+    </div>
+    <div class="form-group">
+      <label>Tipo * (não pode ser alterado depois)</label>
+      <select name="novoTipo" [disabled]="carregando" [(ngModel)]="novoTipo">
+        <option value="">Selecione...</option>
+        <option *ngFor="let t of typeOptions" [value]="t">{{ typeLabels[t] }}</option>
+      </select>
+    </div>
+    <button type="button" class="btn-salvar" [disabled]="carregando" (click)="criar()">
+      ADICIONAR
+    </button>
+  </div>
+
+  <p class="vazio" *ngIf="carregando">Carregando categorias...</p>
+  <p class="vazio" *ngIf="!carregando && categorias.length === 0">Nenhuma categoria cadastrada.</p>
+
+  <ul class="lista">
+    <li *ngFor="let c of categorias" class="item" [class.arquivada]="c.archived">
+      <div class="item-info">
+        <ng-container *ngIf="editandoId !== c.id; else edicao">
+          <span class="item-nome">{{ c.name }}</span>
+        </ng-container>
+        <ng-template #edicao>
+          <input
+            type="text"
+            class="input-edicao"
+            name="nomeEditado"
+            [(ngModel)]="nomeEditado"
+            (keyup.enter)="confirmarRenomear(c)"
+            (keyup.escape)="cancelarRenomear()"
+          />
+        </ng-template>
+        <span class="tag" [ngClass]="'tag-' + c.type">{{ typeLabels[c.type] }}</span>
+        <span class="tag tag-arquivada" *ngIf="c.archived">Arquivada</span>
+      </div>
+
+      <div class="item-acoes">
+        <ng-container *ngIf="editandoId !== c.id; else acoesEdicao">
+          <button type="button" class="btn-acao" (click)="iniciarRenomear(c)">Renomear</button>
+          <button type="button" class="btn-acao" (click)="alternarArquivo(c)">
+            {{ c.archived ? 'Reativar' : 'Arquivar' }}
+          </button>
+          <button
+            type="button"
+            class="btn-acao btn-excluir"
+            *ngIf="!temVinculo(c)"
+            (click)="openCategoryDeleteModal(c)"
+          >
+            Excluir
+          </button>
+        </ng-container>
+        <ng-template #acoesEdicao>
+          <button type="button" class="btn-acao" (click)="confirmarRenomear(c)">Salvar</button>
+          <button type="button" class="btn-acao" (click)="cancelarRenomear()">Cancelar</button>
+        </ng-template>
+      </div>
+
+      <p class="item-aviso" *ngIf="temVinculo(c)">
+        Possui despesas ou recorrências vinculadas: só pode ser arquivada.
+      </p>
+    </li>
+  </ul>
+
+  <div class="form-actions">
+    <button type="button" class="btn-cancelar" (click)="fechar()">FECHAR</button>
+  </div>
+
+  <!-- MODAL DE EXCLUSÃO -->
+  <div class="modal-overlay" *ngIf="isCategoryDeleteModalOpen" (click)="closeCategoryDeleteModal()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-icon">⚠️</div>
+      <h2>Excluir Categoria?</h2>
+      <div class="modal-info" *ngIf="categoryToDelete">
+        <p>Você está prestes a excluir:</p>
+        <strong>{{ categoryToDelete.name }}</strong>
+        <p class="modal-aviso">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancelar" (click)="closeCategoryDeleteModal()">
+          CANCELAR
+        </button>
+        <button type="button" class="btn-perigo" (click)="confirmCategoryDelete()">
+          SIM, EXCLUIR
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

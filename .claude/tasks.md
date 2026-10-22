@@ -987,7 +987,7 @@ HISTORICO: 2026-10-22 — hanzo: ExpenseFormComponent (unica/parcelada/recorrent
 
 
 ## TASK-053 — Componente ExpenseCategoryManager
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-042
 ESCOPO: criar componente standalone `expense-category-manager` para listar categorias com tag de tipo, criar nova (nome + escolha obrigatória do tipo), renomear, arquivar/desarquivar e excluir (só se sem vínculo; erro do service vira notif.warning clara).
@@ -997,7 +997,8 @@ CRITERIO DE ACEITE: (1) tipo só escolhido na criação e exibido (somente leitu
 ARQUIVOS PERMITIDOS: src/components/expense-category-manager/expense-category-manager.ts, src/components/expense-category-manager/expense-category-manager.html, src/components/expense-category-manager/expense-category-manager.css
 NAO FAZER: não alterar o service; não editar outros arquivos; não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivos + `ng build` sem erro.
-HISTORICO:
+HISTORICO: 2026-10-22 — hanzo: ExpenseCategoryManagerComponent (@Input categoryIdsInUse: ReadonlySet<string> calculado pelo pai; @Output closed; exporta EXPENSE_CATEGORY_TYPE_LABELS). style PRECISA CORRIGIR (1 rodada): corrida — criar categoria antes do seed terminar impedia o seed unico para sempre -> form travado ate ensureDefaults + 1o snapshot; window confirm() -> modal padrao do projeto com CSS local (bills sera apagado na 061). 2a revisao APROVADO. Obs nao bloqueante: erro no stream getCategories deixa o form travado (tratar com error: no subscribe numa task futura). Mobile via @media no proprio .css (restricao de arquivos).
+
 
 ## TASK-054 — Tela Despesas (/contas): mês, cards, grupos, ações e filtros
 STATUS: PENDENTE
@@ -1013,7 +1014,7 @@ RETORNO ESPERADO: arquivos + `ng build` sem erro + descrição do fluxo. Gate: s
 HISTORICO:
 
 ## TASK-055 — [TDD RED] Balanço: gastosPeriodo/resultadoFinal por despesas (competência)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-040, TASK-042
 ESCOPO: ampliar product-inventory.spec.ts com testes dos getters de Balanço/Despesas do ProductInventory (mocks de ExpenseService/ExpenseCategoryService/ExpenseRecurrenceService) e confirmar RED contra a implementação atual (baseada em bills).
@@ -1023,7 +1024,8 @@ CRITERIO DE ACEITE: contrato de membros do componente a testar — `despesas`, `
 ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.spec.ts
 NAO FAZER: não editar o componente; não remover provider de BillService/PurchaseProductService ainda; não editar .claude/tasks.md.
 RETORNO ESPERADO: testes + saída RED.
-HISTORICO:
+HISTORICO: 2026-10-22 — mike: 12 testes RED em product-inventory.spec.ts (sem emulador): gastosPeriodo por dueDate em qualquer status, limites inclusivos, custo_producao fora, orfa operacional, centavos; custoProducaoPeriodo; resultadoFinal; gastosPorCategoria. Semeou bill pago de 999 no periodo para o RED ser honesto. Mocks de ExpenseService/Category/Recurrence adicionados; BillService/PurchaseProductService mantidos.
+
 
 ## TASK-056 — product-inventory.ts: lógica de Despesas/Balanço e remoção da aba Compras
 STATUS: PENDENTE
