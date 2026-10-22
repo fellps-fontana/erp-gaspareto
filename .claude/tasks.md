@@ -845,7 +845,7 @@ RETORNO ESPERADO: arquivos implementados + saída do runner. Gate: style + gon (
 HISTORICO:
 
 ## TASK-043 — [TDD RED] firestore.rules para expenses/expenseCategories/expenseSeries
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-036
 ESCOPO: estender test/firestore.rules.spec.ts cobrindo as 3 coleções novas (isolamento por companyId, super-admin, update sem trocar companyId, anônimo negado) e confirmar RED.
@@ -855,10 +855,11 @@ CRITERIO DE ACEITE: (1) para cada uma das 3 coleções: leitura/criação/atuali
 ARQUIVOS PERMITIDOS: test/firestore.rules.spec.ts
 NAO FAZER: não editar firestore.rules; não remover casos existentes; não editar .claude/tasks.md.
 RETORNO ESPERADO: casos adicionados + saída de `npm run test:rules` com RED válido.
-HISTORICO:
+HISTORICO: 2026-10-22 — mike: 42 casos novos (14 x 3 colecoes) + 3 colecoes nas 2 listas existentes do spec. RED: 15 falhas/99 por PERMISSION_DENIED. Casos negativos passavam pelo motivo errado ate a TASK-044.
+
 
 ## TASK-044 — firestore.rules e índices das coleções de Despesas
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-043
 ESCOPO: adicionar 'expenses', 'expenseCategories', 'expenseSeries' em isOperationalCollection e o índice composto de expenses (companyId ASC, dueDate DESC) em firestore.indexes.json, mantendo bills e purchaseProducts.
@@ -868,7 +869,8 @@ CRITERIO DE ACEITE: (1) `npm run test:rules` 100% GREEN (casos novos e antigos);
 ARQUIVOS PERMITIDOS: firestore.rules, firestore.indexes.json
 NAO FAZER: não executar deploy; não remover bills/purchaseProducts; não editar o spec; não editar .claude/tasks.md.
 RETORNO ESPERADO: diff + saída do test:rules. Gate: style + gon (autorização).
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: 3 colecoes em isOperationalCollection (firestore.rules:26) + indice expenses(companyId ASC, dueDate DESC). test:rules 99/99. style APROVADO. gon APROVADO; achado baixo registrado como melhoria futura: squatting de id deterministico de categoria padrao (`${companyId}_${systemKey}`) por outro tenant que conheca o companyId — blindagem possivel exigindo docId com prefixo companyId_ na criacao de expenseCategories. Informativo: sem checagem de papel nas colecoes de despesas (igual as demais operacionais).
+
 
 ## TASK-045 — [TDD RED] ExpenseRecurrenceService (catch-up idempotente)
 STATUS: PENDENTE
