@@ -1,0 +1,151 @@
+.gastos-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-md);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.gastos-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--sp-lg);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.gastos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-md);
+}
+
+.gastos-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.gastos-fechar {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.gastos-fechar:hover {
+  color: var(--color-primary);
+}
+
+.gastos-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-md);
+  margin-bottom: var(--sp-md);
+  background: var(--bg-muted);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-primary);
+}
+
+.gastos-total strong {
+  font-size: 1.2rem;
+}
+
+.gastos-vazio {
+  margin: 0 0 var(--sp-md);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.gastos-lista {
+  list-style: none;
+  margin: 0 0 var(--sp-md);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.gastos-linha {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--sp-xs) var(--sp-sm);
+  align-items: center;
+}
+
+.gastos-nome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gastos-pct {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.gastos-valor {
+  min-width: 90px;
+  text-align: right;
+}
+
+.gastos-barra {
+  grid-column: 1 / -1;
+  height: 6px;
+  background: var(--bg-muted);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.gastos-barra-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
+}
+
+.gastos-cmv {
+  padding: var(--sp-md);
+  background: transparent;
+  border: 1px dashed var(--color-info);
+  border-radius: var(--radius-md);
+}
+
+.gastos-cmv-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.gastos-cmv-tag {
+  padding: 2px var(--sp-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-info);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.gastos-cmv-nota {
+  margin: var(--sp-sm) 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .gastos-modal {
+    padding: var(--sp-md);
+  }
+}

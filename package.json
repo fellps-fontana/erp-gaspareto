@@ -11,6 +11,8 @@
     "test": "ng test",
     "test:rules:only": "jest test/firestore.rules.spec.ts",
     "test:rules": "firebase emulators:exec --only firestore,auth \"npm run test:rules:only\"",
+    "test:migration": "node --test test/expense-migration-core.test.mjs",
+    "test:migration:emulator": "firebase emulators:exec --only firestore --project hologaerp \"node --test --test-reporter=spec test/migrate-bills-to-expenses.emulator.test.mjs\"",
     "seed:demo": "node scripts/seed-demo.mjs",
     "seed:demo:hml": "node scripts/seed-demo.mjs --target=hml",
     "deploy:rules:staging": "firebase deploy --only firestore:rules,firestore:indexes --project hml",

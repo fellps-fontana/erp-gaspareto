@@ -916,7 +916,7 @@ RETORNO ESPERADO: contagem exata e veredito.
 HISTORICO:
 
 ## TASK-048 — [TDD RED] Núcleo e script da migração bills/purchaseProducts -> expenses
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-036
 ESCOPO: escrever os testes node:test do núcleo puro e um teste de integração do script contra o Firestore Emulator (Admin SDK), confirmando RED.
@@ -926,7 +926,8 @@ CRITERIO DE ACEITE: (1) status: pendente->a_pagar; recebido->a_pagar+goodsReceiv
 ARQUIVOS PERMITIDOS: test/expense-migration-core.test.mjs, test/migrate-bills-to-expenses.emulator.test.mjs, package.json (somente adicionar scripts `test:migration` e `test:migration:emulator`)
 NAO FAZER: não editar scripts/ nem src/; não rodar contra projeto real; não editar .claude/tasks.md.
 RETORNO ESPERADO: lista de testes + saída RED + comandos de execução.
-HISTORICO:
+HISTORICO: 2026-10-22 — mike: test/expense-migration-core.test.mjs (53 testes; RED 52 por not implemented, 1 de paridade de categorias passa por construcao — guarda de regressao) + test/migrate-bills-to-expenses.emulator.test.mjs (7; RED por script ausente) + scripts npm test:migration/test:migration:emulator. Contrato de report nao estava no esqueleto: Kira fixou formato no briefing da TASK-049 (byStatus, byCategory, revisar, skipped, created + ids ignorados no stdout).
+
 
 ## TASK-049 — Implementar núcleo e script de migração (hml only)
 STATUS: PENDENTE
@@ -968,7 +969,7 @@ RETORNO ESPERADO: o usuário confirma no chat + cola o relatório do script.
 HISTORICO:
 
 ## TASK-052 — Componente ExpenseForm (única / parcelada / recorrente)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-040
 ESCOPO: criar componente standalone `expense-form` (template-driven, ngModel) para criar/editar despesa com modo único, parcelado (N, preview das parcelas via ExpenseScheduleService.buildInstallments) e recorrente (semanal/mensal), emitindo o payload por @Output.
@@ -978,7 +979,8 @@ CRITERIO DE ACEITE: (1) campos: descrição, valor, categoria (só não arquivad
 ARQUIVOS PERMITIDOS: src/components/expense-form/expense-form.ts, src/components/expense-form/expense-form.html, src/components/expense-form/expense-form.css, src/components/expense-form/expense-form-mobile.css
 NAO FAZER: não chamar Firestore/services de escrita (só emite evento); não calcular parcela fora do ExpenseScheduleService; não editar outros arquivos; não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivos + contrato de @Input/@Output + `ng build` sem erro.
-HISTORICO:
+HISTORICO: 2026-10-22 — hanzo: ExpenseFormComponent (unica/parcelada/recorrente; preview via buildInstallments; aviso ancora > 24 meses). style PRECISA CORRIGIR (1 rodada): ngOnChanges sobrescrevia digitacao quando categories reemitia e nao resetava em expense=null (MEDIA); getter de preview recalculado 5x/ciclo; "24 meses" hardcoded; outputs com nome nativo -> saved/cancelled. 2a revisao: APROVADO. Obs: aviso de ancora usa fuso America/Sao_Paulo (toDateKey) e a §7.1 fala em "data local do navegador" — divergencia so de texto, cliente opera no Brasil.
+
 
 ## TASK-053 — Componente ExpenseCategoryManager
 STATUS: PENDENTE
@@ -1046,7 +1048,7 @@ RETORNO ESPERADO: contagem e veredito.
 HISTORICO:
 
 ## TASK-058 — Componentes do relatório de Despesas (pizza, barras 12 meses, modal Gastos)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-040
 ESCOPO: criar `expense-report-panel` (pizza por categoria no período + barras dos 12 meses, Chart.js) e `gastos-breakdown-modal` (breakdown operacional + bloco separado "já incluso no CMV" só informativo), recebendo dados por @Input.
@@ -1056,7 +1058,8 @@ CRITERIO DE ACEITE: (1) painel usa ExpenseReportService.breakdownPorCategoria e 
 ARQUIVOS PERMITIDOS: src/components/expense-report-panel/expense-report-panel.ts, src/components/expense-report-panel/expense-report-panel.html, src/components/expense-report-panel/expense-report-panel.css, src/components/gastos-breakdown-modal/gastos-breakdown-modal.ts, src/components/gastos-breakdown-modal/gastos-breakdown-modal.html, src/components/gastos-breakdown-modal/gastos-breakdown-modal.css
 NAO FAZER: não editar product-inventory; não consultar Firestore (só @Input); não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivos + contrato de @Input/@Output + `ng build` sem erro.
-HISTORICO:
+HISTORICO: 2026-10-22 — hanzo: ExpenseReportPanelComponent (rosca por categoria + barras 12 meses empilhadas por tipo) e GastosBreakdownModalComponent (operacional + bloco "Ja incluso no CMV"). style PRECISA CORRIGIR (1 rodada): prettier, sufixo Component, output close->closed + Esc. 2a revisao: APROVADO. Tolerado: cores de eixo/grade do Chart.js fixas p/ tema escuro (mesmo precedente do product-inventory).
+
 
 ## TASK-059 — product-inventory.html/.css: sub-aba Despesas, Balanço e modal Gastos
 STATUS: PENDENTE

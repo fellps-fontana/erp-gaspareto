@@ -1,0 +1,148 @@
+.expense-form {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.expense-form h2 {
+  margin: 0;
+}
+
+.modo-tabs {
+  display: flex;
+  gap: var(--sp-sm);
+}
+
+.modo-tabs button {
+  flex: 1;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--sp-sm) var(--sp-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modo-tabs button.active {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  border-color: var(--color-primary);
+}
+
+.row {
+  display: flex;
+  gap: var(--sp-md);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  min-width: 0;
+}
+
+.form-group.grow {
+  flex: 1;
+}
+
+.form-group label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--sp-sm) var(--sp-md);
+  font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.modo-box {
+  background: var(--bg-muted);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--sp-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.preview-titulo {
+  margin: 0 0 var(--sp-sm);
+  color: var(--text-primary);
+}
+
+.preview-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.preview-lista li {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--sp-xs) 0;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.aviso {
+  margin: 0;
+  color: var(--color-warning);
+  font-size: 0.9rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-sm);
+}
+
+.btn-cancelar,
+.btn-salvar {
+  border-radius: var(--radius-md);
+  padding: 12px 24px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-cancelar {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-cancelar:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.btn-salvar {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  border: none;
+}
+
+.btn-salvar:hover {
+  background: var(--color-primary-dark);
+}
