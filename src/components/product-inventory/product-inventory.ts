@@ -3,9 +3,25 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Chart, registerables } from 'chart.js';
-import { Observable, of, combineLatest } from 'rxjs';
+import { Observable, Subscription, of, combineLatest } from 'rxjs';
 
 Chart.register(...registerables);
+
+/** Qual dos três cards clicáveis do Relatório abriu o modal de detalhe. */
+export type DetalheRelatorio = 'faturamento' | 'cmv' | 'lucro';
+/** 'vendas' = filtros completos da aba Vendas; 'balanco' = só o período (aba Balanço). */
+export type EscopoDetalhe = 'vendas' | 'balanco';
+
+const TITULO_DETALHE: Record<DetalheRelatorio, string> = {
+  faturamento: 'Faturamento',
+  cmv: 'Custo (CMV)',
+  lucro: 'Lucro Bruto'
+};
+
+/** Tokens (identidade-visual.md) usados em sequência nas fatias da pizza; 'Outros' usa --text-muted. */
+const TOKENS_PALETA = ['--color-primary', '--color-info', '--color-secondary-dark', '--color-danger', '--color-warning'];
+
+const CARDS_VAZIOS: CardsRelatorio = { faturamento: 0, custoTotal: 0, lucro: 0, qtdVendas: 0, margem: 0 };
 
 // Models e Services
 import { Product } from '../../models/product-model';
@@ -32,6 +48,12 @@ import { CustomerRecurringOrdersComponent } from '../customer-recurring-orders/c
 import { filtrarPorTermo } from './busca-por-nome';
 import { calcularTotalItemPorPeso } from '../../services/product-service/product-weight-rules';
 import { MovimentoMes, PanoramaAnual, calcularAReceberTotal, calcularRecebidoNoPeriodo, listarMovimentoDoMes, montarPanoramaAnual } from '../../services/order-service/order-receivables-rules';
+import {
+  CardsRelatorio, DetalheFaturamento, FatiaProduto, FiltroRelatorio, LinhaCmv, LinhaLucro, ModoTop,
+  NomesClientes, OrigemVenda, ProdutosPorId, RankingQuantidade, VendaFiltrada, VendaRelatorio,
+  calcularCards, filtrarVendas, filtroSomentePeriodo, modoTopEfetivo, montarDetalheCmv,
+  montarDetalheFaturamento, montarDetalheLucro, rankingTopQuantidade, serieDiaria
+} from '../../services/sale-service/sale-report-rules';
 
 // --- HISTÓRICO GERAL: item de produto dentro de um lançamento unificado ---
 // Snapshot preservado (priceAtSale/priceAtCost) igual Sale/Order/Comanda —
@@ -95,7 +117,7 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   filtroDataInicio: string = '';
   filtroDataFim: string = '';
   filtroProdutoId: string = '';
-  filtroOrigem: string = 'todos'; // 'todos' | 'pdv' | 'order'
+  filtroOrigem: OrigemVenda | 'todos' = 'todos';
   filtroClienteId: string = '';
   filtroFormaPagamento: PaymentMethod | 'todos' = 'todos';
   filtrosRelatorioVisiveis: boolean = false;
@@ -105,13 +127,36 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   productToDelete: Product | null = null;
 
   // --- DADOS DO RELATÓRIO ---
-  relatorio = {
-    faturamento: 0,
-    custoTotal: 0,
-    lucro: 0,
-    qtdVendas: 0,
-    margem: 0
-  };
+  // Números vêm de sale-report-rules (calcularCards); o componente só guarda e exibe.
+  /** Snapshot cru de getSalesByDate — fonte única de onde tudo abaixo deriva. */
+  vendasBase: VendaRelatorio[] = [];
+  /** Vendas que passaram em todos os filtros da aba Vendas. */
+  vendasFiltradas: VendaFiltrada[] = [];
+  /** Vendas do período apenas (aba Balanço ignora produto/origem/cliente/forma). */
+  vendasBalanco: VendaFiltrada[] = [];
+  relatorio: CardsRelatorio = { ...CARDS_VAZIOS };
+  relatorioBalanco: CardsRelatorio = { ...CARDS_VAZIOS };
+  private vendasSub: Subscription | null = null;
+
+  // --- MODAIS DE DETALHE (Faturamento / CMV / Lucro Bruto) ---
+  detalheAberto: DetalheRelatorio | null = null;
+  detalheEscopo: EscopoDetalhe = 'vendas';
+  detalheFaturamento: DetalheFaturamento | null = null;
+  linhasCmv: LinhaCmv[] = [];
+  linhasLucro: LinhaLucro[] = [];
+  /** Quantas linhas do CMV têm custo zero (aviso no topo do modal). */
+  cmvLinhasSemCusto = 0;
+  /** Texto do período e filtros ativos do escopo aberto (cabeçalho do modal). */
+  detalhePeriodo = '';
+  detalheFiltrosAtivos: string[] = [];
+  /** Cor de cada fatia da pizza (mesma ordem de fatias), resolvida dos tokens. */
+  coresPizza: string[] = [];
+  faturamentoPizzaChart: Chart | null = null;
+  faturamentoDiaChart: Chart | null = null;
+
+  // --- TOP 5 (unidade e kg nunca se misturam) ---
+  topModo: ModoTop = 'unidade';
+  ranking: RankingQuantidade = { unidade: [], peso: [] };
 
   // --- RECEBÍVEIS (valores vêm de order-receivables-rules; o componente só guarda e exibe) ---
   recebidoNoPeriodo = 0;
@@ -133,8 +178,8 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   movimentosMesDetalhe: MovimentoMes[] = [];
 
   // --- CHART INSTANCES ---
-  salesChart: any;
-  topProductsChart: any;
+  salesChart: Chart | null = null;
+  topProductsChart: Chart | null = null;
 
   // --- DADOS PARA CADASTRO / EDIÇÃO (CAMPOS NOVOS ADICIONADOS) ---
   novoProduto: Omit<Product, 'companyId'> = {
@@ -292,6 +337,7 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     this.productService.getProducts().subscribe(data => {
       this.products = data;
       this.isLoading = false;
+      this.recalcularSeHaVendas(); // nomes/peso de produto entram no Top 5 e nos modais
     });
 
     // 2. Define datas iniciais como HOJE
@@ -305,6 +351,7 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     // 4. Carrega clientes em tempo real
     this.customerService.getCustomers().subscribe(data => {
       this.customers = data;
+      this.recalcularSeHaVendas(); // nome do cliente entra nos modais
     });
 
     // 5. Carrega contas a pagar em tempo real
@@ -555,8 +602,20 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
       .reduce((s, b) => s + b.value, 0);
   }
 
+  /** Balanço olha só o período: faturamento e CMV vêm de relatorioBalanco, não dos filtros da aba Vendas. */
   get resultadoFinal(): number {
-    return this.relatorio.faturamento - this.relatorio.custoTotal - this.gastosPeriodo;
+    return this.relatorioBalanco.faturamento - this.relatorioBalanco.custoTotal - this.gastosPeriodo;
+  }
+
+  /** Subtotal "= Lucro Bruto" da Composição do Resultado (faturamento - CMV do período). */
+  get lucroBrutoBalanco(): number {
+    return this.relatorioBalanco.lucro;
+  }
+
+  /** Margem líquida = Resultado Final / faturamento do período; 0 sem faturamento. */
+  get margemLiquida(): number {
+    const faturamento = this.relatorioBalanco.faturamento;
+    return faturamento > 0 ? (this.resultadoFinal / faturamento) * 100 : 0;
   }
 
   get billsFiltradosRelatorio(): Bill[] {
@@ -626,51 +685,26 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   // ==========================================================
   // ABA 1: RELATÓRIO FINANCEIRO
   // ==========================================================
+  /** Único lugar que monta o filtro de venda a partir dos filtro* atuais. */
+  get filtroRelatorio(): FiltroRelatorio {
+    return {
+      inicio: new Date(this.filtroDataInicio + 'T00:00:00'),
+      fim: new Date(this.filtroDataFim + 'T23:59:59'),
+      produtoId: this.filtroProdutoId,
+      origem: this.filtroOrigem,
+      clienteId: this.filtroClienteId,
+      formaPagamento: this.filtroFormaPagamento
+    };
+  }
+
+  /** (Re)assina o Firestore para o período atual (cancelando a assinatura anterior) e recalcula. */
   atualizarRelatorio() {
-    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
-    const fim = new Date(this.filtroDataFim + 'T23:59:59');
+    const { inicio, fim } = this.filtroRelatorio;
 
-    this.saleService.getSalesByDate(inicio, fim).subscribe(todasAsVendas => {
-      // Venda cancelada nunca entra em faturamento, custo, lucro, contagem nem gráficos.
-      const vendas = todasAsVendas.filter((v: any) => v.status !== 'canceled');
-      let faturamento = 0;
-      let custo = 0;
-      let contagemVendas = 0;
-
-      vendas.forEach((venda: any) => {
-        // Filtro por Origem (PDV vs Pedidos/Massa)
-        if (this.filtroOrigem !== 'todos' && venda.sale_type !== this.filtroOrigem) return;
-
-        // Filtro por Cliente — PDV nunca terá customerId, só pedidos com vínculo passam
-        if (this.filtroClienteId && venda.customerId !== this.filtroClienteId) return;
-
-        // Filtro por Forma de Pagamento
-        if (this.filtroFormaPagamento !== 'todos' && venda.paymentMethod !== this.filtroFormaPagamento) return;
-
-        let vendaEntrouNoFiltro = false;
-        if (venda.items) {
-          venda.items.forEach((item: any) => {
-            if (this.filtroProdutoId && item.idProduct !== this.filtroProdutoId) return;
-
-            faturamento += (item.priceAtSale * item.quantity);
-            custo += ((item.priceAtCost || 0) * item.quantity);
-            vendaEntrouNoFiltro = true;
-          });
-        }
-        if (vendaEntrouNoFiltro) contagemVendas++;
-      });
-
-      const lucro = faturamento - custo;
-      this.relatorio = {
-        faturamento,
-        custoTotal: custo,
-        lucro,
-        qtdVendas: contagemVendas,
-        margem: faturamento > 0 ? (lucro / faturamento * 100) : 0
-      };
-
-      // Atualiza os gráficos com os dados filtrados
-      this.renderCharts(vendas);
+    this.vendasSub?.unsubscribe();
+    this.vendasSub = this.saleService.getSalesByDate(inicio, fim).subscribe(vendas => {
+      this.vendasBase = vendas;
+      this.recalcularRelatorio();
     });
 
     // Atualiza o painel de comissões da sub-aba Vendedores (mesmo período filtrado).
@@ -678,7 +712,37 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     this.atualizarRecebiveis();
   }
 
+  /** Filtra a base uma vez por escopo (Vendas e Balanço) e deriva cards, gráficos e modal aberto. */
+  private recalcularRelatorio() {
+    const filtro = this.filtroRelatorio;
+    this.vendasFiltradas = filtrarVendas(this.vendasBase, filtro);
+    this.relatorio = calcularCards(this.vendasFiltradas);
+    this.vendasBalanco = filtrarVendas(this.vendasBase, filtroSomentePeriodo(filtro));
+    this.relatorioBalanco = calcularCards(this.vendasBalanco);
+    this.ranking = rankingTopQuantidade(this.vendasFiltradas, this.produtosPorId());
+
+    this.agendarGraficosVendas();
+    if (this.detalheAberto) this.recalcularDetalhe();
+  }
+
+  /** Produtos/clientes chegam depois das vendas; só reprocessa se já houver base. */
+  private recalcularSeHaVendas() {
+    if (this.vendasBase.length > 0) this.recalcularRelatorio();
+  }
+
+  private produtosPorId(): ProdutosPorId {
+    return new Map(this.products.filter(p => !!p.id).map(p => [p.id!, p]));
+  }
+
+  private nomesClientes(): NomesClientes {
+    return new Map(this.customers.filter(c => !!c.id).map(c => [c.id!, c.name]));
+  }
+
   ngOnDestroy() {
+    this.vendasSub?.unsubscribe();
+    this.vendasSub = null;
+    this.destruirGraficosVendas();
+    this.destruirGraficosDetalhe();
     this.receberChart?.destroy();
     this.receberChart = null;
   }
@@ -691,6 +755,9 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   selecionarReportTab(tab: ProductInventoryComponent['reportTab']) {
     this.reportTab = tab;
     this.fecharMesDetalhe();
+    this.fecharDetalhe();
+    this.destruirGraficosVendas(); // o canvas some pelo *ngIf; ao voltar para Vendas é redesenhado
+    if (tab === 'vendas') this.agendarGraficosVendas();
     if (tab === 'receber') {
       this.atualizarPanorama();
     } else {
@@ -705,10 +772,15 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
       this.receberChart?.destroy();
       this.receberChart = null;
       this.fecharMesDetalhe();
+      this.fecharDetalhe();
+      this.destruirGraficosVendas();
     }
     this.activeTab = tab;
     if (tab === 'relatorio' && this.reportTab === 'receber') {
       this.recalcularPanorama();
+    }
+    if (tab === 'relatorio' && this.reportTab === 'vendas') {
+      this.agendarGraficosVendas();
     }
   }
 
@@ -819,63 +891,50 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   }
 
   // --- LÓGICA DE GRÁFICOS ---
-  renderCharts(vendas: any[]) {
-    this.renderSalesHistoryChart(vendas);
-    this.renderTopProductsChart(vendas);
+  // Todos derivam de vendasFiltradas / ranking (nenhum filtro de venda mora aqui).
+
+  /** Canvas dentro de *ngIf só existe após o render: cria os gráficos num tick seguinte. */
+  private agendarGraficosVendas() {
+    setTimeout(() => this.renderCharts());
   }
 
-  renderSalesHistoryChart(vendas: any[]) {
-    const ctx = document.getElementById('salesChart') as HTMLCanvasElement;
+  renderCharts() {
+    this.renderSalesHistoryChart();
+    this.renderTopProductsChart();
+  }
+
+  private destruirGraficosVendas() {
+    this.salesChart?.destroy();
+    this.salesChart = null;
+    this.topProductsChart?.destroy();
+    this.topProductsChart = null;
+  }
+
+  /** 'yyyy-MM-dd' -> 'dd/MM' (só apresentação; a chave vem de serieDiaria). */
+  private rotuloDia(dia: string): string {
+    return `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+  }
+
+  private formatarMoeda(valor: number): string {
+    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  renderSalesHistoryChart() {
+    this.salesChart?.destroy();
+    this.salesChart = null;
+    const ctx = document.getElementById('salesChart') as HTMLCanvasElement | null;
     if (!ctx) return;
 
-    // Agrupa vendas por dia
-    const salesByDay: { [key: string]: number } = {};
-
-    // Preenche os dias entre inicio e fim para não ficar buraco no gráfico
-    let current = new Date(this.filtroDataInicio + 'T00:00:00');
-    const end = new Date(this.filtroDataFim + 'T23:59:59');
-
-    while (current <= end) {
-      const dayKey = current.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      salesByDay[dayKey] = 0;
-      current.setDate(current.getDate() + 1);
-    }
-
-    vendas.forEach(v => {
-      // Filtro por Origem
-      if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
-      // Filtro por Cliente
-      if (this.filtroClienteId && v.customerId !== this.filtroClienteId) return;
-      // Filtro por Forma de Pagamento
-      if (this.filtroFormaPagamento !== 'todos' && v.paymentMethod !== this.filtroFormaPagamento) return;
-
-      const vDate = (v.date?.toDate ? v.date.toDate() : new Date(v.date));
-      const dayKey = vDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-
-      let totalVenda = 0;
-      v.items?.forEach((item: any) => {
-        if (!this.filtroProdutoId || item.idProduct === this.filtroProdutoId) {
-          totalVenda += (item.priceAtSale * item.quantity);
-        }
-      });
-
-      if (salesByDay[dayKey] !== undefined) {
-        salesByDay[dayKey] += totalVenda;
-      }
-    });
-
-    const labels = Object.keys(salesByDay);
-    const data = Object.values(salesByDay);
-
-    if (this.salesChart) this.salesChart.destroy();
+    const { inicio, fim } = this.filtroRelatorio;
+    const serie = serieDiaria(this.vendasFiltradas, inicio, fim);
 
     this.salesChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels,
+        labels: serie.map(p => this.rotuloDia(p.dia)),
         datasets: [{
           label: 'Vendas (R$)',
-          data,
+          data: serie.map(p => p.valor),
           borderColor: '#f4c042',
           backgroundColor: 'rgba(244, 192, 66, 0.1)',
           fill: true,
@@ -905,47 +964,46 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     });
   }
 
-  renderTopProductsChart(vendas: any[]) {
-    const ctx = document.getElementById('topProductsChart') as HTMLCanvasElement;
+  // --- TOP 5 PRODUTOS (unidade x kg) ---
+
+  get topModoEfetivo(): ModoTop {
+    return modoTopEfetivo(this.ranking, this.topModo);
+  }
+
+  get topTemAmbos(): boolean {
+    return this.ranking.unidade.length > 0 && this.ranking.peso.length > 0;
+  }
+
+  get topSemDados(): boolean {
+    return this.ranking.unidade.length === 0 && this.ranking.peso.length === 0;
+  }
+
+  definirTopModo(modo: ModoTop) {
+    this.topModo = modo;
+    this.renderTopProductsChart();
+  }
+
+  renderTopProductsChart() {
+    this.topProductsChart?.destroy();
+    this.topProductsChart = null;
+    const ctx = document.getElementById('topProductsChart') as HTMLCanvasElement | null;
     if (!ctx) return;
 
-    const productsMap: { [key: string]: { name: string, qty: number } } = {};
+    const modo = this.topModoEfetivo;
+    const itens = this.ranking[modo];
+    if (itens.length === 0) return;
 
-    vendas.forEach(v => {
-      // Filtro por Origem
-      if (this.filtroOrigem !== 'todos' && v.sale_type !== this.filtroOrigem) return;
-      // Filtro por Cliente
-      if (this.filtroClienteId && v.customerId !== this.filtroClienteId) return;
-      // Filtro por Forma de Pagamento
-      if (this.filtroFormaPagamento !== 'todos' && v.paymentMethod !== this.filtroFormaPagamento) return;
-
-      v.items?.forEach((item: any) => {
-        if (!productsMap[item.idProduct]) {
-          // Tenta pegar o nome do produto da lista principal caso não esteja no item da venda
-          const prodInfo = this.products.find(p => p.id === item.idProduct);
-          productsMap[item.idProduct] = { name: item.title || prodInfo?.title || 'Produto S/N', qty: 0 };
-        }
-        productsMap[item.idProduct].qty += item.quantity;
-      });
-    });
-
-    // Ordena e pega os top 5
-    const sorted = Object.values(productsMap)
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5);
-
-    const labels = sorted.map(s => s.name);
-    const data = sorted.map(s => s.qty);
-
-    if (this.topProductsChart) this.topProductsChart.destroy();
+    const casas = modo === 'peso' ? 3 : 0;
+    const sufixo = modo === 'peso' ? 'kg' : 'un';
+    const formatar = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: casas });
 
     this.topProductsChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels,
+        labels: itens.map(i => i.nome),
         datasets: [{
-          label: 'Qtd Vendida',
-          data,
+          label: `Qtd Vendida (${sufixo})`,
+          data: itens.map(i => i.quantidade),
           backgroundColor: [
             '#f4c042', '#3498db', '#2ecc71', '#e74c3c', '#9b59b6'
           ],
@@ -957,13 +1015,16 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false }
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: c => `${formatar(Number(c.parsed.x))} ${sufixo}` }
+          }
         },
         scales: {
           x: {
             beginAtZero: true,
             grid: { color: 'rgba(255,255,255,0.05)' },
-            ticks: { color: '#888' }
+            ticks: { color: '#888', precision: casas, callback: v => formatar(Number(v)) }
           },
           y: {
             grid: { display: false },
@@ -972,6 +1033,182 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
         }
       }
     });
+  }
+
+  // ==========================================================
+  // MODAIS DE DETALHE: Faturamento / CMV / Lucro Bruto
+  // ==========================================================
+
+  abrirDetalhe(tipo: DetalheRelatorio, escopo: EscopoDetalhe) {
+    this.detalheAberto = tipo;
+    this.detalheEscopo = escopo;
+    this.recalcularDetalhe();
+  }
+
+  fecharDetalhe() {
+    this.detalheAberto = null;
+    this.detalheFaturamento = null;
+    this.linhasCmv = [];
+    this.linhasLucro = [];
+    this.cmvLinhasSemCusto = 0;
+    this.destruirGraficosDetalhe();
+  }
+
+  get detalheTitulo(): string {
+    return this.detalheAberto ? TITULO_DETALHE[this.detalheAberto] : '';
+  }
+
+  /** Cards do escopo aberto — o rodapé do modal tem que bater com o card clicado. */
+  private get cardsDoEscopo(): CardsRelatorio {
+    return this.detalheEscopo === 'balanco' ? this.relatorioBalanco : this.relatorio;
+  }
+
+  get detalheTotal(): number {
+    const cards = this.cardsDoEscopo;
+    switch (this.detalheAberto) {
+      case 'faturamento': return cards.faturamento;
+      case 'cmv': return cards.custoTotal;
+      case 'lucro': return cards.lucro;
+      default: return 0;
+    }
+  }
+
+  get faturamentoGeral(): Extract<DetalheFaturamento, { modo: 'geral' }> | null {
+    return this.detalheFaturamento?.modo === 'geral' ? this.detalheFaturamento : null;
+  }
+
+  get faturamentoPorProduto(): Extract<DetalheFaturamento, { modo: 'produto' }> | null {
+    return this.detalheFaturamento?.modo === 'produto' ? this.detalheFaturamento : null;
+  }
+
+  origemVendaLabel(origem: OrigemVenda): string {
+    return origem === 'pdv' ? 'PDV' : 'Pedido';
+  }
+
+  /** Recalcula o conteúdo do modal aberto a partir das vendas do escopo (nunca de outra fonte). */
+  private recalcularDetalhe() {
+    const tipo = this.detalheAberto;
+    if (!tipo) return;
+
+    const balanco = this.detalheEscopo === 'balanco';
+    const vendas = balanco ? this.vendasBalanco : this.vendasFiltradas;
+    const filtro = balanco ? filtroSomentePeriodo(this.filtroRelatorio) : this.filtroRelatorio;
+    const produtos = this.produtosPorId();
+
+    if (tipo === 'faturamento') {
+      this.detalheFaturamento = montarDetalheFaturamento(vendas, filtro, produtos, this.nomesClientes());
+      this.coresPizza = this.detalheFaturamento.modo === 'geral'
+        ? this.coresDasFatias(this.detalheFaturamento.pizza)
+        : [];
+    } else if (tipo === 'cmv') {
+      this.linhasCmv = montarDetalheCmv(vendas, produtos);
+      this.cmvLinhasSemCusto = this.linhasCmv.filter(l => l.custoZero).length;
+    } else {
+      this.linhasLucro = montarDetalheLucro(vendas, produtos);
+    }
+
+    this.montarCabecalhoDetalhe(balanco);
+    setTimeout(() => this.renderGraficosDetalhe());
+  }
+
+  /** Período + filtros ativos do escopo (Balanço só tem período). */
+  private montarCabecalhoDetalhe(balanco: boolean) {
+    this.detalhePeriodo = `${this.formatarDataInput(this.filtroDataInicio)} a ${this.formatarDataInput(this.filtroDataFim)}`;
+    const ativos: string[] = [];
+    if (!balanco) {
+      if (this.filtroProdutoId) {
+        ativos.push(`Produto: ${this.products.find(p => p.id === this.filtroProdutoId)?.title ?? 'não encontrado'}`);
+      }
+      if (this.filtroOrigem !== 'todos') ativos.push(`Origem: ${this.origemVendaLabel(this.filtroOrigem)}`);
+      if (this.filtroClienteId) {
+        ativos.push(`Cliente: ${this.customers.find(c => c.id === this.filtroClienteId)?.name ?? 'não encontrado'}`);
+      }
+      if (this.filtroFormaPagamento !== 'todos') {
+        ativos.push(`Pagamento: ${PAYMENT_METHOD_LABELS[this.filtroFormaPagamento]}`);
+      }
+    }
+    this.detalheFiltrosAtivos = ativos;
+  }
+
+  /** 'yyyy-MM-dd' (valor do input date) -> 'dd/MM/yyyy'. */
+  private formatarDataInput(valor: string): string {
+    const [ano, mes, dia] = valor.split('-');
+    return dia && mes && ano ? `${dia}/${mes}/${ano}` : valor;
+  }
+
+  private coresDasFatias(fatias: FatiaProduto[]): string[] {
+    const paleta = TOKENS_PALETA.map(t => this.lerToken(t));
+    const outros = this.lerToken('--text-muted');
+    return fatias.map((f, i) => (f.idProduct === null ? outros : paleta[i % paleta.length]));
+  }
+
+  private destruirGraficosDetalhe() {
+    this.faturamentoPizzaChart?.destroy();
+    this.faturamentoPizzaChart = null;
+    this.faturamentoDiaChart?.destroy();
+    this.faturamentoDiaChart = null;
+  }
+
+  /** Canvas do modal vive em *ngIf: recria os gráficos a cada recálculo, destrói ao fechar. */
+  private renderGraficosDetalhe() {
+    this.destruirGraficosDetalhe();
+    if (this.detalheAberto !== 'faturamento') return;
+
+    const textoMudo = this.lerToken('--text-muted');
+    const corGrade = this.lerToken('--border-color');
+    const geral = this.faturamentoGeral;
+    const porProduto = this.faturamentoPorProduto;
+
+    const ctxPizza = document.getElementById('faturamentoPizzaChart') as HTMLCanvasElement | null;
+    if (geral && ctxPizza && geral.pizza.length > 0) {
+      this.faturamentoPizzaChart = new Chart(ctxPizza, {
+        type: 'pie',
+        data: {
+          labels: geral.pizza.map(f => f.nome),
+          datasets: [{
+            data: geral.pizza.map(f => f.valor),
+            backgroundColor: this.coresPizza,
+            borderColor: this.lerToken('--bg-card')
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => `${c.label}: ${this.formatarMoeda(Number(c.parsed))}` } }
+          }
+        }
+      });
+    }
+
+    const ctxDia = document.getElementById('faturamentoDiaChart') as HTMLCanvasElement | null;
+    if (porProduto && ctxDia && porProduto.porDia.length > 0) {
+      this.faturamentoDiaChart = new Chart(ctxDia, {
+        type: 'bar',
+        data: {
+          labels: porProduto.porDia.map(d => this.rotuloDia(d.dia)),
+          datasets: [{
+            label: 'Faturamento (R$)',
+            data: porProduto.porDia.map(d => d.valor),
+            backgroundColor: this.lerToken('--color-primary'),
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => this.formatarMoeda(Number(c.parsed.y)) } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textoMudo } },
+            y: { beginAtZero: true, grid: { color: corGrade }, ticks: { color: textoMudo } }
+          }
+        }
+      });
+    }
   }
 
   limparFiltros() {
