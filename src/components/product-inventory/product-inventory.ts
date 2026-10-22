@@ -47,7 +47,7 @@ import { MapPickerComponent } from '../map-picker/map-picker';
 import { CustomerRecurringOrdersComponent } from '../customer-recurring-orders/customer-recurring-orders';
 import { filtrarPorTermo } from './busca-por-nome';
 import { calcularTotalItemPorPeso } from '../../services/product-service/product-weight-rules';
-import { MovimentoMes, PanoramaAnual, calcularAReceberTotal, calcularRecebidoNoPeriodo, listarMovimentoDoMes, montarPanoramaAnual } from '../../services/order-service/order-receivables-rules';
+import { MovimentoMes, PanoramaAnual, listarMovimentoDoMes, montarPanoramaAnual } from '../../services/order-service/order-receivables-rules';
 import {
   CardsRelatorio, DetalheFaturamento, FatiaProduto, FiltroRelatorio, LinhaCmv, LinhaLucro, ModoTop,
   NomesClientes, OrigemVenda, ProdutosPorId, RankingQuantidade, VendaFiltrada, VendaRelatorio,
@@ -157,10 +157,6 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
   // --- TOP 5 (unidade e kg nunca se misturam) ---
   topModo: ModoTop = 'unidade';
   ranking: RankingQuantidade = { unidade: [], peso: [] };
-
-  // --- RECEBÍVEIS (valores vêm de order-receivables-rules; o componente só guarda e exibe) ---
-  recebidoNoPeriodo = 0;
-  aReceberTotal = 0;
 
   // --- SUB-ABA A RECEBER (panorama anual; números vêm de order-receivables-rules) ---
   readonly mesesAbreviados = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -382,7 +378,6 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     // 9. Carrega pedidos em tempo real (usado no cálculo de comissão por vendedor)
     this.orderService.getOrders().subscribe(data => {
       this.orders = data;
-      this.atualizarRecebiveis();
       if (this.reportTab === 'receber') this.recalcularPanorama();
     });
   }
@@ -709,7 +704,6 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
 
     // Atualiza o painel de comissões da sub-aba Vendedores (mesmo período filtrado).
     this.atualizarComissoesVendedores();
-    this.atualizarRecebiveis();
   }
 
   /** Filtra a base uma vez por escopo (Vendas e Balanço) e deriva cards, gráficos e modal aberto. */
@@ -853,14 +847,6 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
 
   tipoMovimentoLabel(tipo: MovimentoMes['tipo']): string {
     return { recebido: 'Recebido', previsto: 'Previsto', vencido: 'Vencido' }[tipo];
-  }
-
-  /** Recebido no período filtrado e A receber total — delega às funções puras de order-receivables-rules. */
-  private atualizarRecebiveis() {
-    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
-    const fim = new Date(this.filtroDataFim + 'T23:59:59');
-    this.recebidoNoPeriodo = calcularRecebidoNoPeriodo(this.orders, inicio, fim);
-    this.aReceberTotal = calcularAReceberTotal(this.orders, new Date());
   }
 
   // --- PRESETS DE DATA ---

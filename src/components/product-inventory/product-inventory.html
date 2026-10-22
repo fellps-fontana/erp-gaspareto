@@ -145,16 +145,6 @@
           </small>
         </div>
 
-        <div class="card kpi-success">
-          <span class="kpi-label">Recebido no Período</span>
-          <strong class="kpi-value kpi-value-success">R$ {{ recebidoNoPeriodo | number:'1.2-2' }}</strong>
-          <small class="kpi-meta">pagamentos no período, de todos os pedidos (ignora filtros de produto, origem, cliente e forma)</small>
-        </div>
-        <div class="card kpi-info">
-          <span class="kpi-label">A Receber</span>
-          <strong class="kpi-value kpi-value-info">R$ {{ aReceberTotal | number:'1.2-2' }}</strong>
-          <small class="kpi-meta">parcelas em aberto de todos os pedidos (ignora filtros de produto, origem, cliente e forma)</small>
-        </div>
       </div>
 
       <!-- GRÁFICOS -->
@@ -315,16 +305,6 @@
             <small class="kpi-meta" *ngIf="relatorioBalanco.faturamento > 0">
               Margem líquida: {{ margemLiquida | number:'1.0-0' }}%
             </small>
-          </div>
-          <div class="card kpi-success">
-            <span class="kpi-label">Recebido no Período</span>
-            <strong class="kpi-value kpi-value-success">R$ {{ recebidoNoPeriodo | number:'1.2-2' }}</strong>
-            <small class="kpi-meta">pagamentos de pedidos no período</small>
-          </div>
-          <div class="card kpi-info">
-            <span class="kpi-label">A Receber</span>
-            <strong class="kpi-value kpi-value-info">R$ {{ aReceberTotal | number:'1.2-2' }}</strong>
-            <small class="kpi-meta">parcelas previstas em aberto</small>
           </div>
         </div>
 
@@ -988,6 +968,7 @@
   <!-- MODAL EXCLUIR PRODUTO DE COMPRA -->
   <div class="checkout-overlay" *ngIf="isDeleteCompraModalOpen" (click)="closeDeleteCompraModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteCompraModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Produto?</h2>
       <div class="delete-info" *ngIf="produtoCompraToDelete">
@@ -1005,6 +986,7 @@
   <!-- MODAL DE EXCLUSÃO DE CLIENTE -->
   <div class="checkout-overlay" *ngIf="isDeleteClienteModalOpen" (click)="closeDeleteClienteModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteClienteModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Cliente?</h2>
       <div class="delete-info" *ngIf="clienteToDelete">
@@ -1022,6 +1004,7 @@
   <!-- MODAL DE EXCLUSÃO DE VENDEDOR -->
   <div class="checkout-overlay" *ngIf="isDeleteVendedorModalOpen" (click)="closeDeleteVendedorModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteVendedorModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Vendedor?</h2>
       <div class="delete-info" *ngIf="vendedorToDelete">
@@ -1039,6 +1022,7 @@
   <!-- MODAL HISTÓRICO DE PEDIDOS DO CLIENTE -->
   <div class="checkout-overlay" *ngIf="isHistoricoClienteOpen" (click)="fecharHistoricoCliente()">
     <div class="checkout-modal historico-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharHistoricoCliente()">✕</button>
       <h2>Histórico de {{ clienteHistorico?.name }}</h2>
 
       <div class="historico-lista">
@@ -1071,16 +1055,13 @@
           <div class="clientes-vazio">Carregando histórico...</div>
         </ng-template>
       </div>
-
-      <div class="checkout-actions">
-        <button class="btn-cancel" (click)="fecharHistoricoCliente()">FECHAR</button>
-      </div>
     </div>
   </div>
 
   <!-- MODAL MOVIMENTO DO MÊS (sub-aba A Receber) -->
   <div class="checkout-overlay" *ngIf="mesDetalheAberto !== null" (click)="fecharMesDetalhe()">
     <div class="checkout-modal receber-mes-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharMesDetalhe()">✕</button>
       <h2>{{ mesesAbreviados[mesDetalheAberto] }}/{{ anoPanorama }}</h2>
 
       <p class="receber-mes-vazio" *ngIf="movimentosMesDetalhe.length === 0">Nenhum recebimento ou parcela neste mês.</p>
@@ -1095,14 +1076,13 @@
           <strong class="receber-mes-valor">R$ {{ m.amount | number:'1.2-2' }}</strong>
         </li>
       </ul>
-
-      <button class="btn-dashboard-action secondary" (click)="fecharMesDetalhe()">FECHAR</button>
     </div>
   </div>
 
   <!-- MODAL DETALHE DO RELATÓRIO (cards Faturamento / CMV / Lucro Bruto — abas Vendas e Balanço) -->
   <div class="checkout-overlay" *ngIf="detalheAberto" (click)="fecharDetalhe()">
     <div class="checkout-modal detalhe-relatorio-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharDetalhe()">✕</button>
       <h2>{{ detalheTitulo }}</h2>
       <p class="detalhe-contexto">
         <span>{{ detalhePeriodo }}</span>
@@ -1229,14 +1209,13 @@
         <span class="detalhe-rodape-label">Total</span>
         <strong class="detalhe-rodape-valor">R$ {{ detalheTotal | number:'1.2-2' }}</strong>
       </div>
-
-      <button class="btn-dashboard-action secondary" (click)="fecharDetalhe()">FECHAR</button>
     </div>
   </div>
 
   <!-- MODAL DETALHE DO LANÇAMENTO (Histórico Geral: pdv/pedido/comanda) -->
   <div class="checkout-overlay" *ngIf="detalheLancamentoAberto as item" (click)="fecharDetalheLancamento()">
     <div class="checkout-modal detalhe-lancamento-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharDetalheLancamento()">✕</button>
       <div class="pedido-historico-header">
         <div class="header-left-group">
           <span class="order-number" *ngIf="item.numero">#{{ item.numero }}</span>
@@ -1300,16 +1279,13 @@
           <span class="formula-valor">R$ {{ lucroHistoricoItem(item) | number:'1.2-2' }}</span>
         </div>
       </div>
-
-      <div class="checkout-actions">
-        <button class="btn-cancel" (click)="fecharDetalheLancamento()">FECHAR</button>
-      </div>
     </div>
   </div>
 
   <!-- MODAL DE EXCLUSÃO DE PRODUTO -->
   <div class="checkout-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Produto?</h2>
 
