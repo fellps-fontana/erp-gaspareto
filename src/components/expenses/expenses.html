@@ -187,6 +187,15 @@
   <!-- MODAL DE PAGAMENTO -->
   <div class="modal-overlay" *ngIf="despesaParaPagar" (click)="fecharPagamento()">
     <div class="modal-box" (click)="$event.stopPropagation()">
+      <button
+        type="button"
+        class="modal-fechar"
+        aria-label="Fechar"
+        title="Fechar"
+        (click)="fecharPagamento()"
+      >
+        ✕
+      </button>
       <h2>Registrar pagamento</h2>
       <div class="modal-info">
         <strong>{{ despesaParaPagar.description }}</strong>
@@ -215,6 +224,15 @@
   <!-- MODAL DE EXCLUSÃO -->
   <div class="modal-overlay" *ngIf="despesaParaExcluir" (click)="fecharExclusao()">
     <div class="modal-box" (click)="$event.stopPropagation()">
+      <button
+        type="button"
+        class="modal-fechar"
+        aria-label="Fechar"
+        title="Fechar"
+        (click)="fecharExclusao()"
+      >
+        ✕
+      </button>
       <div class="modal-icon">⚠️</div>
       <h2>Excluir Despesa?</h2>
       <div class="modal-info">
@@ -232,6 +250,15 @@
   <!-- MODAL DE ENCERRAMENTO DE RECORRÊNCIA -->
   <div class="modal-overlay" *ngIf="despesaParaEncerrar" (click)="fecharEncerramento()">
     <div class="modal-box" (click)="$event.stopPropagation()">
+      <button
+        type="button"
+        class="modal-fechar"
+        aria-label="Fechar"
+        title="Fechar"
+        (click)="fecharEncerramento()"
+      >
+        ✕
+      </button>
       <div class="modal-icon">🔄</div>
       <h2>Encerrar recorrência?</h2>
       <div class="modal-info">

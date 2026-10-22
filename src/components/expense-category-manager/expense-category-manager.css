@@ -214,6 +214,7 @@ select:disabled {
 }
 
 .modal-box {
+  position: relative;
   background: var(--bg-card);
   color: var(--text-primary);
   border-radius: var(--radius-lg);

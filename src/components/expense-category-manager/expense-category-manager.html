@@ -82,6 +82,15 @@
   <!-- MODAL DE EXCLUSÃO -->
   <div class="modal-overlay" *ngIf="isCategoryDeleteModalOpen" (click)="closeCategoryDeleteModal()">
     <div class="modal-box" (click)="$event.stopPropagation()">
+      <button
+        type="button"
+        class="modal-fechar"
+        aria-label="Fechar"
+        title="Fechar"
+        (click)="closeCategoryDeleteModal()"
+      >
+        ✕
+      </button>
       <div class="modal-icon">⚠️</div>
       <h2>Excluir Categoria?</h2>
       <div class="modal-info" *ngIf="categoryToDelete">

@@ -13,6 +13,7 @@
   width: 100%;
   max-width: 520px;
   max-height: 90vh;
+  position: relative;
   overflow-y: auto;
   padding: var(--sp-lg);
   background: var(--bg-card);
@@ -32,18 +33,6 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-}
-
-.gastos-fechar {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  cursor: pointer;
-}
-
-.gastos-fechar:hover {
-  color: var(--color-primary);
 }
 
 .gastos-total {
