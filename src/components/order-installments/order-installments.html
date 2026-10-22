@@ -1,5 +1,6 @@
 <div class="modal-backdrop">
   <div class="modal-content installments-modal">
+    <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closed.emit()" [disabled]="processing">✕</button>
     <h3>Montar parcelas</h3>
     <p>Saldo a parcelar: <strong>{{ saldoAlvo | currency:'BRL' }}</strong></p>
 

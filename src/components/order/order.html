@@ -235,7 +235,7 @@
     <div class="panel-content">
       <div class="panel-header">
         <h2>{{ editingOrderId ? 'Editar Pedido' : 'Nova Encomenda' }}</h2>
-        <button class="btn-close" (click)="closeNewOrder()">✕</button>
+        <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeNewOrder()">✕</button>
       </div>
 
       <div class="panel-body">
@@ -408,6 +408,7 @@
   ════════════════════════════════════════════════════════════ -->
   <div class="modal-backdrop" *ngIf="isPaymentModalOpen">
     <div class="modal-content">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closePaymentModal()" [disabled]="isProcessingAction">✕</button>
       <h3>Registrar pagamento</h3>
       <p>Saldo a receber: <strong>{{ paymentSaldo | currency:'BRL' }}</strong></p>
 
@@ -464,6 +465,7 @@
   ════════════════════════════════════════════════════════════ -->
   <div class="modal-backdrop" *ngIf="isCancelPaymentsModalOpen && cancelOrderWithPayments">
     <div class="modal-content cancel-payments-modal">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeCancelPaymentsModal()" [disabled]="isProcessingAction">✕</button>
       <h3>Cancelar pedido de {{ cancelOrderWithPayments.customerName }}</h3>
       <p class="cancel-received">Já recebido: <strong>{{ cancelPaidAmount | currency:'BRL' }}</strong></p>
 
@@ -496,6 +498,7 @@
   ════════════════════════════════════════════════════════════ -->
   <div class="modal-backdrop" *ngIf="isConfirmModalOpen">
     <div class="modal-content confirm-modal">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeConfirmModal()" [disabled]="isProcessingAction">✕</button>
       <h3>Confirmação</h3>
       <p>{{ confirmMessage }}</p>
       <div class="modal-actions">
@@ -514,12 +517,7 @@
     <div class="modal-content details-modal">
       <div class="modal-header">
         <h3>Detalhes do Pedido #{{ selectedOrderDetails.orderNumber }}</h3>
-        <button class="btn-close-modal" (click)="closeDetails()">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+        <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDetails()">✕</button>
       </div>
 
       <div class="modal-body">

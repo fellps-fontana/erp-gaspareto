@@ -121,6 +121,7 @@
   <!-- MODAL DE EXCLUSÃO -->
   <div class="checkout-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Conta?</h2>
       <div class="delete-info" *ngIf="billToDelete">
