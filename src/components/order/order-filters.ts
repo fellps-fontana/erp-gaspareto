@@ -15,6 +15,11 @@
  * tenant, confiam no isolamento a montante.
  */
 
+import { Order } from '../../models/order-model';
+import { calcularSaldo, calcularSaldoDescoberto } from '../../services/order-service/order-payment-rules';
+
+const STATUS_ENTREGUE: Order['status'] = 'delivered';
+
 /** Valor sentinela do seletor: "Todas as cidades" (nenhum filtro de cidade). */
 export const TODAS_AS_CIDADES = '';
 
@@ -126,4 +131,20 @@ export function filtrarPorCidade<T extends OrderCidadeRef>(
     if (!order.customerId) return false;
     return cidadePorCustomerId.get(order.customerId) === alvo;
   });
+}
+
+/**
+ * Pedido entregue com saldo todo coberto por parcelas previstas sai do kanban
+ * e é acompanhado só na aba A receber (regra-de-negocio.md seção 5.3).
+ * Saldo e saldo descoberto vêm de order-payment-rules (nenhuma fórmula aqui).
+ */
+export function pedidoSaiuDoKanban(order: Order): boolean {
+  return order.status === STATUS_ENTREGUE
+    && calcularSaldo(order) > 0
+    && calcularSaldoDescoberto(order) === 0;
+}
+
+/** Remove do kanban os pedidos que sairam dele (seção 5.3); preserva a ordem. */
+export function excluirPedidosForaDoKanban<T extends Order>(orders: readonly T[]): T[] {
+  return orders.filter(order => !pedidoSaiuDoKanban(order));
 }

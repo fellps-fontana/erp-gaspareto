@@ -739,3 +739,411 @@ eliminada, posicao logica da chamada preservada nos dois pontos, tsc limpo.
 Regra de negocio coberta: nenhuma nova — mesma regra critica da secao 7,
 fecha o ultimo caminho de criacao de bill dentro de product-inventory.ts
 que ainda tinha o bug do filtro.
+
+## TASK-035 — Esqueletos compilaveis: pagamentos/parcelas/A receber de Pedidos
+STATUS: CONCLUIDA
+AGENT: killua
+DEPENDENCIAS:
+ESCOPO: definir os arquivos de esqueleto (assinaturas finais, corpo lancando NotImplemented) do bloco ESQUELETO abaixo; Kira cria os arquivos a partir dele.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 3, 5, 5.2, 5.3), .claude/context/stack.md, .claude/context/clean-code.md, src/models/order-model.ts, src/models/sell-model.ts, src/services/order-service/order-service.ts, src/services/sale-service/sale-service.ts, src/components/order/order-filters.ts
+CRITERIO DE ACEITE: (1) `npx tsc --noEmit -p tsconfig.app.json` e `ng build` passam com o esqueleto; (2) nenhuma logica real (so NotImplemented, exceto os tipos/campos novos e o enum MISTO); (3) assinaturas identicas ao bloco ESQUELETO.
+ARQUIVOS PERMITIDOS: src/models/order-model.ts, src/models/sell-model.ts, src/services/order-service/order-payment-rules.ts (novo), src/services/order-service/order-receivables-rules.ts (novo), src/services/order-service/order-service.ts (so stubs/assinaturas), src/services/sale-service/sale-service.ts (so stubs), src/components/order/order-filters.ts (so stubs)
+NAO FAZER: nao implementar logica; nao remover finalizeOrder (quebra order.ts); nao tocar componentes .ts/.html; nao editar .claude/tasks.md.
+RETORNO ESPERADO: lista de arquivos criados/alterados e confirmacao de build.
+ESQUELETO:
+```ts
+// ---- src/models/sell-model.ts ----
+// enum PaymentMethod: acrescentar MISTO = 'misto'; PAYMENT_METHOD_LABELS[MISTO] = 'Misto'
+// interface Sale: paymentMethod?: PaymentMethod   (passa a opcional)
+
+// ---- src/models/order-model.ts (acrescentar) ----
+export type OrderPaymentStatus = 'previsto' | 'pago' | 'cancelado' | 'estornado';
+export interface OrderPayment {
+  id: string;
+  amount: number;
+  method: PaymentMethod;     // nunca MISTO
+  installments: number;      // informativo; Pix e previsto => 1
+  dueDate?: Timestamp;       // so parcelas da agenda (Timestamp.fromDate; nao serverTimestamp)
+  paidDate?: Timestamp;      // so status 'pago'
+  status: OrderPaymentStatus;
+}
+// interface Order: payments?: OrderPayment[]; saleId?: string;
+
+// ---- src/services/order-service/order-payment-rules.ts ----
+import { Order, OrderPayment } from '../../models/order-model';
+import { PaymentMethod } from '../../models/sell-model';
+
+export type CodigoPagamentoInvalido =
+  | 'VALOR_INVALIDO' | 'ACIMA_DO_SALDO' | 'PEDIDO_CANCELADO' | 'PEDIDO_FINALIZADO'
+  | 'PARCELA_INEXISTENTE' | 'CARTAO_NAO_PARCELA' | 'PARCELAS_NAO_FECHAM'
+  | 'TOTAL_ABAIXO_DO_PAGO' | 'PARCELAS_NAO_REAJUSTADAS';
+export class PagamentoInvalidoError extends Error {
+  constructor(public readonly codigo: CodigoPagamentoInvalido, message: string) { super(message); }
+}
+export type PedidoFinanceiro = Pick<Order,
+  'total' | 'status' | 'payments' | 'paymentMethod' | 'installments' | 'paymentDate' | 'saleId'>;
+export interface RegistrarPagamentoInput {
+  amount: number; method: PaymentMethod; installments?: number;
+  paidDate?: Date;            // default: agora
+  parcelaId?: string;         // pagamento de uma parcela prevista
+}
+export interface ResultadoPagamento { payments: OrderPayment[]; saldo: number; zerouSaldo: boolean; }
+export interface ParcelaInput { amount: number; dueDate: Date; method: PaymentMethod; }
+export interface FormaFinal { paymentMethod: PaymentMethod; installments: number; }
+
+export function arredondar2(valor: number): number { throw new Error('NotImplemented'); }
+export function listarPagamentos(order: PedidoFinanceiro): OrderPayment[] { throw new Error('NotImplemented'); }
+export function calcularPago(order: PedidoFinanceiro): number { throw new Error('NotImplemented'); }
+export function calcularSaldo(order: PedidoFinanceiro): number { throw new Error('NotImplemented'); }
+export function calcularPrevisto(order: PedidoFinanceiro): number { throw new Error('NotImplemented'); }
+export function calcularSaldoDescoberto(order: PedidoFinanceiro): number { throw new Error('NotImplemented'); }
+export function isPedidoEntregueLegado(order: PedidoFinanceiro): boolean { throw new Error('NotImplemented'); }
+export function aplicarPagamento(order: PedidoFinanceiro, input: RegistrarPagamentoInput, gerarId: () => string): ResultadoPagamento { throw new Error('NotImplemented'); }
+export function gerarParcelasIguais(saldo: number, quantidade: number, primeiraData: Date, method: PaymentMethod): ParcelaInput[] { throw new Error('NotImplemented'); }
+export function aplicarAgendaParcelas(order: PedidoFinanceiro, parcelas: ParcelaInput[], gerarId: () => string): OrderPayment[] { throw new Error('NotImplemented'); }
+export function validarNovoTotal(order: PedidoFinanceiro, novoTotal: number, novasParcelas?: ParcelaInput[], gerarId?: () => string): OrderPayment[] { throw new Error('NotImplemented'); }
+export function aplicarCancelamento(order: PedidoFinanceiro, estornar: boolean): OrderPayment[] { throw new Error('NotImplemented'); }
+export function resolverFormaFinal(payments: readonly OrderPayment[]): FormaFinal | null { throw new Error('NotImplemented'); }
+export function deveConcluir(order: PedidoFinanceiro, payments: readonly OrderPayment[]): boolean { throw new Error('NotImplemented'); }
+
+// ---- src/services/order-service/order-receivables-rules.ts ----
+import { Order } from '../../models/order-model';
+export interface ParcelaReceber {
+  orderId: string; orderNumber: number; customerName: string; customerId?: string;
+  paymentId: string; k: number; n: number; amount: number; dueDate: Date; diasAtraso: number; // >0 vencida
+}
+export interface AbaAReceber {
+  vencido: number; venceEsteMes: number; proximos: number; quantidadeVencidas: number;
+  vencidas: ParcelaReceber[]; esteMes: ParcelaReceber[]; proximosMeses: ParcelaReceber[];
+}
+export interface MesPanorama { mes: number /* 0-11 */; recebido: number; previsto: number; vencido: number; }
+export interface PanoramaAnual { ano: number; meses: MesPanorama[]; recebidoAno: number; aReceberAno: number; vencidoTotal: number; }
+export interface MovimentoMes { orderId: string; orderNumber: number; customerName: string; tipo: 'recebido' | 'previsto' | 'vencido'; amount: number; data: Date; }
+export interface ResumoValores { total: number; pago: number; saldo: number; }
+export function listarParcelasReceber(orders: readonly Order[], hoje: Date): ParcelaReceber[] { throw new Error('NotImplemented'); }
+export function montarAbaAReceber(orders: readonly Order[], hoje: Date): AbaAReceber { throw new Error('NotImplemented'); }
+export function montarPanoramaAnual(orders: readonly Order[], ano: number, hoje: Date): PanoramaAnual { throw new Error('NotImplemented'); }
+export function listarMovimentoDoMes(orders: readonly Order[], ano: number, mes: number, hoje: Date): MovimentoMes[] { throw new Error('NotImplemented'); }
+export function calcularRecebidoNoPeriodo(orders: readonly Order[], inicio: Date, fim: Date): number { throw new Error('NotImplemented'); }
+export function calcularAReceberTotal(orders: readonly Order[], hoje: Date): number { throw new Error('NotImplemented'); }
+export function resumirValoresPedidos(orders: readonly Order[]): ResumoValores { throw new Error('NotImplemented'); }
+
+// ---- src/components/order/order-filters.ts (acrescentar) ----
+export function pedidoSaiuDoKanban(order: Order): boolean { throw new Error('NotImplemented'); }
+export function excluirPedidosForaDoKanban<T extends Order>(orders: readonly T[]): T[] { throw new Error('NotImplemented'); }
+
+// ---- src/services/sale-service/sale-service.ts (acrescentar, stubs) ----
+// addSaleInTransaction(transaction: Transaction, sale: Omit<Sale,'id'|'companyId'>, companyId: string): DocumentReference
+// setSalePaymentInTransaction(transaction: Transaction, saleId: string, forma: { paymentMethod: PaymentMethod; installments: number }): void
+// cancelSaleRecordInTransaction(transaction: Transaction, saleId: string): void   // so status 'canceled', SEM estoque
+
+// ---- src/services/order-service/order-service.ts (stubs / assinaturas finais) ----
+export interface RegistrarPagamentoResultado { concluido: boolean; saldo: number; }
+export interface CancelOrderOptions { estornar: boolean; }
+// registerPayment(orderId: string, input: RegistrarPagamentoInput): Promise<RegistrarPagamentoResultado>
+// setScheduledInstallments(orderId: string, parcelas: ParcelaInput[]): Promise<void>
+// updateOrder(orderId: string, orderData: Partial<Order>, opts?: { parcelas?: ParcelaInput[] }): Promise<void>
+// cancelOrder(orderId: string, opts: CancelOrderOptions = { estornar: false }): Promise<void>
+// (finalizeOrder permanece ate TASK-055; markAsDelivered permanece com assinatura atual)
+```
+HISTORICO: 2026-10-20 — esqueleto criado inline pelo Kira a partir da forma definida pelo killua (Secao 5, passo 2). Modelos: OrderPayment/OrderPaymentStatus, Order.payments/saleId, PaymentMethod.MISTO + label, Sale.paymentMethod opcional. Novos: order-payment-rules.ts, order-receivables-rules.ts (so NotImplemented). Stubs: SaleService (3 helpers transacionais), OrderService (registerPayment, setScheduledInstallments; updateOrder ganhou opts e cancelOrder ganhou opts com default {estornar:false}, corpos inalterados), order-filters.ts (pedidoSaiuDoKanban, excluirPedidosForaDoKanban). Validacao: tsc app/spec exit 0, ng build ok (so warnings de budget pre-existentes). npm ci rodado no worktree (node_modules ausente). Pontos assumidos da secao 12 (1-8) mantidos: usuario seguiu sem corrigir.
+
+## TASK-036 — [TDD RED] Regras puras de pagamento (order-payment-rules)
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-035
+ESCOPO: escrever src/services/order-service/order-payment-rules.spec.ts cobrindo as regras da secao 5.3 e confirmar RED por logica ausente (nunca por erro de compilacao).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 3, 5, 5.3), src/services/order-service/order-payment-rules.ts (esqueleto), src/models/order-model.ts, src/models/sell-model.ts, src/services/product-service/product-weight-rules.spec.ts (padrao de spec de funcao pura)
+CRITERIO DE ACEITE: (1) spec cobre: saldo/pago/previsto derivados; derivacao de finished antigo (1 pagamento valor cheio) e delivered sem saleId = legado; bloqueio valor<=0 e valor>saldo (codigo ACIMA_DO_SALDO) e pedido canceled (PEDIDO_CANCELADO); cartao pago na hora sem virar previsto e Pix forcando installments=1; pagamento de parcela com diferenca indo para a proxima, ou criando parcela nova em dueDate+30 dias, e pagamento maior que a parcela abatendo proximas em cascata; invariante soma(previsto)==saldo e remocao de parcela zerada; pagamento avulso abatendo das previstas mais antigas; gerarParcelasIguais (centavos sobrantes na ultima, fim de mes: 31/01 +1 mes = 28/02); aplicarAgendaParcelas (soma != saldo => PARCELAS_NAO_FECHAM, cartao => CARTAO_NAO_PARCELA, preserva pagas, substitui previstas); validarNovoTotal (novoTotal < pago => TOTAL_ABAIXO_DO_PAGO; previstas desajustadas sem novas => PARCELAS_NAO_REAJUSTADAS); aplicarCancelamento (previstas -> cancelado; estornar true => pago vira estornado, false => segue pago); resolverFormaFinal (uma forma, ultima por paidDate, misto com >1 forma, ignora estornado/cancelado); deveConcluir (delivered && saldo 0; nao conclui pending mesmo com saldo 0); (2) roda `npx ng test --include='**/order-payment-rules.spec.ts' --browsers=ChromeHeadless --watch=false` e todos os testes falham por NotImplemented; (3) nenhum teste depende de Firestore.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-payment-rules.spec.ts
+NAO FAZER: nao alterar o esqueleto nem codigo de producao; nao editar .claude/tasks.md; nao deixar specs de debug no working tree.
+RETORNO ESPERADO: lista de testes, saida do comando mostrando RED por logica ausente.
+HISTORICO: 2026-10-20 — mike criou order-payment-rules.spec.ts: 77 testes, RED confirmado (77 FAILED por NotImplemented, 0 por compilacao). Premissas documentadas no spec: parcela 1 vence na data X; fim de mes ancorado (31/01->28/02->31/03); truncamento com resto na ultima (10/7 = 6x1.42 + 1.48); +30 dias em calendario; cascata continua apos zerar intermediaria; finished antes de ACIMA_DO_SALDO. Nao cobertos (regra omissa): cartao com previstas existentes (Kira: abate das mais antigas como avulso, p/ manter invariante), parcelaId apontando p/ pago, novoTotal==pago com previstas, finished antigo sem paymentDate.
+
+## TASK-037 — [TDD GREEN] Implementar regras puras de pagamento
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-036
+ESCOPO: implementar order-payment-rules.ts ate o spec da TASK-036 ficar GREEN, sem alterar assinaturas.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 3, 5, 5.3), .claude/context/clean-code.md, src/services/order-service/order-payment-rules.ts, src/services/order-service/order-payment-rules.spec.ts (somente leitura), src/models/order-model.ts, src/models/sell-model.ts
+CRITERIO DE ACEITE: (1) todos os testes de order-payment-rules.spec.ts GREEN; (2) funcoes puras (sem Angular/Firestore), comparacoes em centavos inteiros via arredondar2; (3) datas de saida sempre Timestamp.fromDate; erros sempre PagamentoInvalidoError com o codigo da regra.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-payment-rules.ts
+NAO FAZER: nao editar o spec; nao mudar assinaturas; nao tocar OrderService nem componentes; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff resumido e saida do comando de teste.
+HISTORICO: 2026-10-20 — levi implementou order-payment-rules.ts: 77 SUCCESS, 0 FAILED. Centavos inteiros (paraCentavos/deCentavos), Timestamp.fromDate em toda saida, cascata por dueDate posterior a parcela paga, +30 dias calendario, parcelas iguais ancoradas no dia original. Decisao Kira aplicada: avulso de qualquer forma (incl. cartao) abate previstas mais antigas. Interpretacoes do levi: excesso sem parcelas posteriores nao e erro; validarNovoTotal sem novasParcelas aceita se previstas ja fecham o novo saldo; gerarId com fallback Math.random. Pontos abertos p/ OrderService: nao rejeita method 'misto' na entrada; agenda/novoTotal nao bloqueiam canceled/finished (guarda fica no service); pago legado id 'legado' pode ser materializado ao gravar.
+
+## TASK-038 — [TDD GREEN] Confirmar regras puras de pagamento
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-037
+ESCOPO: so RODAR os mesmos testes da TASK-036 e confirmar GREEN; se falhar, relatorio de bug.
+FLUXO: Implementacao
+CONTEXTO A LER: src/services/order-service/order-payment-rules.ts, src/services/order-service/order-payment-rules.spec.ts, .claude/context/regra-de-negocio.md (monolitico; secao 5.3)
+CRITERIO DE ACEITE: (1) `npx ng test --include='**/order-payment-rules.spec.ts' --browsers=ChromeHeadless --watch=false` 100% GREEN; (2) nenhum teste reescrito.
+ARQUIVOS PERMITIDOS: nenhum
+NAO FAZER: nao editar codigo nem spec; nao editar .claude/tasks.md.
+RETORNO ESPERADO: GREEN confirmado (contagem) ou relatorio de bug para redespacho do levi.
+HISTORICO: 2026-10-20 — mike rodada GREEN: 77 SUCCESS, sem teste passando por motivo errado. Kira abriu ciclo de correcao sobre a TASK-037: (1) regra stale — trava 'Pix nao parcela' foi removida pelo usuario no commit 333d386 (2026-08-28), regra-de-negocio.md secoes 3/5/5.3 corrigidas, implementacao ainda forca Pix=1; (2) guarda nova FORMA_INVALIDA para method 'misto' na entrada (codigo adicionado ao tipo pelo Kira); (3) aplicarAgendaParcelas bloqueia canceled/finished. Cartao quitando parcela especifica: aceito como esta (pago na hora + cascata nas previstas). Correcao segue mike RED -> levi -> mike GREEN.
+
+## TASK-039 — [TDD RED] Regras puras de A receber, resumo de valores e saida do kanban
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-035
+ESCOPO: escrever order-receivables-rules.spec.ts e order-filters.spec.ts (novos) e confirmar RED por logica ausente.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 5, 5.3), src/services/order-service/order-receivables-rules.ts (esqueleto), src/components/order/order-filters.ts (esqueleto), src/models/order-model.ts
+CRITERIO DE ACEITE: (1) cobre: listarParcelasReceber (so previsto de pedido nao cancelado; k/n pela posicao entre pagamentos com dueDate; diasAtraso>0 so se dueDate < inicio do dia de hoje); montarAbaAReceber (cards vencido / vence este mes (>= hoje ate fim do mes) / proximos, grupos e quantidadeVencidas); montarPanoramaAnual (recebido por paidDate, previsto nao vencido e vencido por mes, recebidoAno, aReceberAno, vencidoTotal de todos os anos); sinal retido (pedido canceled com pago) conta como Recebido, estornado nao; finished antigo derivado conta como Recebido na paymentDate; calcularRecebidoNoPeriodo e calcularAReceberTotal batem com o panorama; listarMovimentoDoMes; resumirValoresPedidos (total, pago, saldo); pedidoSaiuDoKanban (delivered && saldo>0 && saldoDescoberto==0 => true; delivered sem parcelas => false; pending com parcelas => false) e excluirPedidosForaDoKanban; (2) roda `npx ng test --include='**/order-receivables-rules.spec.ts' --include='**/order-filters.spec.ts' --browsers=ChromeHeadless --watch=false` e todos falham por NotImplemented; (3) sem Firestore.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-receivables-rules.spec.ts, src/components/order/order-filters.spec.ts
+NAO FAZER: nao alterar esqueleto/producao; nao editar order.spec.ts; nao editar .claude/tasks.md.
+RETORNO ESPERADO: lista de testes e saida RED.
+HISTORICO: 2026-10-20 — mike criou order-receivables-rules.spec.ts (34) e order-filters.spec.ts (11): 45 testes, RED confirmado (45 FAILED por NotImplemented). hoje fixo 20/10/2026. Premissas: mes 0-11 em listarMovimentoDoMes; grupos crescentes por dueDate; calcularAReceberTotal inclui vencidas (conforme 5.3). Nao cobertos: k/n com pagos/estornados misturados, previsto sem dueDate, total de cancelado em resumirValoresPedidos.
+
+## TASK-040 — [TDD GREEN] Implementar regras de A receber, resumo e kanban
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-039, TASK-037
+ESCOPO: implementar order-receivables-rules.ts e as 2 funcoes novas de order-filters.ts ate GREEN, reaproveitando listarPagamentos/calcularSaldo/calcularSaldoDescoberto de order-payment-rules.ts.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 5, 5.3), .claude/context/clean-code.md, src/services/order-service/order-receivables-rules.ts, src/services/order-service/order-receivables-rules.spec.ts (leitura), src/components/order/order-filters.ts, src/components/order/order-filters.spec.ts (leitura), src/services/order-service/order-payment-rules.ts
+CRITERIO DE ACEITE: (1) specs da TASK-039 GREEN; (2) uma unica funcao de calculo alimenta aba de Pedidos e panorama (sem duplicar formula); (3) funcoes existentes de order-filters.ts continuam intactas.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-receivables-rules.ts, src/components/order/order-filters.ts
+NAO FAZER: nao editar specs; nao tocar order.ts/order.html nem services; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff resumido e saida dos testes.
+HISTORICO: 2026-10-20 — levi implementou order-receivables-rules.ts (fonte unica: listarParcelasReceber + listarRecebimentos alimentam aba/panorama/movimento/totais; saldo via order-payment-rules) e pedidoSaiuDoKanban/excluirPedidosForaDoKanban em order-filters.ts: 45 SUCCESS; order.spec.ts 7 SUCCESS. Pendencias anotadas pelo Kira: k/n hoje conta so previstas (pago de parcela perde dueDate) -> exibe 1/4 em vez de 2/5 da spec; correcao planejada (pago de parcela mantem dueDate; k/n entre pago+previsto com dueDate). finished legado sem paymentDate entra no pago do resumo mas nao no recebido por periodo (sem data). calcularAReceberTotal inclui previstas de qualquer ano.
+
+## TASK-041 — [TDD GREEN] Confirmar regras de A receber e kanban
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-040
+ESCOPO: so RODAR os specs da TASK-039 e confirmar GREEN, mais `npx ng test --include='**/order.spec.ts'` para garantir que o filtro existente nao regrediu.
+FLUXO: Implementacao
+CONTEXTO A LER: src/services/order-service/order-receivables-rules.ts, src/services/order-service/order-receivables-rules.spec.ts, src/components/order/order-filters.ts, src/components/order/order-filters.spec.ts
+CRITERIO DE ACEITE: (1) os dois specs novos 100% GREEN; (2) order.spec.ts continua GREEN; (3) nenhum teste reescrito.
+ARQUIVOS PERMITIDOS: nenhum
+NAO FAZER: nao editar codigo nem spec; nao editar .claude/tasks.md.
+RETORNO ESPERADO: GREEN com contagens ou relatorio de bug.
+HISTORICO: 2026-10-20 — mike GREEN: receivables+filters 45 SUCCESS, order.spec 7 SUCCESS, sem teste passando por motivo errado. Em paralelo: ciclo de correcao da TASK-037 fechado pelo levi (Pix sem trava, FORMA_INVALIDA p/ misto, agenda bloqueia canceled/finished): order-payment-rules 82 SUCCESS. Aberto ciclo de correcao k/n (pago de parcela mantem dueDate; n conta pago+previsto com dueDate) p/ exibir 2/5 conforme spec.
+
+## TASK-042 — [TDD RED] SaleService em transacao (venda sem forma, atualizar forma, cancelar registro)
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-035
+ESCOPO: acrescentar ao sale-service.spec.ts testes (emulador) para os 3 helpers transacionais e confirmar RED.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 2, 3, 5.3), src/services/sale-service/sale-service.ts (esqueleto), src/services/sale-service/sale-service.spec.ts, src/services/test-helpers.ts, src/models/sell-model.ts
+CRITERIO DE ACEITE: (1) addSaleInTransaction dentro de runTransaction grava Sale status 'completed', companyId, total cheio, sem paymentMethod e sem tocar estoque; (2) setSalePaymentInTransaction grava paymentMethod/installments (inclusive 'misto'); (3) cancelSaleRecordInTransaction muda so status para 'canceled' e NAO altera o estoque; (4) falha da transacao apos o helper nao deixa Sale gravada (atomicidade); (5) falham por NotImplemented, nao por compilacao; (6) testes existentes do spec preservados.
+ARQUIVOS PERMITIDOS: src/services/sale-service/sale-service.spec.ts
+NAO FAZER: nao alterar producao; ids de documento unicos (Date.now) como no padrao da TASK-032; nao editar .claude/tasks.md.
+RETORNO ESPERADO: testes novos e saida RED (emuladores Firestore+Auth no ar).
+HISTORICO: 2026-10-20 — mike acrescentou 6 testes ao sale-service.spec.ts (emulador): TOTAL 6 FAILED (NotImplemented), 3 SUCCESS (testes antigos preservados). Cobre criacao sem forma/sem estoque, atomicidade, forma pix/misto, cancelamento so de status. Nao coberto: cancelSaleRecordInTransaction em Sale inexistente (regra omissa).
+
+## TASK-043 — [TDD GREEN] SaleService em transacao, enum MISTO e Sale.paymentMethod opcional
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-042
+ESCOPO: implementar os 3 helpers de SaleService e confirmar que o enum MISTO e Sale.paymentMethod opcional (do esqueleto) nao quebram PDV/Comandas.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 2, 3, 5.3), .claude/context/clean-code.md, src/services/sale-service/sale-service.ts, src/services/sale-service/sale-service.spec.ts (leitura), src/models/sell-model.ts
+CRITERIO DE ACEITE: (1) testes da TASK-042 GREEN; (2) processSale e cancelSale existentes inalterados e seus testes GREEN; (3) `ng build` sem erro novo.
+ARQUIVOS PERMITIDOS: src/services/sale-service/sale-service.ts, src/models/sell-model.ts
+NAO FAZER: nao editar specs; nao alterar PDV (src/components/pdv/); nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff resumido, saida de testes e build.
+HISTORICO: 2026-10-20 — levi implementou os 3 helpers em sale-service.ts (transaction.set/update, sem runTransaction proprio, sem estoque; constante SALE_STATUS; helpers privados saleRef/mapSaleItems): emulador 9 SUCCESS, 0 FAILED; ng build EXIT 0. processSale/cancelSale inalterados. Atencao: processSale grava paymentMethod mesmo undefined (PDV sempre passa, ok hoje); date da Sale vem do caller -> markAsDelivered deve passar a data da entrega; mapeamento de items duplicado entre processSale e mapSaleItems (unificar depois).
+
+## TASK-044 — [TDD RED] OrderService: registerPayment, setScheduledInstallments e conclusao
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-037, TASK-043
+ESCOPO: no order-service.spec.ts, reescrever os testes de finalizeOrder como testes de registerPayment equivalentes e acrescentar os casos novos de registerPayment e setScheduledInstallments; confirmar RED.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 3, 5, 5.3), src/services/order-service/order-service.ts (esqueleto), src/services/order-service/order-service.spec.ts, src/services/order-service/order-payment-rules.ts, src/services/sale-service/sale-service.ts, src/services/test-helpers.ts, src/models/order-model.ts
+CRITERIO DE ACEITE: (1) registerPayment: pagamento parcial grava pago e saldo; valor > saldo rejeita (ACIMA_DO_SALDO) sem gravar nada; pedido canceled rejeita; pagamento antes da entrega permitido sem concluir; delivered + saldo 0 conclui (status finished, paymentDate, closingDate, Order.paymentMethod/installments); conclusao atualiza a Sale existente com a forma do ultimo pagamento ou 'misto'; pedido legado (delivered sem saleId) cria a Sale na conclusao com date de conclusao; Pix forca installments=1; cartao vira pago na hora; pagamento de parcela com diferenca reajusta a proxima ou cria +30 dias; (2) atomicidade: falha forcada (ex.: Sale inexistente) NAO deixa pedido finished nem pagamento gravado, e nunca duplica Sale; (3) setScheduledInstallments: soma != saldo rejeita; cartao rejeita; substitui previstas e preserva pagas; (4) falham por NotImplemented; (5) os testes de isolamento companyId existentes do spec ficam preservados.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-service.spec.ts
+NAO FAZER: nao alterar producao; nao remover testes de isolamento/numeracao; finalizeOrder ainda existe no codigo — nao testar mais ele; nao editar .claude/tasks.md.
+RETORNO ESPERADO: lista de testes novos/reescritos e saida RED.
+HISTORICO: 2026-10-20 — mike reescreveu order-service.spec.ts: bloco finalizeOrder (5) removido, 25 testes novos de registerPayment/setScheduledInstallments (parcial, bloqueios, antes da entrega, conclusao + forma final/misto, legado cria Sale sem duplicar, cartao, Pix 3x preservado, installments<=0 -> 1, atomicidade com saleId invalido, parcela/avulso/+30 dias, agenda). Emulador: 25 FAILED, 3 SUCCESS (isolamento preservado). Assumido: agenda em canceled -> PEDIDO_CANCELADO (ja coberto pela correcao da 037). Comentario stale de Pix em order-model.ts corrigido inline pelo Kira.
+
+## TASK-045 — [TDD GREEN] OrderService: registerPayment e setScheduledInstallments
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-044
+ESCOPO: implementar registerPayment e setScheduledInstallments em runTransaction (ler pedido, aplicar regra pura, gravar payments; na conclusao gravar status/paymentDate/closingDate/paymentMethod/installments e atualizar ou criar a Sale via helpers de SaleService), ate os testes da TASK-044 ficarem GREEN.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 3, 5, 5.3), .claude/context/clean-code.md, src/services/order-service/order-service.ts, src/services/order-service/order-service.spec.ts (leitura), src/services/order-service/order-payment-rules.ts, src/services/sale-service/sale-service.ts
+CRITERIO DE ACEITE: (1) testes da TASK-044 GREEN; (2) toda escrita de dinheiro dentro de UMA runTransaction, com todas as leituras antes das escritas e Sale tocada so via SaleService; (3) nenhum serverTimestamp dentro de payments (Timestamp.fromDate); erros de regra sobem como PagamentoInvalidoError.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-service.ts
+NAO FAZER: nao editar specs; nao remover finalizeOrder (TASK-055); nao tocar markAsDelivered/cancelOrder/updateOrder (TASK-047); nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff resumido e saida de testes.
+HISTORICO: 2026-10-20 — levi implementou registerPayment (runTransaction, leitura unica antes das escritas, aplicarPagamento + concluirPedido; legado cria Sale via addSaleInTransaction e grava saleId; forma via setSalePaymentInTransaction) e setScheduledInstallments: emulador 28 SUCCESS, 0 FAILED; ng build ok. paymentDate = paidDate do pago mais recente; gerarId = doc(ordersCollection).id. Sale inexistente por saleId faz o commit falhar (precondicao do update) e reverte tudo. Achado: SaleService.addSaleInTransaction descarta customerId (bug da TASK-043, sem cobertura) -> coberto na TASK-046 (RED) e corrigido na TASK-047 (sale-service.ts liberado).
+
+## TASK-046 — [TDD RED] OrderService: markAsDelivered com Sale, cancelOrder, updateOrder e legado
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-045
+ESCOPO: acrescentar ao order-service.spec.ts os testes do restante do ciclo e confirmar RED.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 2, 3, 5, 5.3), src/services/order-service/order-service.ts, src/services/order-service/order-service.spec.ts, src/services/order-service/order-payment-rules.ts, src/services/sale-service/sale-service.ts, src/services/test-helpers.ts
+CRITERIO DE ACEITE: (1) markAsDelivered: baixa estoque, cria Sale (completed, total cheio, itens com snapshot, sem forma, sale_type order, customerId) e grava Order.saleId na MESMA transacao; estoque insuficiente reverte tudo e nao deixa Sale; entrega dupla (status delivered/finished/canceled) rejeita sem baixar estoque de novo; saldo ja zerado antes da entrega => conclui na entrega (finished + Sale com forma); (2) cancelOrder: pedido delivered devolve estoque UMA vez, cancela a Sale (status canceled), previstas viram cancelado; estornar=true => pagos estornado, estornar=false => pagos permanecem (sinal retido) e nenhuma Sale nova; pedido pending com pagamentos cancela sem mexer em estoque; finished/canceled rejeita; legado (sem saleId) cancela sem tocar Sale; (3) updateOrder: reduzir total abaixo do pago rejeita (TOTAL_ABAIXO_DO_PAGO) sem gravar; com previstas exige opts.parcelas que fechem o novo saldo (PARCELAS_NAO_REAJUSTADAS) e grava itens+total+parcelas atomicamente; sem pagamentos mantem o comportamento atual (total recalculado com soldByWeight); (4) falham por NotImplemented/comportamento ausente, nao por compilacao.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-service.spec.ts
+NAO FAZER: nao alterar producao; nao editar .claude/tasks.md.
+RETORNO ESPERADO: testes novos e saida RED.
+HISTORICO: 2026-10-20 — mike acrescentou 17 testes ao order-service.spec.ts (markAsDelivered com Sale/guarda/conclusao na entrega, customerId na Sale de legado, cancelOrder com estorno/sinal retido/Sale cancelada/guardas, updateOrder com TOTAL_ABAIXO_DO_PAGO/PARCELAS_NAO_REAJUSTADAS/escrita unica). Emulador: 13 FAILED, 32 SUCCESS (28 antigos + 4 guardas que o codigo atual ja cumpre: estoque insuficiente reverte, cancel legado, cancelOrder sem opts, updateOrder sem pagamentos). Sessao caiu no meio e a task foi retomada. Revisao style das regras puras (paralela): APROVADO, opcionais de refactor anotados p/ limpeza antes do PR.
+
+## TASK-047 — [TDD GREEN] OrderService: markAsDelivered, cancelOrder e updateOrder
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-046
+ESCOPO: reescrever markAsDelivered (guarda de status + Sale na transacao + conclusao se saldo 0), cancelOrder(orderId, opts) e updateOrder(orderId, data, opts) em runTransaction conforme secao 5.3, ate GREEN.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 2, 3, 5, 5.3), .claude/context/clean-code.md, src/services/order-service/order-service.ts, src/services/order-service/order-service.spec.ts (leitura), src/services/order-service/order-payment-rules.ts, src/services/sale-service/sale-service.ts
+CRITERIO DE ACEITE: (1) testes da TASK-046 GREEN e demais specs de order-service continuam GREEN; (2) estoque devolvido/baixado exatamente uma vez; Sale criada/cancelada somente via helpers de SaleService; (3) cancelOrder mantem default {estornar:false} para o order.ts atual compilar; `ng build` passa.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-service.ts, src/services/sale-service/sale-service.ts (so p/ addSaleInTransaction gravar customerId)
+NAO FAZER: nao editar specs; nao remover finalizeOrder; nao tocar componentes; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff resumido, testes e build.
+HISTORICO: 2026-10-20 — levi (mesmo executor da 045): markAsDelivered com guarda de status, leituras antes das escritas, baixa de estoque + Sale (addSaleInTransaction, customerId, sem forma) + saleId/actualDeliveryDate na mesma transacao, conclusao na entrega se saldo 0 (pedido passado a deveConcluir ja com status delivered, apontamento do style); cancelOrder com guarda, estoque 1x, aplicarCancelamento, cancelSaleRecordInTransaction; updateOrder transacional com validarNovoTotal e gerarId do service; caminho unico de conclusao (camposDeConclusao) compartilhado com registerPayment. sale-service.ts: addSaleInTransaction grava customerId. Emulador order-service+sale-service: 54 SUCCESS, 0 FAILED; ng build ok. Pontos p/ usuario: pedido total 0 entregue sem pagamento nao conclui (sem forma); editar so o frete nao recalcula total (comportamento pre-existente). Sale date na entrega = serverTimestamp.
+
+## TASK-048 — [TDD GREEN] Confirmar servicos de pagamento e suite completa
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-047
+ESCOPO: so RODAR os specs das TASK-042/044/046 e depois a suite completa dentro de `firebase emulators:exec` (ng test), confirmando GREEN ou devolvendo relatorio de bug.
+FLUXO: Implementacao
+CONTEXTO A LER: src/services/order-service/order-service.spec.ts, src/services/sale-service/sale-service.spec.ts, src/services/order-service/order-payment-rules.spec.ts, src/services/order-service/order-receivables-rules.spec.ts, .claude/context/regra-de-negocio.md (monolitico; secao 5.3)
+CRITERIO DE ACEITE: (1) specs de order-service e sale-service 100% GREEN; (2) suite completa verde (unica falha tolerada: AppComponent/SwUpdate pre-existente, se ainda existir); (3) nenhum teste reescrito.
+ARQUIVOS PERMITIDOS: nenhum
+NAO FAZER: nao editar codigo nem spec; nao editar .claude/tasks.md.
+RETORNO ESPERADO: GREEN com contagens ou relatorio de bug para levi.
+HISTORICO: 2026-10-20 — mike rodou a suite completa via firebase emulators:exec: TOTAL 388 SUCCESS, 0 FAILED, exit 0 (era 210 em 2026-10-09). Ruido esperado: ERROR de ComandaService (caminho de erro coberto) e WARN AngularFire fora de injection context.
+
+## TASK-049 — Teste de caracterizacao: comissao so entra com pedido concluido
+STATUS: CONCLUIDA
+AGENT: mike
+DEPENDENCIAS: TASK-048
+ESCOPO: acrescentar ao vendedor-service.spec.ts testes que fixam a regra "comissao so com saldo 0"; o codigo ja a cumpre via status 'finished', entao estes testes nascem GREEN (nao ha RED aplicavel).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 5.2, 5.3), src/services/vendedor-service/vendedor-service.ts, src/services/vendedor-service/vendedor-service.spec.ts, src/models/order-model.ts
+CRITERIO DE ACEITE: (1) pedido 'delivered' com payments parciais (saldo>0) nao entra em totalVendido/totalComissao; (2) pedido 'canceled' com sinal retido nao entra; (3) pedido 'finished' entra normalmente (frete fora da base); (4) todos GREEN.
+ARQUIVOS PERMITIDOS: src/services/vendedor-service/vendedor-service.spec.ts
+NAO FAZER: nao alterar vendedor-service.ts; nao editar .claude/tasks.md.
+RETORNO ESPERADO: testes adicionados e saida GREEN.
+HISTORICO: 2026-10-20 — mike acrescentou 3 testes de caracterizacao ao vendedor-service.spec.ts (delivered parcial fora; canceled com sinal retido fora; finished quitado entra com frete fora da base): 29 SUCCESS (26 + 3), nascem GREEN como previsto. vendedor-service.ts intocado.
+
+## TASK-050 — UI Pedidos: modal Registrar pagamento, card "Pago R$ X de Y" e kanban
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-041, TASK-048
+ESCOPO: trocar o modal de pagamento por "Registrar pagamento" (valor com default = saldo, forma, parcelas informativas so p/ cartao, data paga default hoje) chamando orderService.registerPayment; botao em todo status exceto cancelado; card do kanban mostra "Pago R$ X de Y"; aplicar excluirPedidosForaDoKanban no filteredOrders$ e em cidadesDisponiveis$.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secao 5.3), .claude/context/identidade-visual.md, .claude/context/clean-code.md, src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css, src/components/order/order-filters.ts, src/services/order-service/order-service.ts, src/services/order-service/order-payment-rules.ts
+CRITERIO DE ACEITE: (1) valor > saldo e <=0 bloqueados na UI E erro do servico (PagamentoInvalidoError.codigo) vira notif.warning/error em pt-BR; (2) toast de conclusao quando RegistrarPagamentoResultado.concluido; (3) pedido entregue com parcelas cobrindo o saldo some do kanban; sem chamar finalizeOrder em lugar nenhum de order.ts; Pix forca 1 parcela na UI.
+ARQUIVOS PERMITIDOS: src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css, src/components/order/order-mobile.css
+NAO FAZER: nao alterar services/models; nao tocar PDV/Comandas; nao editar order.spec.ts; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, `ng build` sem erro, resumo.
+HISTORICO: 2026-10-20 — hanzo: modal 'Registrar pagamento' (saldo via calcularSaldo, valor default = saldo, forma sem Misto, parcelas informativas p/ todas as formas incl. Pix, data paga default hoje enviada como meio-dia local) chamando registerPayment; mapa tipado codigo -> mensagem pt-BR p/ todos os PagamentoInvalidoError; toast de conclusao; 'Pagar' do delivered abre o modal; icone de pagamento nos demais status (exceto canceled/finished); linha 'Pago R$ X de Y' no card; excluirPedidosForaDoKanban em filteredOrders$ e cidadesDisponiveis$. order.ts nao chama mais finalizeOrder. ng build ok; order.spec 7 SUCCESS. Revisao style do back (order-service/sale-service) em paralelo: APROVADO; opcionais: guarda de status em updateOrder (UI so edita open/pending), duplicacao processSale/mapSaleItems, printWidth, itens repetidos do mesmo produto validados contra estoque cheio (pre-existente).
+
+## TASK-051 — UI Pedidos: modal Montar parcelas e edicao de itens com parcelas
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-050
+ESCOPO: botao "Montar parcelas" (modo A: N iguais mensais a partir da data X via gerarParcelasIguais; modo B: livre) chamando setScheduledInstallments; soma x saldo bloqueando salvar; destaque "vencida ha X dias"; na edicao de itens com pagamentos, bloquear novo total < pago e exigir reajuste de parcelas antes de salvar via updateOrder(id, data, { parcelas }).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secao 5.3), .claude/context/identidade-visual.md, src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css, src/services/order-service/order-service.ts, src/services/order-service/order-payment-rules.ts
+CRITERIO DE ACEITE: (1) soma != saldo impede salvar e mostra a diferenca; cartao nao aparece como forma de parcela; (2) editar itens para total < pago e bloqueado com mensagem; com previstas, salvar so e possivel apos reajustar e a edicao e gravada numa unica chamada; (3) funciona no mobile.
+ARQUIVOS PERMITIDOS: src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css, src/components/order/order-mobile.css
+NAO FAZER: nao alterar services/models; nao tocar PDV/Comandas; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, `ng build`, resumo.
+HISTORICO: 2026-10-20 — hanzo (mesmo executor da 050): botao 'Montar parcelas' (card e detalhe, pedido nao canceled/finished com saldo > 0); modal com modo parcelas iguais (gerarParcelasIguais -> previa editavel) e modo livre (abre com previstas atuais); soma x saldo com diferenca, salvar bloqueado ate fechar; formas so Dinheiro/Pix/Cheque/Boleto; lista 'Parcelas previstas' no detalhe com 'vencida ha X dias' e linha 'prox: R$ · dd/mm' no card; edicao de itens bloqueia total < pago e, com previstas desajustadas, abre o mesmo modal pre-carregado e grava via updateOrder(id, data, {parcelas}) numa chamada. Mobile <=600px empilha. ng build ok; order.spec 7 SUCCESS. Ponto p/ style: soma das parcelas e reduce + arredondar2 no componente (nao ha funcao pura de soma).
+
+## TASK-052 — UI Pedidos: cancelamento com pagamentos lancados (estornar ou sinal retido)
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-051
+ESCOPO: em cancelAction, se o pedido tem pagamentos 'pago', avisar o valor ja recebido e perguntar "Estornar?" (sim => estornar:true; nao => sinal retido, estornar:false); informar que parcelas previstas serao canceladas; chamar cancelOrder(id, { estornar }).
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 3, 5, 5.3), .claude/context/identidade-visual.md, src/components/order/order.ts, src/components/order/order.html, src/services/order-service/order-service.ts, src/services/order-service/order-payment-rules.ts
+CRITERIO DE ACEITE: (1) sem pagamentos pagos o fluxo atual de confirmacao nao muda; (2) com pagamentos o usuario escolhe estornar ou reter e a escolha chega ao servico; (3) mensagens deixam claro que nao estornar mantem o valor como recebido.
+ARQUIVOS PERMITIDOS: src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css
+NAO FAZER: nao alterar services; nao tocar a regra de estoque; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, `ng build`, resumo.
+HISTORICO: 2026-10-20 — hanzo: cancelAction com calcularPago > 0 abre modal proprio (sem confirm nativo): 'Ja recebido: R$ X', aviso de previstas canceladas e, se entregue, de estoque devolvido + venda cancelada; opcoes Estornar R$ X (estornar:true) / Manter como sinal retido (estornar:false, texto 'continua contado como recebido e nao vira venda') / Voltar. Sem pagamento pago o confirm antigo segue igual. Toast indica o caminho; erros via mapa de mensagens. ng build ok; order.spec 7 SUCCESS.
+
+## TASK-053 — UI Pedidos: aba "A receber" (mobile incluso)
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-052
+ESCOPO: abas "Pedidos | A receber (N vencidas)" que trocam o conteudo inteiro; componente novo src/components/order-receivables/ com cards, grupos VENCIDAS / ESTE MES / PROXIMOS MESES e linhas com [Recebi] via montarAbaAReceber; [Recebi] abre Registrar pagamento com a parcela preenchida e editavel (parcelaId); clique no cliente abre o detalhe do pedido.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secao 5.3), .claude/context/identidade-visual.md, src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css, src/components/order/order-mobile.css, src/services/order-service/order-receivables-rules.ts
+CRITERIO DE ACEITE: (1) numeros e grupos vem exclusivamente de montarAbaAReceber (sem formula nova no componente); (2) [Recebi] pre-preenche o valor da parcela e a parcela paga some/atualiza em tempo real; (3) layout utilizavel em mobile.
+ARQUIVOS PERMITIDOS: src/components/order-receivables/order-receivables.ts, src/components/order-receivables/order-receivables.html, src/components/order-receivables/order-receivables.css, src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css, src/components/order/order-mobile.css
+NAO FAZER: nao alterar services/models; nao criar colecao nem service; nao tocar PDV/Comandas; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, `ng build`, resumo.
+HISTORICO: 2026-10-20 — hanzo: abas 'Pedidos | A receber (N vencidas)' (contador de quantidadeVencidas sobre todos os pedidos); componente standalone OrderReceivablesComponent (src/components/order-receivables/) recebe orders$ completo por @Input e so apresenta montarAbaAReceber: cards Vencido/Vence este mes/Proximos, grupos VENCIDAS/ESTE MES/PROXIMOS MESES, linha cliente · #n · parcela k/n · valor · 'venceu ha X dias'/'vence dd/mm', estado vazio. [Recebi] abre Registrar pagamento com valor/forma da parcela e parcelaId; clique no cliente abre o detalhe. Mobile: cards empilham, [Recebi] 44px. ng build ok; order.spec 7 SUCCESS. Filtros do kanban ainda visiveis na aba A receber -> ocultados na TASK-054.
+
+## TASK-054 — UI Pedidos: valor estimado ao lado do Resumo de Producao
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-053
+ESCOPO: bloco "Valor estimado" (total / pago / saldo) ao lado do Resumo de Producao, via resumirValoresPedidos sobre filteredOrders$.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secao 5.3), .claude/context/identidade-visual.md, src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css, src/services/order-service/order-receivables-rules.ts
+CRITERIO DE ACEITE: (1) base e filteredOrders$ (muda com filtro de status/cidade); (2) pedido parcelado que saiu do kanban nao entra; (3) usa order.total gravado (inclui frete).
+ARQUIVOS PERMITIDOS: src/components/order/order.ts, src/components/order/order.html, src/components/order/order.css, src/components/order/order-mobile.css
+NAO FAZER: nao alterar services; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, `ng build`, resumo.
+HISTORICO: 2026-10-20 — hanzo: bloco 'Valor estimado' (Total/Pago/Saldo) ao lado do Resumo de Producao via resumirValoresPedidos sobre filteredOrders$ (respeita filtros, exclui parcelados fora do kanban, total gravado com frete); filtros de status/cidade/ordenacao ocultos na aba A receber. Mobile <=768px empilha. ng build ok; order.spec 7 SUCCESS. Revisao style das telas 050-054: 1a rodada PRECISA CORRIGIR (formulas de dinheiro/regra no order.ts — soma de parcelas, pre-check de edicao, dias de atraso, previstas, validacao de valor; order.ts inchado 710->1100; fallback de erro errado em saveInstallments; fechamento duplicado). Ciclo: Kira criou esqueletos (resumirAgenda, avaliarNovoTotal, listarPrevistas, proximaPrevista, valorDePagamentoValido, calcularTotalDoPedido; calcularDiasAtraso exportada) -> mike RED (43) -> levi GREEN (183 puros + 54 emulador; avaliarNovoTotal e validarNovoTotal com predicado comum; OrderService.updateOrder usa calcularTotalDoPedido; itemsTotal arredondado a centavos) -> hanzo trocou formulas, extraiu OrderInstallmentsComponent (src/components/order-installments/) e payment-error-messages.ts; order.ts 991 linhas. 2a rodada style: APROVADO. Opcionais: extrair modais de pagamento/cancelamento, hoje congelado na aba A receber apos meia-noite, tabpanel, 'Pago R$ 0,00 de X' em todo card.
+
+## TASK-055 — Remover OrderService.finalizeOrder
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-050, TASK-048
+ESCOPO: remover finalizeOrder (e imports mortos) do OrderService, apos confirmar por busca que nada mais o chama.
+FLUXO: Melhoria
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 5, 5.3), src/services/order-service/order-service.ts, src/components/order/order.ts
+CRITERIO DE ACEITE: (1) grep de `finalizeOrder` em src/ retorna zero; (2) `ng build` e suite do order-service continuam GREEN; (3) nenhuma regra de pagamento alterada.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-service.ts
+NAO FAZER: nao editar specs nem componentes (se sobrar chamador, parar e reportar); nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff, resultado do grep e build.
+HISTORICO: 2026-10-20 — levi removeu OrderService.finalizeOrder (sem chamadores) e o import morto de PaymentMethod. grep finalizeOrder em src/: zero. ng build ok; emulador order-service+sale-service 54 SUCCESS. Fecha o bug de Sale duplicada (duas escritas sem transacao) por eliminacao do caminho antigo.
+
+## TASK-056 — Gestao: forma Misto, vendas canceladas fora dos relatorios e cards Recebido/A receber
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-041, TASK-048
+ESCOPO: (a) incluir 'Misto' nos selects filtroFormaPagamento e filtroHistoricoFormaPagamento e no paymentMethodLabel; (b) excluir Sale com status 'canceled' de atualizarRelatorio e das demais agregacoes de vendas (~linhas 617, 709, 779); (c) cards "Recebido no periodo" (calcularRecebidoNoPeriodo) e "A receber" (calcularAReceberTotal) nas abas Vendas e Balanco.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secoes 3, 5.1, 5.3), .claude/context/identidade-visual.md, src/components/product-inventory/product-inventory.ts, src/components/product-inventory/product-inventory.html, src/components/product-inventory/product-inventory.css, src/services/order-service/order-receivables-rules.ts, src/models/sell-model.ts
+CRITERIO DE ACEITE: (1) venda cancelada nao entra em faturamento/custo/contagem; (2) filtro por 'Misto' funciona e pedido sem forma aparece com filtro "todos"; (3) os cards usam as funcoes de order-receivables-rules (mesmos numeros da aba A receber de Pedidos).
+ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.ts, src/components/product-inventory/product-inventory.html, src/components/product-inventory/product-inventory.css
+NAO FAZER: nao alterar services/models; nao tocar order.*; nao mexer na logica de Contas (bills); nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, `ng build`, resumo.
+HISTORICO: 2026-10-20 — hanzo: 'Misto' nos selects de forma (Vendas e Historico; label via PAYMENT_METHOD_LABELS); atualizarRelatorio descarta Sale status 'canceled' na entrada (alimenta faturamento/custo/lucro/margem/qtdVendas, grafico por dia, top produtos, Balanco); Historico Geral mantem canceladas (listagem com label); Vendedores ja so usa finished. Cards 'Recebido no Periodo' (calcularRecebidoNoPeriodo) e 'A Receber' (calcularAReceberTotal) em Vendas e Balanco. ng build ok; product-inventory.spec 23 SUCCESS. Pendente: revisao style junto do lote de UI. Revisao style: 1a rodada APROVADA na regra (canceladas fora de todas as agregacoes, Misto, cards via funcoes puras); 2a rodada APROVADO junto da 057.
+
+## TASK-057 — Gestao: sub-aba Relatorio > A receber (panorama anual)
+STATUS: CONCLUIDA
+AGENT: hanzo
+DEPENDENCIAS: TASK-056
+ESCOPO: acrescentar 'receber' ao reportTab com seletor de ano, grafico Chart.js de 12 barras empilhadas (recebido / previsto / vencido nao pago), cards Recebido no ano / A receber no ano / Vencido total, e modal com as parcelas do mes ao clicar na barra (listarMovimentoDoMes), tudo via montarPanoramaAnual.
+FLUXO: Implementacao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (monolitico; secao 5.3), .claude/context/identidade-visual.md, .claude/context/stack.md, src/components/product-inventory/product-inventory.ts, src/components/product-inventory/product-inventory.html, src/components/product-inventory/product-inventory.css, src/services/order-service/order-receivables-rules.ts
+CRITERIO DE ACEITE: (1) numeros batem com a aba A receber de Pedidos para o mesmo dia (mesma funcao); (2) clique no mes abre o modal com as parcelas daquele mes; (3) a trava existente que volta reportTab para 'vendas' quando o modulo some nao regride.
+ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.ts, src/components/product-inventory/product-inventory.html, src/components/product-inventory/product-inventory.css
+NAO FAZER: nao alterar services/models; nao criar formula nova de calculo no componente; nao editar .claude/tasks.md.
+RETORNO ESPERADO: diff aplicado, `ng build`, resumo.
+HISTORICO: 2026-10-20 — hanzo (mesmo executor da 056): sub-aba 'A Receber' no Relatorio com seletor de ano (atual-3..atual+2), Chart.js 12 barras empilhadas Recebido/Previsto/Vencido (cores lidas dos tokens success/info/danger), cards Recebido no Ano / A Receber no Ano / Vencido Total ('todos os anos'), modal do mes via listarMovimentoDoMes; tudo de montarPanoramaAnual. selecionarReportTab() destroi/recria o chart na troca de aba/ano/dados + ngOnDestroy; trava de modulo vendedores preservada. ng build ok; product-inventory.spec 23 SUCCESS. Revisao style 1a rodada: PRECISA CORRIGIR (2 bugs: grafico em branco ao voltar da aba principal — canvas destruido pelo *ngIf com chart orfao; modal do mes fechando a cada snapshot de orders). hanzo corrigiu: selecionarAbaPrincipal(tab) destroi/redesenha; recalcularPanorama() no snapshot nao fecha modal e recalcula movimentos; atualizarPanorama() (troca de ano) fecha. Opcionais aplicados: constantes ANOS_PANORAMA_PARA_TRAS/FRENTE, grade via token, classes kpi-value-*, hint 'ignora filtros' nos cards de Vendas. product-inventory.spec 23 SUCCESS. 2a rodada style: APROVADO. Restam opcionais pre-existentes (destroy de salesChart/topProductsChart, filtro de cancelada no componente em vez do SaleService).
+
+## TASK-058 — Pedidos: limite de 60 parcelas em Montar parcelas (crash com N enorme)
+STATUS: CONCLUIDA
+AGENT: levi
+DEPENDENCIAS: TASK-057
+FLUXO: Correcao
+CONTEXTO A LER: .claude/context/regra-de-negocio.md (secao 5.3, "### Parcelas previstas", bullet "Limite"); .claude/context/clean-code.md
+ESCOPO: Rejeitar mais de 60 parcelas previstas (PARCELAS_ACIMA_DO_LIMITE) e parcela abaixo de R$ 0,01 no modo iguais, validando antes de montar a lista.
+CRITERIO DE ACEITE: gerarParcelasIguais(…, 61/100000) e agendas/reajustes com 61 itens lancam PARCELAS_ACIMA_DO_LIMITE; quantidade > saldo em centavos lanca VALOR_INVALIDO; UI limita o input e mostra a mensagem.
+ARQUIVOS PERMITIDOS: src/services/order-service/order-payment-rules.ts, src/services/order-service/order-payment-rules.spec.ts, src/components/order/payment-error-messages.ts, src/components/order-installments/order-installments.ts, src/components/order-installments/order-installments.html
+NAO FAZER: mexer em outras regras de parcelas
+RETORNO ESPERADO: suite verde + aprovacao do style
+HISTORICO: Bug reportado pelo usuario (N enorme travou a aba: Array.from sem teto). Limite 60 decidido pelo usuario. mike RED: 8 testes (5 falharam por assercao; caso 1e9 trocado por 100000 para nao travar o runner). levi GREEN: MAXIMO_DE_PARCELAS exportada, validarTamanhoDaAgenda em validarAgenda (cobre agenda livre e reajuste) e em validarQuantidadeDeParcelas (antes do Array.from) + piso de centavos. Kira inline na UI: [max] no input, mensagem de quantidade propria e PARCELAS_ACIMA_DO_LIMITE em MENSAGENS_PAGAMENTO. Suite 464 SUCCESS. style APROVADO em 1 rodada (obs nao bloqueante: "R$ 0,01" fixo em 2 mensagens). gon nao se aplica.

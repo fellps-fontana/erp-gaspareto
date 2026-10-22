@@ -1,0 +1,55 @@
+<div class="modal-backdrop">
+  <div class="modal-content installments-modal">
+    <h3>Montar parcelas</h3>
+    <p>Saldo a parcelar: <strong>{{ saldoAlvo | currency:'BRL' }}</strong></p>
+
+    <div class="installments-mode">
+      <button type="button" [class.active]="mode === 'iguais'" (click)="setMode('iguais')">Parcelas iguais</button>
+      <button type="button" [class.active]="mode === 'livre'" (click)="setMode('livre')">Lançamento livre</button>
+    </div>
+
+    <div class="installments-equal" *ngIf="mode === 'iguais'">
+      <div class="form-field">
+        <label for="equalCountInput">Nº de parcelas</label>
+        <input id="equalCountInput" type="number" min="1" [max]="maximoDeParcelas" step="1" [(ngModel)]="equalCount">
+      </div>
+      <div class="form-field">
+        <label for="equalDateInput">1º vencimento</label>
+        <input id="equalDateInput" type="date" [(ngModel)]="equalFirstDate">
+      </div>
+      <div class="form-field">
+        <label for="equalMethodSelect">Forma</label>
+        <select id="equalMethodSelect" [(ngModel)]="equalMethod">
+          <option *ngFor="let m of methodOptions" [value]="m.value">{{ m.label }}</option>
+        </select>
+      </div>
+      <button type="button" class="btn-secondary" (click)="generateEqual()">Gerar prévia</button>
+    </div>
+
+    <div class="installments-rows">
+      <div class="installment-row" *ngFor="let row of rows; let i = index">
+        <input type="number" min="0.01" step="0.01" placeholder="Valor" [(ngModel)]="row.amount" [attr.aria-label]="'Valor da parcela ' + (i + 1)">
+        <input type="date" [(ngModel)]="row.dueDate" [attr.aria-label]="'Vencimento da parcela ' + (i + 1)">
+        <select [(ngModel)]="row.method" [attr.aria-label]="'Forma da parcela ' + (i + 1)">
+          <option *ngFor="let m of methodOptions" [value]="m.value">{{ m.label }}</option>
+        </select>
+        <button type="button" class="btn-icon cancel" (click)="removeRow(i)" title="Remover parcela">✕</button>
+      </div>
+      <button type="button" class="btn-secondary" *ngIf="mode === 'livre'" (click)="addRow()">+ Adicionar parcela</button>
+    </div>
+
+    <div class="installments-summary" [class.ok]="resumo.diferenca === 0" [class.off]="resumo.diferenca !== 0">
+      <span>Soma: {{ resumo.soma | currency:'BRL' }} de {{ saldoAlvo | currency:'BRL' }}</span>
+      <strong *ngIf="resumo.diferenca > 0">Faltam {{ resumo.diferenca | currency:'BRL' }}</strong>
+      <strong *ngIf="resumo.diferenca < 0">Excede {{ -resumo.diferenca | currency:'BRL' }}</strong>
+      <strong *ngIf="resumo.diferenca === 0">Fechou com o saldo</strong>
+    </div>
+
+    <div class="modal-actions">
+      <button (click)="closed.emit()" [disabled]="processing">Cancelar</button>
+      <button class="btn-confirm" (click)="save()" [disabled]="processing || !canSave">
+        {{ processing ? 'Salvando...' : (reajuste ? 'Salvar parcelas e pedido' : 'Salvar parcelas') }}
+      </button>
+    </div>
+  </div>
+</div>

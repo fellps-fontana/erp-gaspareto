@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -30,6 +30,7 @@ import { GeocodingService } from '../../services/geocoding-service/geocoding-ser
 import { MapPickerComponent } from '../map-picker/map-picker';
 import { filtrarPorTermo } from './busca-por-nome';
 import { calcularTotalItemPorPeso } from '../../services/product-service/product-weight-rules';
+import { MovimentoMes, PanoramaAnual, calcularAReceberTotal, calcularRecebidoNoPeriodo, listarMovimentoDoMes, montarPanoramaAnual } from '../../services/order-service/order-receivables-rules';
 
 // --- HISTÓRICO GERAL: item de produto dentro de um lançamento unificado ---
 // Snapshot preservado (priceAtSale/priceAtCost) igual Sale/Order/Comanda —
@@ -73,13 +74,13 @@ export interface HistoricoItem {
   templateUrl: './product-inventory.html',
   styleUrls: ['./product-inventory.css', './product-inventory-mobile.css']
 })
-export class ProductInventoryComponent implements OnInit {
+export class ProductInventoryComponent implements OnInit, OnDestroy {
   readonly config = inject(ConfigService);
   private geocodingService = inject(GeocodingService);
 
   // Controle das Abas
   activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' | 'vendedores' = 'relatorio';
-  reportTab: 'vendas' | 'contas' | 'balanco' | 'vendedores' = 'vendas';
+  reportTab: 'vendas' | 'contas' | 'balanco' | 'receber' | 'vendedores' = 'vendas';
 
   // Controle de Visualização do Formulário
   exibirFormularioNovo: boolean = false;
@@ -110,6 +111,25 @@ export class ProductInventoryComponent implements OnInit {
     qtdVendas: 0,
     margem: 0
   };
+
+  // --- RECEBÍVEIS (valores vêm de order-receivables-rules; o componente só guarda e exibe) ---
+  recebidoNoPeriodo = 0;
+  aReceberTotal = 0;
+
+  // --- SUB-ABA A RECEBER (panorama anual; números vêm de order-receivables-rules) ---
+  readonly mesesAbreviados = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  private static readonly ANOS_PANORAMA_PARA_TRAS = 3;
+  private static readonly ANOS_PANORAMA_PARA_FRENTE = 2;
+  readonly anosPanorama: number[] = Array.from(
+    { length: ProductInventoryComponent.ANOS_PANORAMA_PARA_TRAS + ProductInventoryComponent.ANOS_PANORAMA_PARA_FRENTE + 1 },
+    (_, i) => new Date().getFullYear() - ProductInventoryComponent.ANOS_PANORAMA_PARA_TRAS + i
+  );
+  anoPanorama: number = new Date().getFullYear();
+  panorama: PanoramaAnual | null = null;
+  receberChart: Chart | null = null;
+  /** Mês (0-11) aberto no modal de movimento; null = modal fechado. */
+  mesDetalheAberto: number | null = null;
+  movimentosMesDetalhe: MovimentoMes[] = [];
 
   // --- CHART INSTANCES ---
   salesChart: any;
@@ -260,7 +280,7 @@ export class ProductInventoryComponent implements OnInit {
       if ((this.activeTab === 'clientes' && !m.clientes) ||
           (this.activeTab === 'compras' && !m.compras) ||
           (this.activeTab === 'vendedores' && !m.vendedores)) {
-        this.activeTab = 'relatorio';
+        this.selecionarAbaPrincipal('relatorio');
       }
       if (this.reportTab === 'vendedores' && !m.vendedores) {
         this.reportTab = 'vendas';
@@ -314,6 +334,8 @@ export class ProductInventoryComponent implements OnInit {
     // 9. Carrega pedidos em tempo real (usado no cálculo de comissão por vendedor)
     this.orderService.getOrders().subscribe(data => {
       this.orders = data;
+      this.atualizarRecebiveis();
+      if (this.reportTab === 'receber') this.recalcularPanorama();
     });
   }
 
@@ -607,7 +629,9 @@ export class ProductInventoryComponent implements OnInit {
     const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
     const fim = new Date(this.filtroDataFim + 'T23:59:59');
 
-    this.saleService.getSalesByDate(inicio, fim).subscribe(vendas => {
+    this.saleService.getSalesByDate(inicio, fim).subscribe(todasAsVendas => {
+      // Venda cancelada nunca entra em faturamento, custo, lucro, contagem nem gráficos.
+      const vendas = todasAsVendas.filter((v: any) => v.status !== 'canceled');
       let faturamento = 0;
       let custo = 0;
       let contagemVendas = 0;
@@ -650,6 +674,120 @@ export class ProductInventoryComponent implements OnInit {
 
     // Atualiza o painel de comissões da sub-aba Vendedores (mesmo período filtrado).
     this.atualizarComissoesVendedores();
+    this.atualizarRecebiveis();
+  }
+
+  ngOnDestroy() {
+    this.receberChart?.destroy();
+    this.receberChart = null;
+  }
+
+  // ==========================================================
+  // SUB-ABA A RECEBER (panorama anual)
+  // ==========================================================
+
+  /** Troca a sub-aba do relatório; o gráfico do panorama é destruído ao sair e recriado ao entrar. */
+  selecionarReportTab(tab: ProductInventoryComponent['reportTab']) {
+    this.reportTab = tab;
+    this.fecharMesDetalhe();
+    if (tab === 'receber') {
+      this.atualizarPanorama();
+    } else {
+      this.receberChart?.destroy();
+      this.receberChart = null;
+    }
+  }
+
+  /** Troca a aba principal; ao sair do Relatório destrói o gráfico (o canvas some pelo *ngIf) e ao voltar redesenha o panorama. */
+  selecionarAbaPrincipal(tab: ProductInventoryComponent['activeTab']) {
+    if (this.activeTab === 'relatorio' && tab !== 'relatorio') {
+      this.receberChart?.destroy();
+      this.receberChart = null;
+      this.fecharMesDetalhe();
+    }
+    this.activeTab = tab;
+    if (tab === 'relatorio' && this.reportTab === 'receber') {
+      this.recalcularPanorama();
+    }
+  }
+
+  /** Navegação (troca de ano): recalcula o panorama e fecha o modal do mês. */
+  atualizarPanorama() {
+    this.fecharMesDetalhe();
+    this.recalcularPanorama();
+  }
+
+  /** Dado novo ou navegação: recalcula panorama e gráfico; se o modal do mês está aberto, atualiza a lista sem fechá-lo. */
+  private recalcularPanorama() {
+    const hoje = new Date();
+    this.panorama = montarPanoramaAnual(this.orders, this.anoPanorama, hoje);
+    if (this.mesDetalheAberto !== null) {
+      this.movimentosMesDetalhe = listarMovimentoDoMes(this.orders, this.anoPanorama, this.mesDetalheAberto, hoje);
+    }
+    setTimeout(() => this.renderReceberChart());
+  }
+
+  private lerToken(nome: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+  }
+
+  renderReceberChart() {
+    const ctx = document.getElementById('receberChart') as HTMLCanvasElement | null;
+    this.receberChart?.destroy();
+    this.receberChart = null;
+    if (!ctx || !this.panorama || this.reportTab !== 'receber') return;
+
+    const meses = this.panorama.meses;
+    const textoMudo = this.lerToken('--text-muted');
+    const textoPrincipal = this.lerToken('--text-primary');
+    const corGrade = this.lerToken('--border-color');
+
+    this.receberChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: this.mesesAbreviados,
+        datasets: [
+          { label: 'Recebido', data: meses.map(m => m.recebido), backgroundColor: this.lerToken('--color-success'), borderRadius: 4 },
+          { label: 'Previsto', data: meses.map(m => m.previsto), backgroundColor: this.lerToken('--color-info'), borderRadius: 4 },
+          { label: 'Vencido', data: meses.map(m => m.vencido), backgroundColor: this.lerToken('--color-danger'), borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        onClick: (evento, _elementos, chart) => {
+          const alvos = chart.getElementsAtEventForMode(evento as unknown as Event, 'index', { intersect: false }, true);
+          if (alvos.length) this.abrirMesDetalhe(alvos[0].index);
+        },
+        plugins: { legend: { display: true, labels: { color: textoPrincipal } } },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { color: textoMudo } },
+          y: { stacked: true, beginAtZero: true, grid: { color: corGrade }, ticks: { color: textoMudo } }
+        }
+      }
+    });
+  }
+
+  abrirMesDetalhe(mes: number) {
+    this.mesDetalheAberto = mes;
+    this.movimentosMesDetalhe = listarMovimentoDoMes(this.orders, this.anoPanorama, mes, new Date());
+  }
+
+  fecharMesDetalhe() {
+    this.mesDetalheAberto = null;
+    this.movimentosMesDetalhe = [];
+  }
+
+  tipoMovimentoLabel(tipo: MovimentoMes['tipo']): string {
+    return { recebido: 'Recebido', previsto: 'Previsto', vencido: 'Vencido' }[tipo];
+  }
+
+  /** Recebido no período filtrado e A receber total — delega às funções puras de order-receivables-rules. */
+  private atualizarRecebiveis() {
+    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
+    const fim = new Date(this.filtroDataFim + 'T23:59:59');
+    this.recebidoNoPeriodo = calcularRecebidoNoPeriodo(this.orders, inicio, fim);
+    this.aReceberTotal = calcularAReceberTotal(this.orders, new Date());
   }
 
   // --- PRESETS DE DATA ---
