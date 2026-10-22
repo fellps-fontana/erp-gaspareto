@@ -757,7 +757,7 @@ depois do cutover (ver §14).
   previstas não vencidas com `dueDate` no ano, e "Vencido total" soma todos os
   anos; (6) pedido `finished` antigo sem `paymentMethod` é derivado como
   `dinheiro`; (7) `paidDate` futura não é bloqueada; (8) estorno só tira o valor
-  do Recebido, sem lançamento de saída em Contas.
+  do Recebido, sem lançamento de saída em Despesas.
 - ~~Fechar Sale de pedido cancelado após entrega~~ — resolvido pela seção 5.3
   (decisão do usuário de 2026-10-20: a `Sale` é cancelada junto).
 
