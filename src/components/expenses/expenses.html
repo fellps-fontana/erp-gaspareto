@@ -51,30 +51,30 @@
     <!-- CARDS DE RESUMO (ignoram filtros) -->
     <div class="cards-resumo">
       <div class="card-resumo">
-        <span class="card-icone tom-warning" aria-hidden="true">⏳</span>
+        <span class="card-icone" aria-hidden="true">⏳</span>
         <div class="card-texto">
           <span class="card-label">A pagar no mês</span>
           <strong class="card-valor">R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong>
         </div>
       </div>
       <div class="card-resumo">
-        <span class="card-icone tom-success" aria-hidden="true">✓</span>
+        <span class="card-icone" aria-hidden="true">✓</span>
         <div class="card-texto">
           <span class="card-label">Pago no mês</span>
           <strong class="card-valor">R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong>
         </div>
       </div>
-      <div class="card-resumo" [class.card-alerta]="grupos.totals.vencidas > 0">
-        <span class="card-icone tom-danger" aria-hidden="true">!</span>
+      <div class="card-resumo">
+        <span class="card-icone" aria-hidden="true">!</span>
         <div class="card-texto">
           <span class="card-label">Vencidas</span>
-          <strong class="card-valor valor-vencida"
+          <strong class="card-valor" [class.valor-vencida]="grupos.totals.vencidas > 0"
             >R$ {{ grupos.totals.vencidas | number: '1.2-2' }}</strong
           >
         </div>
       </div>
       <div class="card-resumo">
-        <span class="card-icone tom-info" aria-hidden="true">Σ</span>
+        <span class="card-icone" aria-hidden="true">Σ</span>
         <div class="card-texto">
           <span class="card-label">Total do mês</span>
           <strong class="card-valor">R$ {{ totalDoMes | number: '1.2-2' }}</strong>
@@ -110,8 +110,8 @@
         <section class="alerta-vencidas" *ngIf="vencidasVisiveis.length > 0">
           <h2 class="alerta-titulo">
             {{ vencidasVisiveis.length }}
-            {{ vencidasVisiveis.length === 1 ? 'despesa vencida' : 'despesas vencidas' }} · R$
-            {{ grupos.totals.vencidas | number: '1.2-2' }}
+            {{ vencidasVisiveis.length === 1 ? 'despesa vencida' : 'despesas vencidas' }} ·
+            <span class="alerta-valor">R$ {{ grupos.totals.vencidas | number: '1.2-2' }}</span>
           </h2>
           <ng-container *ngFor="let e of vencidasVisiveis">
             <ng-container *ngTemplateOutlet="linha; context: { $implicit: e }"></ng-container>
@@ -195,9 +195,7 @@
   <!-- LINHA DE LANÇAMENTO -->
   <ng-template #linha let-e>
     <div class="linha" [class.linha-paga]="e.status === 'pago'">
-      <span class="avatar" aria-hidden="true" [style.background]="corCategoria(e.categoryId)">{{
-        iconeCategoria(e.categoryId)
-      }}</span>
+      <span class="avatar" aria-hidden="true">{{ iconeCategoria(e.categoryId) }}</span>
 
       <div class="linha-info">
         <span class="linha-nome">
@@ -223,7 +221,9 @@
         </span>
       </div>
 
-      <span class="linha-valor">R$ {{ e.value | number: '1.2-2' }}</span>
+      <span class="linha-valor" [class.valor-vencida]="estaVencida(e)"
+        >R$ {{ e.value | number: '1.2-2' }}</span
+      >
 
       <button
         type="button"

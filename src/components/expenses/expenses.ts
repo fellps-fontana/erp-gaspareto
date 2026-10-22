@@ -68,7 +68,7 @@ const EMPTY_GROUPS: MonthGroups = {
   totals: { vencidas: 0, aPagarNoMes: 0, pagoNoMes: 0 },
 };
 
-// Apresentacao: icone por categoria padrao (systemKey) e paleta fixa de cores suaves
+// Apresentacao: icone por categoria padrao (systemKey)
 const ICONES_CATEGORIA: Record<string, string> = {
   compra_mercadoria: '🛒',
   insumos_embalagem: '📦',
@@ -84,19 +84,15 @@ const ICONES_CATEGORIA: Record<string, string> = {
   outros: '📌',
 };
 
-const PALETA_CATEGORIAS = [
-  '#e57373',
-  '#f2994a',
+// Mesma paleta de grafico do expense-report-panel
+const PALETA_GRAFICO = [
   '#f4c042',
-  '#81c784',
-  '#4db6ac',
-  '#4fc3f7',
-  '#7986cb',
-  '#ba68c8',
-  '#f06292',
-  '#a1887f',
-  '#90a4ae',
-  '#aed581',
+  '#3498db',
+  '#2ecc71',
+  '#e74c3c',
+  '#9b59b6',
+  '#f39c12',
+  '#00FF7F',
 ];
 
 const CHIPS: ChipView[] = [
@@ -247,15 +243,6 @@ export class ExpensesComponent implements OnInit, OnDestroy {
       return ICONES_CATEGORIA[categoria.systemKey];
     }
     return (categoria?.name ?? '?').trim().charAt(0).toUpperCase() || '?';
-  }
-
-  corCategoria(id: string): string {
-    const chave = this.categoriaPorId.get(id)?.systemKey ?? id;
-    let hash = 0;
-    for (const caractere of chave) {
-      hash = (hash * 31 + caractere.charCodeAt(0)) >>> 0;
-    }
-    return PALETA_CATEGORIAS[hash % PALETA_CATEGORIAS.length];
   }
 
   alternarMenu(despesa: Expense, evento: Event): void {
@@ -572,12 +559,12 @@ export class ExpensesComponent implements OnInit, OnDestroy {
       ExpenseScheduleService.endOfMonth(inicio),
     );
     const soma = linhas.reduce((acc, l) => acc + l.total, 0);
-    return linhas.map((l) => ({
+    return linhas.map((l, indice) => ({
       categoryId: l.categoryId,
       name: l.name,
       total: l.total,
       percentual: soma > 0 ? (l.total / soma) * 100 : 0,
-      cor: this.corCategoria(l.categoryId),
+      cor: PALETA_GRAFICO[indice % PALETA_GRAFICO.length],
     }));
   }
 

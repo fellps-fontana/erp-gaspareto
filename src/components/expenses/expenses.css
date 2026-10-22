@@ -133,10 +133,6 @@ button:disabled {
   min-width: 0;
 }
 
-.card-alerta {
-  border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
-}
-
 .card-icone {
   flex: none;
   width: 36px;
@@ -146,26 +142,8 @@ button:disabled {
   justify-content: center;
   border-radius: var(--radius-pill);
   font-weight: 700;
-}
-
-.tom-warning {
-  color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
-}
-
-.tom-success {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 18%, transparent);
-}
-
-.tom-danger {
-  color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
-}
-
-.tom-info {
-  color: var(--color-info);
-  background: color-mix(in srgb, var(--color-info) 18%, transparent);
+  background: var(--bg-muted);
+  color: var(--text-secondary);
 }
 
 .card-texto {
@@ -183,10 +161,6 @@ button:disabled {
   font-size: 1.3rem;
   font-weight: 700;
   white-space: nowrap;
-}
-
-.valor-vencida {
-  color: var(--color-danger);
 }
 
 /* LAYOUT 2 COLUNAS */
@@ -272,11 +246,17 @@ button:disabled {
 
 /* ALERTA DE VENCIDAS */
 .alerta-vencidas {
-  background: color-mix(in srgb, var(--color-danger) 10%, var(--bg-card));
-  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   padding: var(--sp-xs) var(--sp-md) var(--sp-sm);
   margin-bottom: var(--sp-md);
+}
+
+.alerta-valor,
+.valor-vencida {
+  color: var(--color-danger);
 }
 
 .alerta-titulo {
@@ -284,7 +264,7 @@ button:disabled {
   padding: var(--sp-sm) 0;
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--color-danger);
+  color: var(--text-primary);
 }
 
 /* FILTROS */
@@ -397,7 +377,7 @@ button:disabled {
   border-radius: var(--radius-pill);
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--text-on-primary);
+  background: var(--bg-muted);
 }
 
 .linha-info {
@@ -420,9 +400,6 @@ button:disabled {
 .selo-revisar {
   display: inline-block;
   margin-left: var(--sp-xs);
-  padding: 1px var(--sp-sm);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-warning) 22%, transparent);
   color: var(--color-warning);
   font-size: 0.7rem;
   font-weight: 700;
@@ -430,7 +407,6 @@ button:disabled {
 }
 
 .linha-valor {
-  color: var(--color-danger);
   font-weight: 700;
   white-space: nowrap;
   text-align: right;
@@ -465,7 +441,7 @@ button:disabled {
 }
 
 .check:hover .check-circulo {
-  border-color: var(--color-success);
+  border-color: var(--color-primary);
 }
 
 .check-pago {
@@ -473,9 +449,9 @@ button:disabled {
 }
 
 .check-pago .check-circulo {
-  background: var(--color-success);
-  border-color: var(--color-success);
-  color: var(--text-inverse);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-on-primary);
 }
 
 .lista-rodape {
