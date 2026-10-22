@@ -1,34 +1,24 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
-import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
-import { filter } from 'rxjs/operators';
 import { ThemeService } from '../services/theme/theme-service';
 import { ConfigService } from '../services/config/config.service';
+import { AppUpdateService } from '../services/app-update/app-update.service';
+import { UpdateBannerComponent } from '../components/update-banner/update-banner';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet],
+  imports: [CommonModule, RouterOutlet, UpdateBannerComponent],
   templateUrl: './app.html',
   styleUrls: ['./app.css'],
 })
-export class AppComponent implements OnInit {
+export class AppComponent {
   title = 'Bem vindo ao ERP Gaspareto!';
-  private swUpdate = inject(SwUpdate);
 
   constructor() {
     inject(ThemeService);
     inject(ConfigService);
-  }
-
-  ngOnInit() {
-    if (this.swUpdate.isEnabled) {
-      this.swUpdate.versionUpdates.pipe(
-        filter((evt): evt is VersionReadyEvent => evt.type === 'VERSION_READY')
-      ).subscribe(() => {
-        window.location.reload();
-      });
-    }
+    inject(AppUpdateService);
   }
 }
