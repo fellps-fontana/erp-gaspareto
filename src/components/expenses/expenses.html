@@ -1,21 +1,18 @@
 <div class="expenses-page">
   <div class="expenses-header">
     <div class="header-left">
-      <button type="button" class="btn-voltar" [routerLink]="['/']">⬅ Início</button>
-      <div>
-        <h1>Despesas</h1>
-        <p>Gestão de despesas por competência de vencimento</p>
-      </div>
+      <button type="button" class="link-texto" [routerLink]="['/']">‹ Início</button>
+      <h1>Despesas</h1>
     </div>
     <div class="header-actions" *ngIf="view === 'lista'">
-      <button type="button" class="btn-secundario" (click)="abrirCategorias()">Categorias</button>
+      <button type="button" class="link-texto" (click)="abrirCategorias()">Categorias</button>
       <button
         type="button"
         class="btn-novo"
         [disabled]="!categoriasProntas"
         (click)="abrirNovaDespesa()"
       >
-        + Nova Despesa
+        + Despesa
       </button>
     </div>
   </div>
@@ -38,38 +35,50 @@
     <!-- NAVEGAÇÃO DE MÊS -->
     <div class="month-nav">
       <button type="button" class="btn-mes" aria-label="Mês anterior" (click)="mudarMes(-1)">
-        ◀
+        ‹
       </button>
       <span class="month-label">{{ rotuloMes }}</span>
       <button type="button" class="btn-mes" aria-label="Próximo mês" (click)="mudarMes(1)">
-        ▶
-      </button>
-      <button type="button" class="btn-hoje" *ngIf="!ehMesCorrente" (click)="irParaMesCorrente()">
-        Mês atual
+        ›
       </button>
     </div>
+    <div class="month-sub" *ngIf="!ehMesCorrente">
+      <button type="button" class="link-texto" (click)="irParaMesCorrente()">Hoje</button>
+    </div>
 
-    <!-- CARDS (ignoram filtros) -->
-    <div class="cards-kpi">
-      <div class="card kpi-vencidas">
-        <span class="kpi-label">Vencidas</span>
-        <strong class="kpi-value">R$ {{ grupos.totals.vencidas | number: '1.2-2' }}</strong>
-        <small class="kpi-meta">{{ grupos.vencidas.length }} despesa(s)</small>
+    <!-- RESUMO (ignora filtros) -->
+    <div class="resumo">
+      <div class="resumo-item">
+        <span class="resumo-label">Vencidas</span>
+        <strong class="resumo-valor" [class.valor-vencida]="grupos.totals.vencidas > 0">
+          R$ {{ grupos.totals.vencidas | number: '1.2-2' }}
+        </strong>
       </div>
-      <div class="card kpi-a-pagar">
-        <span class="kpi-label">A pagar no mês</span>
-        <strong class="kpi-value">R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong>
-        <small class="kpi-meta">{{ grupos.aVencer.length }} despesa(s)</small>
+      <div class="resumo-item">
+        <span class="resumo-label">A pagar no mês</span>
+        <strong class="resumo-valor">R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong>
       </div>
-      <div class="card kpi-pago">
-        <span class="kpi-label">Pago no mês</span>
-        <strong class="kpi-value">R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong>
-        <small class="kpi-meta">{{ grupos.pagas.length }} despesa(s)</small>
+      <div class="resumo-item">
+        <span class="resumo-label">Pago no mês</span>
+        <strong class="resumo-valor">R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong>
       </div>
     </div>
 
     <!-- FILTROS (só a lista) -->
-    <div class="filters">
+    <div class="filtros-barra">
+      <button
+        type="button"
+        class="link-texto"
+        [attr.aria-expanded]="filtrosAbertos"
+        (click)="alternarFiltros()"
+      >
+        Filtros<span *ngIf="quantidadeFiltrosAtivos > 0"> ({{ quantidadeFiltrosAtivos }})</span>
+      </button>
+      <button type="button" class="link-texto" *ngIf="filtrosAtivos" (click)="limparFiltros()">
+        Limpar
+      </button>
+    </div>
+    <div class="filters" *ngIf="filtrosAbertos">
       <div class="filter-group">
         <label for="filtro-categoria">Categoria</label>
         <select
@@ -101,83 +110,107 @@
         <input type="checkbox" [(ngModel)]="filtroRevisar" (ngModelChange)="aoMudarFiltro()" />
         Revisar migração
       </label>
-      <button type="button" class="btn-limpar" *ngIf="filtrosAtivos" (click)="limparFiltros()">
-        Limpar filtros
-      </button>
     </div>
 
-    <p class="vazio" *ngIf="totalVisivel === 0">Nenhuma despesa encontrada neste mês.</p>
+    <p class="vazio" *ngIf="totalVisivel === 0">
+      Nenhuma despesa neste mês
+      <button type="button" class="link-texto" (click)="abrirNovaDespesa()">+ Despesa</button>
+    </p>
 
     <!-- GRUPOS -->
-    <section class="group" *ngFor="let g of gruposVisiveis" [ngClass]="'group-' + g.key">
+    <section class="group" *ngFor="let g of gruposVisiveis">
       <ng-container *ngIf="g.items.length > 0">
         <h2 class="group-title">
-          {{ g.title }} <span class="group-count">{{ g.items.length }}</span>
+          <span>{{ g.title }}</span>
+          <span *ngIf="totalDoGrupo(g.key) !== null">
+            R$ {{ totalDoGrupo(g.key) | number: '1.2-2' }}
+          </span>
         </h2>
 
-        <div class="expense-card" *ngFor="let e of g.items">
+        <div class="expense-row" *ngFor="let e of g.items">
+          <span class="dot" [class.dot-producao]="ehCustoProducao(e)" aria-hidden="true"></span>
+
           <div class="expense-info">
             <span class="expense-name">{{ e.description }}</span>
-            <div class="expense-meta">
-              <span class="chip chip-categoria" [class.chip-producao]="ehCustoProducao(e)">
-                {{ nomeCategoria(e.categoryId) }}
-              </span>
-              <span class="chip" [class.chip-vencida]="estaVencida(e)">
-                Vence {{ formatarData(e.dueDate) }}
-              </span>
-              <span class="chip chip-pago" *ngIf="e.paidDate">
-                Pago {{ formatarData(e.paidDate) }}
-              </span>
-              <span class="chip" *ngIf="e.paymentMethod">{{ paymentLabels[e.paymentMethod] }}</span>
-              <span class="chip" *ngIf="e.supplier">{{ e.supplier }}</span>
-              <span class="chip chip-recebida" *ngIf="e.goodsReceivedDate">
-                Chegou {{ formatarData(e.goodsReceivedDate) }}
-              </span>
-              <span class="chip chip-origem" *ngIf="e.origin === 'parcelamento'">
-                Parcela {{ e.installmentNumber }}/{{ e.installmentTotal }}
-              </span>
-              <span class="chip chip-origem" *ngIf="e.origin === 'recorrencia'">Recorrente</span>
-              <span
-                class="chip chip-revisar"
-                *ngIf="e.migracaoRevisar"
-                [title]="e.migracaoMotivo ?? ''"
+            <span class="expense-meta">
+              {{ nomeCategoria(e.categoryId) }} ·
+              <ng-container *ngIf="e.paidDate; else vence"
+                >pago {{ formatarData(e.paidDate) }}</ng-container
               >
-                Revisar migração
+              <ng-template #vence>vence {{ formatarData(e.dueDate) }}</ng-template>
+              <ng-container *ngIf="e.paymentMethod">
+                · {{ paymentLabels[e.paymentMethod] }}</ng-container
+              >
+              <ng-container *ngIf="e.supplier"> · {{ e.supplier }}</ng-container>
+              <ng-container *ngIf="e.goodsReceivedDate">
+                · chegou {{ formatarData(e.goodsReceivedDate) }}</ng-container
+              >
+              <ng-container *ngIf="e.origin === 'parcelamento'">
+                · parcela {{ e.installmentNumber }}/{{ e.installmentTotal }}</ng-container
+              >
+              <ng-container *ngIf="e.origin === 'recorrencia'"> · recorrente</ng-container>
+              <span class="meta-revisar" *ngIf="e.migracaoRevisar" [title]="e.migracaoMotivo ?? ''">
+                · <span class="dot-alerta" aria-hidden="true"></span>revisar migração
               </span>
-            </div>
+            </span>
           </div>
 
-          <div class="expense-valor">R$ {{ e.value | number: '1.2-2' }}</div>
+          <div
+            class="expense-valor"
+            [class.valor-vencida]="estaVencida(e)"
+            [class.valor-paga]="e.status === 'pago'"
+          >
+            R$ {{ e.value | number: '1.2-2' }}
+          </div>
 
           <div class="expense-actions">
             <button
               type="button"
-              class="btn-paguei"
+              class="link-texto link-acao"
               *ngIf="e.status === 'a_pagar'"
               (click)="abrirPagamento(e)"
             >
               Paguei
             </button>
-            <button
-              type="button"
-              class="btn-chegou"
-              *ngIf="podeMarcarChegada(e)"
-              (click)="marcarChegada(e)"
-            >
-              Chegou
-            </button>
-            <button type="button" class="btn-acao" (click)="editar(e)">Editar</button>
-            <button
-              type="button"
-              class="btn-acao"
-              *ngIf="podeEncerrarSerie(e)"
-              (click)="abrirEncerramento(e)"
-            >
-              Encerrar recorrência
-            </button>
-            <button type="button" class="btn-acao btn-excluir" (click)="abrirExclusao(e)">
-              Excluir
-            </button>
+            <div class="menu-wrap">
+              <button
+                type="button"
+                class="btn-menu"
+                aria-label="Mais ações"
+                aria-haspopup="menu"
+                [attr.aria-expanded]="menuAbertoId === e.id"
+                (click)="alternarMenu(e, $event)"
+              >
+                ⋯
+              </button>
+              <div class="menu" role="menu" *ngIf="menuAbertoId === e.id">
+                <button
+                  type="button"
+                  role="menuitem"
+                  *ngIf="podeMarcarChegada(e)"
+                  (click)="marcarChegada(e)"
+                >
+                  Chegou
+                </button>
+                <button type="button" role="menuitem" (click)="editar(e)">Editar</button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  *ngIf="podeEncerrarSerie(e)"
+                  (click)="abrirEncerramento(e)"
+                >
+                  Encerrar recorrência
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="menu-excluir"
+                  (click)="abrirExclusao(e)"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </ng-container>
@@ -213,9 +246,9 @@
         </select>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn-cancelar" (click)="fecharPagamento()">CANCELAR</button>
+        <button type="button" class="btn-cancelar" (click)="fecharPagamento()">Cancelar</button>
         <button type="button" class="btn-confirmar" (click)="confirmarPagamento()">
-          CONFIRMAR
+          Confirmar
         </button>
       </div>
     </div>
@@ -233,16 +266,15 @@
       >
         ✕
       </button>
-      <div class="modal-icon">⚠️</div>
-      <h2>Excluir Despesa?</h2>
+      <h2>Excluir despesa?</h2>
       <div class="modal-info">
         <p>Você está prestes a excluir:</p>
         <strong>{{ despesaParaExcluir.description }}</strong>
         <p class="modal-aviso">Esta ação não pode ser desfeita.</p>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn-cancelar" (click)="fecharExclusao()">CANCELAR</button>
-        <button type="button" class="btn-perigo" (click)="confirmarExclusao()">SIM, EXCLUIR</button>
+        <button type="button" class="btn-cancelar" (click)="fecharExclusao()">Cancelar</button>
+        <button type="button" class="btn-perigo" (click)="confirmarExclusao()">Sim, excluir</button>
       </div>
     </div>
   </div>
@@ -259,16 +291,15 @@
       >
         ✕
       </button>
-      <div class="modal-icon">🔄</div>
       <h2>Encerrar recorrência?</h2>
       <div class="modal-info">
         <strong>{{ despesaParaEncerrar.description }}</strong>
         <p>Novas ocorrências deixarão de ser geradas. As já existentes são mantidas.</p>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn-cancelar" (click)="fecharEncerramento()">CANCELAR</button>
+        <button type="button" class="btn-cancelar" (click)="fecharEncerramento()">Cancelar</button>
         <button type="button" class="btn-perigo" (click)="confirmarEncerramento()">
-          SIM, ENCERRAR
+          Sim, encerrar
         </button>
       </div>
     </div>

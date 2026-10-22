@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -90,6 +90,9 @@ export class ExpensesComponent implements OnInit {
   filtroAPagarJaRecebida = false;
   filtroRevisar = false;
 
+  filtrosAbertos = false;
+  menuAbertoId: string | null = null;
+
   grupos: MonthGroups = EMPTY_GROUPS;
   gruposVisiveis: GroupView[] = [];
   categoryIdsInUse: ReadonlySet<string> = new Set<string>();
@@ -131,6 +134,42 @@ export class ExpensesComponent implements OnInit {
       this.filtroAPagarJaRecebida ||
       this.filtroRevisar
     );
+  }
+
+  get quantidadeFiltrosAtivos(): number {
+    return [
+      !!this.filtroCategoria,
+      this.filtroStatus !== 'todos',
+      this.filtroAPagarJaRecebida,
+      this.filtroRevisar,
+    ].filter(Boolean).length;
+  }
+
+  /** Total do grupo vem do servico; com filtro ativo ele nao representa a lista, entao some. */
+  totalDoGrupo(key: GroupKey): number | null {
+    if (this.filtrosAtivos) {
+      return null;
+    }
+    const totais = this.grupos.totals;
+    if (key === 'vencidas') {
+      return totais.vencidas;
+    }
+    return key === 'aVencer' ? totais.aPagarNoMes : totais.pagoNoMes;
+  }
+
+  alternarFiltros(): void {
+    this.filtrosAbertos = !this.filtrosAbertos;
+  }
+
+  alternarMenu(despesa: Expense, evento: Event): void {
+    evento.stopPropagation();
+    this.menuAbertoId = this.menuAbertoId === despesa.id ? null : (despesa.id ?? null);
+  }
+
+  @HostListener('document:click')
+  @HostListener('document:keydown.escape')
+  fecharMenu(): void {
+    this.menuAbertoId = null;
   }
 
   get totalVisivel(): number {

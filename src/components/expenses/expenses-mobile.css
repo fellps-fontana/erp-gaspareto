@@ -3,27 +3,18 @@
     padding: var(--sp-md);
   }
 
-  .expenses-header {
-    flex-direction: column;
+  .month-label {
+    min-width: 0;
+    flex: 1;
+    font-size: 1.3rem;
   }
 
-  .header-left {
-    flex-direction: column;
-    align-items: flex-start;
+  .resumo {
+    gap: var(--sp-sm);
   }
 
-  .header-actions {
-    width: 100%;
-    flex-direction: column;
-  }
-
-  .btn-novo,
-  .btn-secundario {
-    width: 100%;
-  }
-
-  .cards-kpi {
-    grid-template-columns: 1fr;
+  .resumo-valor {
+    font-size: 0.95rem;
   }
 
   .filters {
@@ -35,29 +26,22 @@
     width: 100%;
   }
 
-  .expense-card {
-    grid-template-columns: 1fr;
+  /* Valor sempre visivel na primeira linha; acoes descem para a segunda */
+  .expense-row {
+    grid-template-columns: auto 1fr auto;
   }
 
-  .expense-valor {
-    text-align: left;
-  }
-
-  .expense-actions button {
-    flex: 1 1 45%;
-    min-height: 44px;
+  .expense-actions {
+    grid-column: 2 / -1;
+    justify-content: space-between;
   }
 
   .modal-actions {
     flex-direction: column-reverse;
   }
 
-  .btn-voltar,
-  .btn-mes,
-  .btn-hoje,
   .btn-novo,
-  .btn-secundario,
-  .btn-limpar,
+  .link-texto,
   .modal-actions button {
     min-height: 44px;
   }
