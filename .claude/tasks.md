@@ -767,7 +767,7 @@ RETORNO ESPERADO: lista de arquivos criados + saída do tsc.
 HISTORICO: 2026-10-22 — Kira criou os 8 arquivos de esqueleto exatamente como entregues pelo killua (acao estrutural, Secao 5 passo 2). Validacao de tipos registrada no chat.
 
 ## TASK-037 — [TDD RED] ExpenseScheduleService + ExpenseReportService (funções puras)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-036
 ESCOPO: escrever os testes (Karma/Jasmine, lógica pura sem emulador) das duas classes estáticas e confirmar RED por lógica ausente.
@@ -777,10 +777,11 @@ CRITERIO DE ACEITE: (1) Schedule: split 100/3 = [33.33,33.33,33.34]; soma exata 
 ARQUIVOS PERMITIDOS: src/services/expense-schedule-service/expense-schedule-service.spec.ts, src/services/expense-report-service/expense-report-service.spec.ts
 NAO FAZER: não editar os services; não escrever teste que dependa de Firestore; não editar .claude/tasks.md.
 RETORNO ESPERADO: lista de testes + saída do runner confirmando RED válido + comando de execução (`npx ng test --include='**/expense-*-service.spec.ts' --browsers=ChromeHeadless --watch=false`).
-HISTORICO:
+HISTORICO: 2026-10-22 — mike: 33+35 testes (schedule/report), RED 68/68 por not implemented; helper exige mensagem != not implemented nos casos de lancamento. Rodada de correcao pos-style: +13 testes applyFilters e +1 orfa "Sem categoria". Spec do report fechou com 48 its, schedule 34 (contagem real do runner). Prettier aplicado pelo Kira.
+
 
 ## TASK-038 — Implementar ExpenseScheduleService
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-037
 ESCOPO: implementar todos os métodos de ExpenseScheduleService até os testes da TASK-037 ficarem GREEN (aritmética em centavos inteiros; datas via componentes Y/M/D, nunca Date local sem fuso).
@@ -790,10 +791,11 @@ CRITERIO DE ACEITE: (1) todos os testes de expense-schedule-service.spec.ts pass
 ARQUIVOS PERMITIDOS: src/services/expense-schedule-service/expense-schedule-service.ts
 NAO FAZER: não alterar o spec nem assinaturas; não tocar em outros arquivos; não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivo implementado + saída do runner (GREEN do spec desta classe).
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: GREEN 34/34. style APROVADO com ressalvas; Kira mandou fechar: assertTotalValid (Number.isFinite — NaN gerava parcelas NaN), assertDateKeyValid em anchor/upTo/generatedThrough (evita laco infinito com dado ruim do Firestore), mensagens de erro em portugues acentuado. 2a revisao style: APROVADO.
+
 
 ## TASK-039 — Implementar ExpenseReportService
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-037
 ESCOPO: implementar todos os métodos de ExpenseReportService até os testes da TASK-037 ficarem GREEN (um único agrupamento alimenta cards e listas; somas em centavos).
@@ -803,10 +805,11 @@ CRITERIO DE ACEITE: (1) todos os testes de expense-report-service.spec.ts passam
 ARQUIVOS PERMITIDOS: src/services/expense-report-service/expense-report-service.ts
 NAO FAZER: não alterar o spec nem assinaturas; não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivo implementado + saída do runner.
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: GREEN 34/34 inicial. style PRECISA CORRIGIR (1 rodada): prettier, orfa exibia categoryId cru -> SEM_CATEGORIA_LABEL, helpers de data duplicados -> reuso de ExpenseScheduleService, comentario enganoso, find duplicado/copia quadratica -> Map. applyFilters sem teste -> mike cobriu. Final 48/48; 2a revisao style: APROVADO.
+
 
 ## TASK-040 — [TDD GREEN] Confirmar ExpenseScheduleService + ExpenseReportService
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-038, TASK-039
 ESCOPO: rodar os dois specs puros (sem reescrever) e confirmar GREEN ou devolver relatório de bug.
@@ -816,7 +819,8 @@ CRITERIO DE ACEITE: (1) 100% dos testes das duas classes passam; (2) suíte Karm
 ARQUIVOS PERMITIDOS: nenhum (somente execução)
 NAO FAZER: não editar specs nem código; não editar .claude/tasks.md.
 RETORNO ESPERADO: contagem exata de SUCCESS/FAILED e veredito GREEN ou relatório de bug.
-HISTORICO:
+HISTORICO: 2026-10-22 — mike: GREEN 68/68 (schedule+report). Criterio (2) suite completa adiado para TASK-047 (emulador ocupado pela TASK-048). Pos-correcao: 82/82 confirmado pelo style.
+
 
 ## TASK-041 — [TDD RED] ExpenseService + ExpenseCategoryService (emulador, isolamento)
 STATUS: PENDENTE
