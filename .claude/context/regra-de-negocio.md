@@ -38,6 +38,13 @@ com sub-abas Clientes e Compras), **Rotas** (entrega), **Contas** (a pagar/receb
   não usar FIFO/média ponderada.
 - Estorno de compra (`deletePurchase`) é negado se o estoque atual for menor
   que a quantidade da compra a estornar (não deixa estoque negativo).
+- **Entrada de estoque não gera conta a pagar.** Decidido com o usuário
+  (2026-10-20): a opção "gerar conta a pagar" da entrada de estoque
+  (Gestão > Estoque > 📦, `confirmarCompra`) foi removida. Motivo: a `bill`
+  gerada, quando paga, entrava em **Gastos** no Balanço, e o custo do mesmo
+  produto entrava de novo no **CMV** ao ser vendido — o Resultado Final
+  descontava a compra de mercadoria duas vezes. A entrada só soma
+  quantidade e atualiza o custo (`addPurchase`).
 
 ## 3. Vendas (`sales`) — [CRÍTICA]
 
@@ -458,8 +465,12 @@ Decisões do usuário (2026-10-20/21). Um **modelo** (`recurringOrders`, com
   período" — preserva o dia do calendário mesmo com atraso na checagem.
 - Uma conta pode nascer vinculada a uma compra (`purchaseProductId`), gerada
   automaticamente ao cadastrar um "produto de compra" recorrente
-  (`gerarBillDeProdutoCompra`) ou ao confirmar uma entrada de estoque com a
-  opção "gerar conta a pagar" marcada.
+  (`gerarBillDeProdutoCompra`). Entrada de estoque **não** gera conta
+  (removido em 2026-10-20 — ver §2). Contas antigas geradas pela entrada de
+  estoque (sem `purchaseProductId`; nome `Compra: <produto>` ou descrição
+  livre digitada na entrada) seguem
+  no banco e serão tratadas na migração do módulo Despesas, categoria
+  "Compra de mercadoria".
 - Escopo temporal da listagem em `bills.ts` (tela Contas a Pagar) — regra de
   exibição, não crítica (não altera a máquina de estado descrita acima).
   Decidido com o usuário (2026-08-16): a tela não tem seletor de mês, o
@@ -478,6 +489,8 @@ Decisões do usuário (2026-10-20/21). Um **modelo** (`recurringOrders`, com
 - Representa insumos/despesas recorrentes (ex.: aluguel, fornecedor fixo) que
   não são produtos de estoque revendáveis — ao cadastrar um novo, gera
   automaticamente uma `bill` (conta a pagar) correspondente.
+- Não confundir com a entrada de estoque de produto revendável (§2): essa
+  não gera `bill` — o custo da mercadoria já entra no Balanço via CMV.
 - Diferença de nomenclatura de período: aqui `'weekly'|'monthly'` (inglês);
   em `bills.recurrencePeriod` é `'semanal'|'mensal'` (português) — o
   service faz o mapeamento entre os dois (`recPeriodMap`).

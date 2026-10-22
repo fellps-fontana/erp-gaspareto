@@ -522,19 +522,6 @@
             Total da entrada: <strong>R$ {{ (dadosCompra.quantidade * dadosCompra.novoPrecoCusto) | number:'1.2-2' }}</strong>
           </div>
 
-          <div class="form-group compra-check-group">
-            <label class="compra-checkbox-label">
-              <input type="checkbox" [(ngModel)]="gerarContaPagar">
-              Gerar conta a pagar vinculada
-            </label>
-          </div>
-
-          <div class="form-group" *ngIf="gerarContaPagar">
-            <label>Descrição da conta</label>
-            <input type="text" [(ngModel)]="nomeConta"
-              [placeholder]="'Compra: ' + produtoSelecionadoCompra.title">
-          </div>
-
           <button class="btn-confirmar-compra" (click)="confirmarCompra()">💰 REGISTRAR ENTRADA</button>
         </div>
       </div>
