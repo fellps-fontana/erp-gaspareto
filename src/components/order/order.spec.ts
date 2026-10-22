@@ -9,6 +9,8 @@ import { ConfigService } from '../../services/config/config.service';
 import { Router } from '@angular/router';
 import { PaymentMethod } from '../../models/sell-model';
 import { OrderItem } from '../../models/order-model';
+import { RecurringOrderService } from '../../services/recurring-order-service/recurring-order-service';
+import { TenantService } from '../../services/tenant-service/tenant-service';
 import { of } from 'rxjs';
 
 describe('OrdersComponent', () => {
@@ -34,6 +36,15 @@ describe('OrdersComponent', () => {
     warning: jasmine.createSpy('warning')
   };
 
+  const mockRecurringOrderService = {
+    getRecurringOrders: () => of([]),
+    generateDueOccurrences: () => Promise.resolve({ criados: 0, pulados: 0 })
+  };
+
+  const mockTenantService = {
+    companyId: () => null
+  };
+
   const mockRouter = {
     navigate: jasmine.createSpy('navigate')
   };
@@ -57,6 +68,8 @@ describe('OrdersComponent', () => {
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: VendedorService, useValue: mockVendedorService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: RecurringOrderService, useValue: mockRecurringOrderService },
+        { provide: TenantService, useValue: mockTenantService },
         { provide: Router, useValue: mockRouter }
       ]
     }).compileComponents();

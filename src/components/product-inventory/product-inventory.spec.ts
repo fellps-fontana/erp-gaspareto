@@ -580,7 +580,7 @@ describe('ProductInventoryComponent', () => {
     beforeEach(() => {
       component.filtroDataInicio = '2026-03-01';
       component.filtroDataFim = '2026-03-31';
-      component.relatorio = { ...component.relatorio, faturamento: 1000, custoTotal: 400 };
+      component.relatorioBalanco = { ...component.relatorioBalanco, faturamento: 1000, custoTotal: 400 };
       (component as any).categoriasDespesa = categorias();
     });
 

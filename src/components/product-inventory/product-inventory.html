@@ -7,19 +7,19 @@
     </div>
 
     <nav class="menu-botoes">
-      <button [class.active]="activeTab === 'relatorio'" (click)="activeTab = 'relatorio'">
+      <button [class.active]="activeTab === 'relatorio'" (click)="selecionarAbaPrincipal('relatorio')">
         📊 Relatório
       </button>
-      <button [class.active]="activeTab === 'estoque'" (click)="activeTab = 'estoque'">
+      <button [class.active]="activeTab === 'estoque'" (click)="selecionarAbaPrincipal('estoque')">
         📦 Gerenciar Estoque
       </button>
-      <button *ngIf="config.modules().clientes" [class.active]="activeTab === 'clientes'" (click)="activeTab = 'clientes'">
+      <button *ngIf="config.modules().clientes" [class.active]="activeTab === 'clientes'" (click)="selecionarAbaPrincipal('clientes')">
         👥 Clientes
       </button>
-      <button *ngIf="config.modules().vendedores" [class.active]="activeTab === 'vendedores'" (click)="activeTab = 'vendedores'">
+      <button *ngIf="config.modules().vendedores" [class.active]="activeTab === 'vendedores'" (click)="selecionarAbaPrincipal('vendedores')">
         🧑‍💼 Vendedores
       </button>
-      <button [class.active]="activeTab === 'historico'" (click)="activeTab = 'historico'">
+      <button [class.active]="activeTab === 'historico'" (click)="selecionarAbaPrincipal('historico')">
         🧾 Histórico
       </button>
     </nav>
@@ -38,10 +38,11 @@
 
       <!-- SUB-TABS DO RELATÓRIO -->
       <div class="report-tabs">
-        <button [class.active]="reportTab === 'vendas'" (click)="reportTab = 'vendas'">📊 Vendas</button>
-        <button [class.active]="reportTab === 'despesas'" (click)="reportTab = 'despesas'">💸 Despesas</button>
-        <button [class.active]="reportTab === 'balanco'" (click)="reportTab = 'balanco'">⚖️ Balanço</button>
-        <button *ngIf="config.modules().vendedores" [class.active]="reportTab === 'vendedores'" (click)="reportTab = 'vendedores'; atualizarComissoesVendedores()">🧑‍💼 Vendedores</button>
+        <button [class.active]="reportTab === 'vendas'" (click)="selecionarReportTab('vendas')">📊 Vendas</button>
+        <button [class.active]="reportTab === 'despesas'" (click)="selecionarReportTab('despesas')">💸 Despesas</button>
+        <button [class.active]="reportTab === 'balanco'" (click)="selecionarReportTab('balanco')">⚖️ Balanço</button>
+        <button [class.active]="reportTab === 'receber'" (click)="selecionarReportTab('receber')">📥 A Receber</button>
+        <button *ngIf="config.modules().vendedores" [class.active]="reportTab === 'vendedores'" (click)="selecionarReportTab('vendedores'); atualizarComissoesVendedores()">🧑‍💼 Vendedores</button>
       </div>
 
       <!-- ===================== ABA VENDAS ===================== -->
@@ -89,6 +90,7 @@
               <option value="cartao">Cartão</option>
               <option value="cheque">Cheque</option>
               <option value="boleto">Boleto</option>
+              <option value="misto">Misto</option>
             </select>
           </div>
 
@@ -115,24 +117,31 @@
 
       <!-- KPIs -->
       <div class="cards-kpi">
-        <div class="card kpi-venda">
+        <div class="card kpi-venda kpi-clicavel" role="button" tabindex="0" title="Ver detalhes"
+             (click)="abrirDetalhe('faturamento', 'vendas')"
+             (keydown.enter)="abrirDetalhe('faturamento', 'vendas')">
           <span class="kpi-label">Faturamento</span>
           <strong class="kpi-value">R$ {{ relatorio.faturamento | number:'1.2-2' }}</strong>
           <small class="kpi-meta">{{ relatorio.qtdVendas }} vendas</small>
         </div>
 
-        <div class="card kpi-custo">
+        <div class="card kpi-custo kpi-clicavel" role="button" tabindex="0" title="Ver detalhes"
+             (click)="abrirDetalhe('cmv', 'vendas')"
+             (keydown.enter)="abrirDetalhe('cmv', 'vendas')">
           <span class="kpi-label">Custo (CMV)</span>
           <strong class="kpi-value">R$ {{ relatorio.custoTotal | number:'1.2-2' }}</strong>
         </div>
 
-        <div class="card kpi-lucro">
-          <span class="kpi-label">Lucro Líquido</span>
+        <div class="card kpi-lucro kpi-clicavel" role="button" tabindex="0" title="Ver detalhes"
+             (click)="abrirDetalhe('lucro', 'vendas')"
+             (keydown.enter)="abrirDetalhe('lucro', 'vendas')">
+          <span class="kpi-label">Lucro Bruto</span>
           <strong class="kpi-value">R$ {{ relatorio.lucro | number:'1.2-2' }}</strong>
           <small class="kpi-meta" *ngIf="relatorio.faturamento > 0">
             Margem: {{ relatorio.margem | number:'1.0-0' }}%
           </small>
         </div>
+
       </div>
 
       <!-- GRÁFICOS -->
@@ -145,8 +154,15 @@
         </div>
 
         <div class="chart-container secondary-chart card-base">
-          <h3>Top 5 Produtos (Qtd)</h3>
-          <div class="canvas-wrapper">
+          <div class="top-cabecalho">
+            <h3>Top 5 Produtos ({{ topModoEfetivo === 'peso' ? 'kg' : 'un' }})</h3>
+            <div class="top-toggle" role="group" aria-label="Unidade do ranking" *ngIf="topTemAmbos">
+              <button type="button" [class.active]="topModoEfetivo === 'unidade'" (click)="definirTopModo('unidade')">Unidades</button>
+              <button type="button" [class.active]="topModoEfetivo === 'peso'" (click)="definirTopModo('peso')">Kg</button>
+            </div>
+          </div>
+          <p class="detalhe-vazio" *ngIf="topSemDados">Sem vendas no filtro</p>
+          <div class="canvas-wrapper" *ngIf="!topSemDados">
             <canvas id="topProductsChart"></canvas>
           </div>
         </div>
@@ -213,14 +229,18 @@
 
         <!-- KPIs Balanço -->
         <div class="cards-kpi balanco-kpis">
-          <div class="card kpi-venda">
+          <div class="card kpi-venda kpi-clicavel" role="button" tabindex="0" title="Ver detalhes"
+               (click)="abrirDetalhe('faturamento', 'balanco')"
+               (keydown.enter)="abrirDetalhe('faturamento', 'balanco')">
             <span class="kpi-label">Faturamento</span>
-            <strong class="kpi-value">R$ {{ relatorio.faturamento | number:'1.2-2' }}</strong>
-            <small class="kpi-meta">{{ relatorio.qtdVendas }} vendas</small>
+            <strong class="kpi-value">R$ {{ relatorioBalanco.faturamento | number:'1.2-2' }}</strong>
+            <small class="kpi-meta">{{ relatorioBalanco.qtdVendas }} vendas</small>
           </div>
-          <div class="card kpi-custo">
+          <div class="card kpi-custo kpi-clicavel" role="button" tabindex="0" title="Ver detalhes"
+               (click)="abrirDetalhe('cmv', 'balanco')"
+               (keydown.enter)="abrirDetalhe('cmv', 'balanco')">
             <span class="kpi-label">CMV (Custo)</span>
-            <strong class="kpi-value">R$ {{ relatorio.custoTotal | number:'1.2-2' }}</strong>
+            <strong class="kpi-value">R$ {{ relatorioBalanco.custoTotal | number:'1.2-2' }}</strong>
           </div>
           <div class="card kpi-gastos kpi-clicavel" role="button" tabindex="0" title="Ver detalhamento dos gastos"
                (click)="abrirGastosModal()" (keydown.enter)="abrirGastosModal()" (keydown.space)="abrirGastosModal(); $event.preventDefault()">
@@ -231,8 +251,8 @@
           <div class="card" [class.kpi-lucro]="resultadoFinal >= 0" [class.kpi-prejuizo]="resultadoFinal < 0">
             <span class="kpi-label">Resultado Final</span>
             <strong class="kpi-value">R$ {{ resultadoFinal | number:'1.2-2' }}</strong>
-            <small class="kpi-meta" *ngIf="relatorio.faturamento > 0">
-              Margem: {{ relatorio.margem | number:'1.0-0' }}%
+            <small class="kpi-meta" *ngIf="relatorioBalanco.faturamento > 0">
+              Margem líquida: {{ margemLiquida | number:'1.0-0' }}%
             </small>
           </div>
         </div>
@@ -242,11 +262,15 @@
           <h3>Composição do Resultado</h3>
           <div class="formula-linha">
             <span class="formula-label">Faturamento</span>
-            <span class="formula-valor positivo">+ R$ {{ relatorio.faturamento | number:'1.2-2' }}</span>
+            <span class="formula-valor positivo">+ R$ {{ relatorioBalanco.faturamento | number:'1.2-2' }}</span>
           </div>
           <div class="formula-linha">
             <span class="formula-label">CMV (Custo dos Produtos)</span>
-            <span class="formula-valor negativo">− R$ {{ relatorio.custoTotal | number:'1.2-2' }}</span>
+            <span class="formula-valor negativo">− R$ {{ relatorioBalanco.custoTotal | number:'1.2-2' }}</span>
+          </div>
+          <div class="formula-linha formula-subtotal">
+            <span class="formula-label">= Lucro Bruto</span>
+            <span class="formula-valor" [class.positivo]="lucroBrutoBalanco >= 0" [class.negativo]="lucroBrutoBalanco < 0">R$ {{ lucroBrutoBalanco | number:'1.2-2' }}</span>
           </div>
           <div class="formula-linha">
             <span class="formula-label">Despesas operacionais (por vencimento no período)</span>
@@ -261,6 +285,44 @@
         </div>
 
       </div><!-- /reportTab balanco -->
+
+      <!-- ===================== ABA A RECEBER (PANORAMA ANUAL) ===================== -->
+      <div *ngIf="reportTab === 'receber'" class="tab-receber">
+        <div class="filtros-dashboard card-base">
+          <div class="filter-row main-filters">
+            <div class="source-selection">
+              <select [(ngModel)]="anoPanorama" (change)="atualizarPanorama()" aria-label="Ano do panorama">
+                <option *ngFor="let a of anosPanorama" [ngValue]="a">{{ a }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="cards-kpi">
+          <div class="card kpi-success">
+            <span class="kpi-label">Recebido no Ano</span>
+            <strong class="kpi-value kpi-value-success">R$ {{ (panorama?.recebidoAno ?? 0) | number:'1.2-2' }}</strong>
+            <small class="kpi-meta">{{ anoPanorama }}</small>
+          </div>
+          <div class="card kpi-info">
+            <span class="kpi-label">A Receber no Ano</span>
+            <strong class="kpi-value kpi-value-info">R$ {{ (panorama?.aReceberAno ?? 0) | number:'1.2-2' }}</strong>
+            <small class="kpi-meta">previsto, a vencer</small>
+          </div>
+          <div class="card kpi-prejuizo">
+            <span class="kpi-label">Vencido Total</span>
+            <strong class="kpi-value">R$ {{ (panorama?.vencidoTotal ?? 0) | number:'1.2-2' }}</strong>
+            <small class="kpi-meta">não pago, todos os anos</small>
+          </div>
+        </div>
+
+        <div class="chart-container card-base receber-chart">
+          <h3>Panorama {{ anoPanorama }} — clique num mês para ver o detalhe</h3>
+          <div class="canvas-wrapper">
+            <canvas id="receberChart"></canvas>
+          </div>
+        </div>
+      </div><!-- /reportTab receber -->
 
       <!-- ===================== ABA VENDEDORES (COMISSÃO) ===================== -->
       <div *ngIf="reportTab === 'vendedores' && config.modules().vendedores" class="tab-vendedores">
@@ -540,6 +602,8 @@
           </ng-template>
         </ng-container>
 
+        <app-customer-recurring-orders *ngIf="clienteEmEdicao?.id as clienteId" [customerId]="clienteId"></app-customer-recurring-orders>
+
         <button class="btn-salvar" (click)="salvarCliente()" [disabled]="isLoading">{{ isLoading ? '⏳ Sincronizando...' : '✅ SALVAR' }}</button>
       </div>
 
@@ -701,6 +765,7 @@
               <option value="cartao">Cartão</option>
               <option value="cheque">Cheque</option>
               <option value="boleto">Boleto</option>
+              <option value="misto">Misto</option>
             </select>
           </div>
 
@@ -773,6 +838,7 @@
   <!-- MODAL DE EXCLUSÃO DE CLIENTE -->
   <div class="checkout-overlay" *ngIf="isDeleteClienteModalOpen" (click)="closeDeleteClienteModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteClienteModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Cliente?</h2>
       <div class="delete-info" *ngIf="clienteToDelete">
@@ -790,6 +856,7 @@
   <!-- MODAL DE EXCLUSÃO DE VENDEDOR -->
   <div class="checkout-overlay" *ngIf="isDeleteVendedorModalOpen" (click)="closeDeleteVendedorModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteVendedorModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Vendedor?</h2>
       <div class="delete-info" *ngIf="vendedorToDelete">
@@ -807,6 +874,7 @@
   <!-- MODAL HISTÓRICO DE PEDIDOS DO CLIENTE -->
   <div class="checkout-overlay" *ngIf="isHistoricoClienteOpen" (click)="fecharHistoricoCliente()">
     <div class="checkout-modal historico-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharHistoricoCliente()">✕</button>
       <h2>Histórico de {{ clienteHistorico?.name }}</h2>
 
       <div class="historico-lista">
@@ -839,9 +907,159 @@
           <div class="clientes-vazio">Carregando histórico...</div>
         </ng-template>
       </div>
+    </div>
+  </div>
 
-      <div class="checkout-actions">
-        <button class="btn-cancel" (click)="fecharHistoricoCliente()">FECHAR</button>
+  <!-- MODAL MOVIMENTO DO MÊS (sub-aba A Receber) -->
+  <div class="checkout-overlay" *ngIf="mesDetalheAberto !== null" (click)="fecharMesDetalhe()">
+    <div class="checkout-modal receber-mes-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharMesDetalhe()">✕</button>
+      <h2>{{ mesesAbreviados[mesDetalheAberto] }}/{{ anoPanorama }}</h2>
+
+      <p class="receber-mes-vazio" *ngIf="movimentosMesDetalhe.length === 0">Nenhum recebimento ou parcela neste mês.</p>
+
+      <ul class="receber-mes-lista" *ngIf="movimentosMesDetalhe.length > 0">
+        <li class="receber-mes-linha" *ngFor="let m of movimentosMesDetalhe">
+          <div class="receber-mes-info">
+            <span class="receber-mes-cliente">{{ m.customerName }}</span>
+            <span class="receber-mes-meta">#{{ m.orderNumber }} · {{ m.data | date:'dd/MM/yyyy' }}</span>
+          </div>
+          <span class="mov-tipo" [ngClass]="m.tipo">{{ tipoMovimentoLabel(m.tipo) }}</span>
+          <strong class="receber-mes-valor">R$ {{ m.amount | number:'1.2-2' }}</strong>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- MODAL DETALHE DO RELATÓRIO (cards Faturamento / CMV / Lucro Bruto — abas Vendas e Balanço) -->
+  <div class="checkout-overlay" *ngIf="detalheAberto" (click)="fecharDetalhe()">
+    <div class="checkout-modal detalhe-relatorio-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharDetalhe()">✕</button>
+      <h2>{{ detalheTitulo }}</h2>
+      <p class="detalhe-contexto">
+        <span>{{ detalhePeriodo }}</span>
+        <span class="detalhe-filtro-tag" *ngFor="let f of detalheFiltrosAtivos">{{ f }}</span>
+        <span class="detalhe-filtro-tag" *ngIf="detalheEscopo === 'balanco'">Somente período</span>
+      </p>
+
+      <div class="detalhe-corpo">
+
+        <!-- FATURAMENTO -->
+        <ng-container *ngIf="detalheAberto === 'faturamento' && detalheFaturamento">
+
+          <ng-container *ngIf="faturamentoGeral as geral">
+            <p class="detalhe-vazio" *ngIf="geral.vendas.length === 0">Nenhuma venda no filtro.</p>
+
+            <ng-container *ngIf="geral.vendas.length > 0">
+              <div class="detalhe-pizza" *ngIf="geral.pizza.length > 0">
+                <div class="detalhe-pizza-canvas">
+                  <canvas id="faturamentoPizzaChart"></canvas>
+                </div>
+                <ul class="detalhe-legenda">
+                  <li *ngFor="let f of geral.pizza; let i = index">
+                    <span class="legenda-cor" [style.background]="coresPizza[i]"></span>
+                    <span class="legenda-nome">{{ f.nome }}</span>
+                    <span class="legenda-pct">{{ f.percentual | number:'1.1-1' }}%</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="detalhe-tabela-wrap">
+                <table class="detalhe-tabela">
+                  <thead>
+                    <tr><th>Data</th><th>Origem</th><th>Cliente</th><th>Forma</th><th class="num">Valor</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let v of geral.vendas">
+                      <td>{{ v.data | date:'dd/MM/yyyy HH:mm' }}</td>
+                      <td><span class="origem-tag" [ngClass]="v.origem">{{ origemVendaLabel(v.origem) }}</span></td>
+                      <td>{{ v.clienteNome }}</td>
+                      <td>{{ v.formaPagamentoLabel }}</td>
+                      <td class="num">R$ {{ v.valor | number:'1.2-2' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </ng-container>
+          </ng-container>
+
+          <ng-container *ngIf="faturamentoPorProduto as porProduto">
+            <p class="detalhe-vazio" *ngIf="porProduto.porCliente.length === 0">Nenhuma venda no filtro.</p>
+
+            <ng-container *ngIf="porProduto.porCliente.length > 0">
+              <div class="detalhe-barras">
+                <canvas id="faturamentoDiaChart"></canvas>
+              </div>
+
+              <div class="detalhe-tabela-wrap">
+                <table class="detalhe-tabela">
+                  <thead>
+                    <tr><th>Cliente</th><th class="num">Vendas</th><th class="num">Valor</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let c of porProduto.porCliente">
+                      <td>{{ c.nome }}</td>
+                      <td class="num">{{ c.qtdVendas }}</td>
+                      <td class="num">R$ {{ c.valor | number:'1.2-2' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </ng-container>
+          </ng-container>
+        </ng-container>
+
+        <!-- CMV -->
+        <ng-container *ngIf="detalheAberto === 'cmv'">
+          <p class="detalhe-aviso" *ngIf="cmvLinhasSemCusto > 0">
+            ⚠️ {{ cmvLinhasSemCusto }} {{ cmvLinhasSemCusto === 1 ? 'linha está' : 'linhas estão' }} sem custo cadastrado — o CMV pode estar subestimado.
+          </p>
+          <p class="detalhe-vazio" *ngIf="linhasCmv.length === 0">Nenhuma venda no filtro.</p>
+          <div class="detalhe-tabela-wrap" *ngIf="linhasCmv.length > 0">
+            <table class="detalhe-tabela">
+              <thead>
+                <tr><th>Produto</th><th class="num">Qtd</th><th class="num">Custo unit.</th><th class="num">Custo total</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let l of linhasCmv" [class.custo-zero]="l.custoZero">
+                  <td>
+                    {{ l.nome }}
+                    <span class="selo-sem-custo" *ngIf="l.custoZero">Sem custo</span>
+                  </td>
+                  <td class="num">{{ l.quantidade | number:'1.0-3' }} {{ l.porPeso ? 'kg' : 'un' }}</td>
+                  <td class="num">R$ {{ l.custoUnitarioMedio | number:'1.2-2' }}</td>
+                  <td class="num">R$ {{ l.custoTotal | number:'1.2-2' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ng-container>
+
+        <!-- LUCRO BRUTO -->
+        <ng-container *ngIf="detalheAberto === 'lucro'">
+          <p class="detalhe-vazio" *ngIf="linhasLucro.length === 0">Nenhuma venda no filtro.</p>
+          <div class="detalhe-tabela-wrap" *ngIf="linhasLucro.length > 0">
+            <table class="detalhe-tabela">
+              <thead>
+                <tr><th>Produto</th><th class="num">Faturamento</th><th class="num">Custo</th><th class="num">Lucro</th><th class="num">Margem</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let l of linhasLucro">
+                  <td>{{ l.nome }}</td>
+                  <td class="num">R$ {{ l.faturamento | number:'1.2-2' }}</td>
+                  <td class="num">R$ {{ l.custo | number:'1.2-2' }}</td>
+                  <td class="num" [class.negativo]="l.lucro < 0">R$ {{ l.lucro | number:'1.2-2' }}</td>
+                  <td class="num" [class.negativo]="l.lucro < 0">{{ l.margem | number:'1.0-1' }}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </ng-container>
+      </div>
+
+      <div class="detalhe-rodape">
+        <span class="detalhe-rodape-label">Total</span>
+        <strong class="detalhe-rodape-valor">R$ {{ detalheTotal | number:'1.2-2' }}</strong>
       </div>
     </div>
   </div>
@@ -849,6 +1067,7 @@
   <!-- MODAL DETALHE DO LANÇAMENTO (Histórico Geral: pdv/pedido/comanda) -->
   <div class="checkout-overlay" *ngIf="detalheLancamentoAberto as item" (click)="fecharDetalheLancamento()">
     <div class="checkout-modal detalhe-lancamento-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharDetalheLancamento()">✕</button>
       <div class="pedido-historico-header">
         <div class="header-left-group">
           <span class="order-number" *ngIf="item.numero">#{{ item.numero }}</span>
@@ -912,16 +1131,13 @@
           <span class="formula-valor">R$ {{ lucroHistoricoItem(item) | number:'1.2-2' }}</span>
         </div>
       </div>
-
-      <div class="checkout-actions">
-        <button class="btn-cancel" (click)="fecharDetalheLancamento()">FECHAR</button>
-      </div>
     </div>
   </div>
 
   <!-- MODAL DE EXCLUSÃO DE PRODUTO -->
   <div class="checkout-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Produto?</h2>
 

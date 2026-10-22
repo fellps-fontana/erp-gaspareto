@@ -9,7 +9,7 @@
         </svg>
       </button>
       <h1>Pedidos & Encomendas</h1>
-      <div class="filters-bar">
+      <div class="filters-bar" *ngIf="activeTab === 'pedidos'">
         <div class="filters filter-group" role="group">
           <button [class.active]="filterStatus === 'all'"       (click)="filterStatus = 'all'">Ativos</button>
           <button [class.active]="filterStatus === 'pending'"   (click)="filterStatus = 'pending'">Pendente</button>
@@ -30,6 +30,43 @@
     </button>
   </header>
 
+  <!-- ABAS -->
+  <nav class="orders-tabs" role="tablist">
+    <button role="tab" [class.active]="activeTab === 'pedidos'" [attr.aria-selected]="activeTab === 'pedidos'"
+      (click)="activeTab = 'pedidos'">Pedidos</button>
+    <button role="tab" [class.active]="activeTab === 'receber'" [attr.aria-selected]="activeTab === 'receber'"
+      (click)="activeTab = 'receber'">
+      A receber
+      <span class="tab-badge" *ngIf="(quantidadeVencidas$ | async) as vencidas">({{ vencidas }} {{ vencidas === 1 ? 'vencida' : 'vencidas' }})</span>
+    </button>
+    <button role="tab" *ngIf="recurringModels.length > 0"
+      [class.active]="activeTab === 'recorrentes'" [attr.aria-selected]="activeTab === 'recorrentes'"
+      (click)="activeTab = 'recorrentes'">Recorrentes</button>
+  </nav>
+
+  <!-- A RECEBER -->
+  <app-order-receivables *ngIf="activeTab === 'receber'"
+    [orders]="(orders$ | async) ?? []"
+    (receive)="onReceiveInstallment($event)"
+    (openOrder)="openOrderFromReceivables($event)"></app-order-receivables>
+
+  <!-- RECORRENTES -->
+  <app-recurring-orders-tab *ngIf="activeTab === 'recorrentes'"
+    [models]="recurringModels"
+    [processing]="isProcessingAction"
+    (pause)="pauseRecurring($event)"
+    (resume)="resumeRecurring($event)"
+    (end)="endRecurring($event)"
+    (edit)="openRecurringEdit($event)"></app-recurring-orders-tab>
+
+  <app-order-recurrence *ngIf="editingRecurring"
+    [model]="editingRecurring"
+    [processing]="isProcessingAction"
+    (edited)="onRecurringEdited($event)"
+    (closed)="closeRecurringEdit()"></app-order-recurrence>
+
+  <ng-container *ngIf="activeTab === 'pedidos'">
+  <div class="summary-row">
   <!-- RESUMO DE PREPARAÇÃO -->
   <section class="order-summary-header" *ngIf="orderSummary$ | async as summary">
     <div class="summary-container" *ngIf="summary.length > 0">
@@ -42,6 +79,17 @@
       </div>
     </div>
   </section>
+
+  <!-- VALOR ESTIMADO -->
+  <section class="estimate-container" *ngIf="valorEstimado$ | async as valor">
+    <span class="summary-title">Valor estimado:</span>
+    <div class="estimate-values">
+      <div class="estimate-item"><span>Total</span><strong>{{ valor.total | currency:'BRL' }}</strong></div>
+      <div class="estimate-item paid"><span>Pago</span><strong>{{ valor.pago | currency:'BRL' }}</strong></div>
+      <div class="estimate-item balance"><span>Saldo</span><strong>{{ valor.saldo | currency:'BRL' }}</strong></div>
+    </div>
+  </section>
+  </div>
 
   <!-- LOADING -->
   <ng-template #loading>
@@ -57,7 +105,11 @@
       <p>Nenhum pedido encontrado.</p>
     </div>
 
-    <div *ngFor="let order of orders; trackBy: trackByOrder" class="order-card" [ngClass]="order.status">
+    <div *ngFor="let order of orders; trackBy: trackByOrder" class="order-card" [ngClass]="order.status"
+      tabindex="0" role="button" [attr.aria-label]="'Ver detalhes do pedido ' + order.orderNumber"
+      (click)="viewDetails(order)"
+      (keydown.enter)="onCardKeydown($event, order)"
+      (keydown.space)="onCardKeydown($event, order)">
       <div class="card-header-styled">
         <div class="header-left-group">
           <span class="order-number">#{{ order.orderNumber }}</span>
@@ -78,6 +130,7 @@
       <div class="card-body-styled">
         <h3 class="customer-name">{{ order.customerName }}</h3>
         <span class="vendedor-tag" *ngIf="order.vendedorName">🧑‍💼 {{ order.vendedorName }}</span>
+        <span class="recurring-tag" *ngIf="isRecurringGenerated(order)" title="Pedido gerado por recorrência">🔁 Recorrente</span>
 
         <div class="scheduled-date-badge" *ngIf="order.scheduledDate && order.status !== 'delivered' && order.status !== 'finished'">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -123,6 +176,14 @@
           <div class="info-content"><strong>Retirada no Balcão</strong></div>
         </div>
 
+        <div class="payment-progress" *ngIf="canRegisterPayment(order)">
+          Pago {{ paidOf(order) | currency:'BRL' }} de {{ order.total | currency:'BRL' }}
+        </div>
+        <div class="next-installment" *ngIf="proximaPrevista(order) as prox" [class.overdue]="diasDeAtraso(prox) > 0">
+          prox: {{ prox.amount | currency:'BRL' }} · {{ getOrderDate(prox.dueDate) | date:'dd/MM' }}
+          <span class="overdue-tag" *ngIf="diasDeAtraso(prox) > 0">{{ atrasoLabel(prox) }}</span>
+        </div>
+
         <ul class="items-list-styled">
           <li *ngFor="let item of order.items.slice(0, 3)">
             <span class="qty">{{ qtyLabel(item) }}</span>
@@ -134,7 +195,7 @@
         </ul>
       </div>
 
-      <div class="card-footer-styled">
+      <div class="card-footer-styled" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
         <div class="main-actions">
           <button *ngIf="getNextActionLabel(order.status)" class="btn-primary-action"
             [disabled]="isProcessingAction" (click)="advanceStatus(order)">
@@ -145,17 +206,12 @@
           </button>
         </div>
         <div class="secondary-actions">
-          <button class="btn-icon view" (click)="viewDetails(order)" title="Ver Detalhes">
+          <button *ngIf="canRegisterPayment(order) && order.status !== 'delivered'"
+            class="btn-icon pay" [disabled]="isProcessingAction"
+            (click)="openPaymentModal(order)" title="Registrar pagamento">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-          </button>
-          <button *ngIf="order.status === 'pending' || order.status === 'open'"
-            class="btn-icon edit" (click)="editOrder(order)" title="Editar Pedido">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              <line x1="12" y1="1" x2="12" y2="23"></line>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
             </svg>
           </button>
           <button *ngIf="order.status !== 'finished' && order.status !== 'canceled'"
@@ -170,6 +226,7 @@
       </div>
     </div>
   </div>
+  </ng-container>
 
   <!-- ═══════════════════════════════════════════════════════════
        OVERLAY NOVO PEDIDO
@@ -178,7 +235,7 @@
     <div class="panel-content">
       <div class="panel-header">
         <h2>{{ editingOrderId ? 'Editar Pedido' : 'Nova Encomenda' }}</h2>
-        <button class="btn-close" (click)="closeNewOrder()">✕</button>
+        <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeNewOrder()">✕</button>
       </div>
 
       <div class="panel-body">
@@ -351,32 +408,87 @@
   ════════════════════════════════════════════════════════════ -->
   <div class="modal-backdrop" *ngIf="isPaymentModalOpen">
     <div class="modal-content">
-      <h3>Finalizar Pedido</h3>
-      <p>Confirmar recebimento e finalizar?</p>
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closePaymentModal()" [disabled]="isProcessingAction">✕</button>
+      <h3>Registrar pagamento</h3>
+      <p>Saldo a receber: <strong>{{ paymentSaldo | currency:'BRL' }}</strong></p>
 
       <div class="payment-form">
         <div class="form-field">
+          <label for="paymentAmountInput">Valor</label>
+          <input id="paymentAmountInput" type="number" min="0.01" step="0.01" [max]="paymentSaldo"
+            [(ngModel)]="paymentAmount">
+          <small class="payment-error" *ngIf="paymentAmount !== null && !isPaymentAmountValid">
+            {{ paymentAmount! > paymentSaldo ? 'Maior que o saldo do pedido.' : 'Informe um valor maior que zero.' }}
+          </small>
+        </div>
+
+        <div class="form-field">
           <label for="paymentMethodSelect">Forma de Pagamento</label>
           <select id="paymentMethodSelect" [(ngModel)]="selectedPaymentMethod">
-            <option value="dinheiro">Dinheiro</option>
-            <option value="pix">Pix</option>
-            <option value="cartao">Cartão</option>
-            <option value="cheque">Cheque</option>
-            <option value="boleto">Boleto</option>
+            <option *ngFor="let m of paymentMethodOptions" [value]="m.value">{{ m.label }}</option>
           </select>
         </div>
 
         <div class="form-field">
-          <label for="installmentsInput">Parcelas</label>
+          <label for="installmentsInput">Parcelas (informativo)</label>
           <input id="installmentsInput" type="number" min="1" [(ngModel)]="selectedInstallments">
+        </div>
+
+        <div class="form-field">
+          <label for="paymentDateInput">Data do pagamento</label>
+          <input id="paymentDateInput" type="date" [(ngModel)]="paymentDate">
         </div>
       </div>
 
       <div class="modal-actions">
         <button (click)="closePaymentModal()" [disabled]="isProcessingAction">Cancelar</button>
-        <button class="btn-confirm" (click)="confirmPayment()" [disabled]="isProcessingAction">
-          {{ isProcessingAction ? 'Processando...' : 'Confirmar Pagamento' }}
+        <button class="btn-confirm" (click)="confirmPayment()" [disabled]="isProcessingAction || !isPaymentAmountValid">
+          {{ isProcessingAction ? 'Processando...' : 'Registrar pagamento' }}
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MODAL MONTAR PARCELAS (componente extraído)
+  ════════════════════════════════════════════════════════════ -->
+  <app-order-installments *ngIf="isInstallmentsModalOpen"
+    [saldoAlvo]="installmentsTargetSaldo"
+    [parcelasIniciais]="installmentsInitial"
+    [reajuste]="hasPendingOrderUpdate"
+    [processing]="isProcessingAction"
+    (saved)="onInstallmentsSaved($event)"
+    (closed)="closeInstallmentsModal()"></app-order-installments>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MODAL CANCELAR PEDIDO COM PAGAMENTOS
+  ════════════════════════════════════════════════════════════ -->
+  <div class="modal-backdrop" *ngIf="isCancelPaymentsModalOpen && cancelOrderWithPayments">
+    <div class="modal-content cancel-payments-modal">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeCancelPaymentsModal()" [disabled]="isProcessingAction">✕</button>
+      <h3>Cancelar pedido de {{ cancelOrderWithPayments.customerName }}</h3>
+      <p class="cancel-received">Já recebido: <strong>{{ cancelPaidAmount | currency:'BRL' }}</strong></p>
+
+      <p class="cancel-warning" *ngIf="cancelHasScheduled">
+        As parcelas previstas serão canceladas.
+      </p>
+      <p class="cancel-warning" *ngIf="cancelWasDelivered">
+        O estoque volta e a venda é cancelada.
+      </p>
+
+      <div class="cancel-options">
+        <button class="cancel-option refund" (click)="confirmCancelWithPayments(true)" [disabled]="isProcessingAction">
+          <strong>Estornar {{ cancelPaidAmount | currency:'BRL' }}</strong>
+          <small>O valor sai do total recebido.</small>
+        </button>
+        <button class="cancel-option retain" (click)="confirmCancelWithPayments(false)" [disabled]="isProcessingAction">
+          <strong>Manter como sinal retido</strong>
+          <small>O valor continua contado como recebido e não vira venda.</small>
+        </button>
+      </div>
+
+      <div class="modal-actions">
+        <button (click)="closeCancelPaymentsModal()" [disabled]="isProcessingAction">Voltar</button>
       </div>
     </div>
   </div>
@@ -386,6 +498,7 @@
   ════════════════════════════════════════════════════════════ -->
   <div class="modal-backdrop" *ngIf="isConfirmModalOpen">
     <div class="modal-content confirm-modal">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeConfirmModal()" [disabled]="isProcessingAction">✕</button>
       <h3>Confirmação</h3>
       <p>{{ confirmMessage }}</p>
       <div class="modal-actions">
@@ -400,16 +513,11 @@
   <!-- ═══════════════════════════════════════════════════════════
        MODAL DETALHES
   ════════════════════════════════════════════════════════════ -->
-  <div class="modal-backdrop" *ngIf="isDetailsModalOpen && selectedOrderDetails">
+  <div class="modal-backdrop" *ngIf="isDetailsModalOpen && selectedOrderDetails" (click)="onDetailsBackdropClick($event)">
     <div class="modal-content details-modal">
       <div class="modal-header">
         <h3>Detalhes do Pedido #{{ selectedOrderDetails.orderNumber }}</h3>
-        <button class="btn-close-modal" (click)="closeDetails()">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+        <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDetails()">✕</button>
       </div>
 
       <div class="modal-body">
@@ -417,6 +525,8 @@
           <div class="customer-info">
             <h2>{{ selectedOrderDetails.customerName }}</h2>
             <span class="vendedor-tag" *ngIf="selectedOrderDetails.vendedorName">🧑‍💼 {{ selectedOrderDetails.vendedorName }}</span>
+            <span class="recurring-tag" *ngIf="isRecurringGenerated(selectedOrderDetails)" title="Pedido gerado por recorrência">🔁 Recorrente</span>
+            <span class="recurring-tag" *ngIf="recurringModelOf(selectedOrderDetails)">🔁 Repete: {{ recurrenceLabelOf(selectedOrderDetails) }}</span>
             <div class="phone-row" *ngIf="selectedOrderDetails.customerPhone">
               <span class="phone">{{ selectedOrderDetails.customerPhone }}</span>
               <button class="btn-whatsapp" (click)="openWhatsApp(selectedOrderDetails.customerPhone!)"
@@ -477,6 +587,17 @@
           </div>
         </div>
 
+        <div class="detail-installments" *ngIf="previstasOf(selectedOrderDetails).length > 0">
+          <h4>Parcelas previstas</h4>
+          <ul>
+            <li *ngFor="let p of previstasOf(selectedOrderDetails)" [class.overdue]="diasDeAtraso(p) > 0">
+              <span>{{ getOrderDate(p.dueDate) | date:'dd/MM/yyyy' }} · {{ methodLabel(p.method) }}</span>
+              <strong>{{ p.amount | currency:'BRL' }}</strong>
+              <span class="overdue-tag" *ngIf="diasDeAtraso(p) > 0">{{ atrasoLabel(p) }}</span>
+            </li>
+          </ul>
+        </div>
+
         <div class="detail-obs" *ngIf="selectedOrderDetails.observations">
           <label>Observações:</label>
           <p>{{ selectedOrderDetails.observations }}</p>
@@ -484,9 +605,21 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-secondary" (click)="closeDetails()">Fechar</button>
+        <button class="btn-secondary" *ngIf="canEditOrder(selectedOrderDetails)"
+          (click)="editFromDetails(selectedOrderDetails)">Editar</button>
+        <button class="btn-secondary" *ngIf="canScheduleInstallments(selectedOrderDetails)"
+          (click)="openInstallmentsFromDetails(selectedOrderDetails)">Montar parcelas</button>
+        <button class="btn-secondary" *ngIf="canRepeatOrder(selectedOrderDetails)"
+          (click)="openRecurrenceModal(selectedOrderDetails)">Repetir pedido</button>
       </div>
     </div>
   </div>
+
+  <!-- MODAL REPETIR PEDIDO (por cima do detalhe, que continua aberto) -->
+  <app-order-recurrence *ngIf="isRecurrenceModalOpen && recurrenceOrder"
+    [order]="recurrenceOrder"
+    [processing]="isProcessingAction"
+    (saved)="onRecurrenceSaved($event)"
+    (closed)="closeRecurrenceModal()"></app-order-recurrence>
 
 </div>

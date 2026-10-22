@@ -51,28 +51,41 @@ chave de módulo `contas`).
 ## 3. Vendas (`sales`) — [CRÍTICA]
 
 - Toda venda tem `sale_type`: `'pdv'` (balcão) ou `'order'` (originada de um
-  pedido finalizado). `customerId` só é preenchido em vendas do tipo `order`
-  com cliente vinculado — vendas de PDV nunca têm `customerId`.
-- `paymentMethod`: `'dinheiro' | 'pix' | 'cartao' | 'cheque'` (enum
-  `PaymentMethod`, em `src/models/sell-model.ts`), com
+  pedido). A venda `'order'` **nasce na entrega do pedido**
+  (`OrderService.markAsDelivered`, valor cheio, data da entrega — seção 5.3),
+  não mais na finalização; pedidos já `delivered` antes do deploy da seção
+  5.3 seguem a regra antiga (nasce na conclusão). `customerId` só é
+  preenchido em vendas do tipo `order` com cliente vinculado — vendas de PDV
+  nunca têm `customerId`.
+- `paymentMethod`: `'dinheiro' | 'pix' | 'cartao' | 'cheque' | 'boleto' |
+  'misto'` (enum `PaymentMethod`, em `src/models/sell-model.ts`), com
   `PAYMENT_METHOD_LABELS: Record<PaymentMethod, string>` mapeando cada valor
-  pro rótulo pt-BR de exibição. Escopo real hoje: só `Sale`s originadas de
-  Pedidos (`sale_type: 'order'`, via `OrderService.finalizeOrder` — seção 5)
-  usam os 4 valores. PDV e Comandas não mudaram — continuam gerando venda só
-  com `'dinheiro'`/`'pix'` na prática (o enum é compartilhado e mais largo,
-  mas a UI deles não expõe as opções novas).
+  pro rótulo pt-BR. `'misto'` NUNCA é escolhido pelo usuário: é o valor que
+  `Sale.paymentMethod`/`Order.paymentMethod` recebem na conclusão de um
+  pedido quando houve mais de uma forma de pagamento distinta entre os
+  pagamentos `pago` (seção 5.3); label `'Misto'`. `Sale.paymentMethod` passa
+  a ser **opcional**: a venda de pedido nasce SEM forma (a forma só é
+  conhecida quando o saldo zera) e é preenchida na conclusão. PDV e Comandas
+  não mudaram — PDV continua sempre gravando `'dinheiro'`/`'pix'`.
 - `installments?: number` (novo campo em `Sale`): metadado de parcelamento —
   `1`/ausente = à vista, `N` = parcelado em N vezes. **Não** gera controle de
   parcela individual nem lançamento em `bills`/Contas a Receber, é só
-  informação de exibição/filtro. Sempre forçado a `1` quando
-  `paymentMethod === PaymentMethod.PIX` (Pix não parcela) — trava aplicada na
-  camada de serviço, não só na UI (ver seção 5).
+  informação de exibição/filtro. Normalizado para inteiro `>= 1` em qualquer
+  forma. A antiga trava "Pix não parcela" foi **removida** pelo usuário
+  (commit `333d386`, 2026-08-28): Pix aceita N parcelas igual às demais formas.
+  Na conclusão de pedido, `Sale.installments` recebe o `installments` do
+  último pagamento (ou `1` se `paymentMethod === 'misto'`).
 - Cada item de venda guarda `priceAtSale` **e** `priceAtCost` no momento da
   venda (snapshot) — o lucro é calculado sobre esses valores congelados, não
   sobre o preço atual do produto. Isso preserva o histórico de margem mesmo
   se o preço do produto mudar depois.
 - Cancelamento de venda (`cancelSale`) devolve todo o estoque dos itens e
   marca a venda como `status: 'canceled'` (não apaga o documento).
+- **Venda cancelada não conta em relatório.** Toda agregação de vendas
+  (Relatório/Balanço/Dashboard/Vendedores) ignora `status === 'canceled'`.
+  Cancelar um pedido já `delivered` cancela também a `Sale` dele
+  (`status: 'canceled'`, sem devolver estoque de novo — o estoque é devolvido
+  uma única vez, pelo cancelamento do pedido), na mesma transação (seção 5.3).
 
 ## 4. Comandas (`comandas`) — [CRÍTICA]
 
@@ -106,34 +119,43 @@ chave de módulo `contas`).
   Pedidos.
 - Ciclo de status: `open → pending → preparing → ready → delivering →
   delivered → finished` (ou `canceled` a qualquer momento antes de `finished`).
+  `delivered → finished` deixou de ser um clique: o pedido vira `finished`
+  automaticamente quando está `delivered` E o saldo é `0` (seção 5.3).
 - `deliveryType`: `'pickup'` (retirada, sem endereço obrigatório) ou
   `'delivery'` (entrega, usa `address`/`addressLat`/`addressLng`).
 - `total = itemsTotal + shippingCost`. Recalculado automaticamente sempre que
   os `items` do pedido são atualizados (`OrderService.updateOrder`).
-- **Baixa de estoque só acontece no status `delivered`**
-  (`markAsDelivered`), não na criação do pedido. Pedido sem itens não pode
-  ser marcado como entregue.
-- **Cancelamento** (`cancelOrder`): só devolve estoque se o pedido já estava
-  `delivered` no momento do cancelamento (senão o estoque nunca foi baixado,
-  então não há o que devolver).
-- **Finalização financeira**
-  (`OrderService.finalizeOrder(order, paymentMethod, installments = 1)`):
-  gera um registro em `sales` (`sale_type: 'order'`, com `paymentMethod` e
-  `installments` escolhidos), sem baixar estoque de novo
-  (`processSale(saleData, false)` — o estoque já saiu em `markAsDelivered`), e
-  marca o pedido como `finished` com `paymentDate` e `closingDate` — no mesmo
-  `updateDoc` o pedido também grava `paymentMethod`/`installments`
-  (redundante com o `Sale` de propósito: permite filtrar por forma de
-  pagamento tanto no Relatório/Dash, que lê de `Sale`, quanto no Histórico
-  Geral, que lê `Order` direto na branch "pedido" — seção 5.1 — sem precisar
-  de join). `installments` é sempre normalizado (`Number(...)`, mínimo `1`) e
-  forçado a `1` sempre que `paymentMethod === PaymentMethod.PIX` — trava de
-  "Pix é sempre à vista" garantida na camada de serviço, não só na UI (mesma
-  regra da seção 3). Escopo: só a finalização de Pedidos. PDV e Comandas não
-  passaram por essa mudança.
+- **Baixa de estoque só acontece no status `delivered`** (`markAsDelivered`),
+  não na criação do pedido. Pedido sem itens não pode ser marcado como
+  entregue. `markAsDelivered` só é permitido a partir de `open|pending|
+  preparing|ready|delivering` (guarda no service contra entrega dupla).
+  Também cria a `Sale` do pedido, na mesma transação (seção 5.3).
+- **Cancelamento** (`cancelOrder(orderId, { estornar })`): só devolve estoque
+  se o pedido já estava `delivered` no momento do cancelamento (senão o
+  estoque nunca foi baixado). Só é permitido a partir de status diferente de
+  `finished`/`canceled` (guarda no service). Efeitos sobre pagamentos, `Sale`
+  e parcelas: seção 5.3.
+- **Finalização financeira — regra ANTERIOR (histórico / regra de transição)**:
+  `OrderService.finalizeOrder(order, paymentMethod, installments = 1)` gerava
+  a `Sale` (`processSale(saleData, false)`) e depois marcava o pedido
+  `finished` com `paymentDate`/`closingDate`/`paymentMethod`/`installments`,
+  em DUAS escritas sem transação (bug: se a segunda falhasse, a venda ficava
+  duplicada). Esta forma foi **substituída** pelos pagamentos da seção 5.3 e
+  `finalizeOrder` é removido. A regra antiga continua valendo só como regra de
+  transição: pedidos que já estavam `delivered` no momento do deploy (status
+  `delivered` e sem `saleId`) têm a `Sale` criada na CONCLUSÃO (quando o
+  saldo zera), com `date` = data da conclusão, em vez de na entrega. Pedidos
+  `finished` antigos (sem `payments`) são lidos como UM pagamento pago de
+  valor cheio (derivado, sem migração) — ver 5.3. Continuam valendo: a
+  redundância deliberada `Order.paymentMethod`/`installments` espelhando a
+  `Sale` (Histórico filtra por forma sem join, seção 5.1) e a normalização
+  de `installments` para inteiro `>= 1` (Pix parcela normalmente desde
+  `333d386` — não existe mais trava de Pix à vista).
 - Datas do ciclo de vida: `createdAt`, `scheduledDate` (previsão),
-  `actualDeliveryDate` (preenchida em `delivered`), `paymentDate` e
-  `closingDate` (preenchidas em `finished`).
+  `actualDeliveryDate` (preenchida em `delivered`), `paymentDate` (data do
+  ÚLTIMO pagamento que zerou o saldo) e `closingDate` (instante da
+  conclusão), ambas preenchidas em `finished`. Datas por pagamento
+  (`dueDate`, `paidDate`) vivem em `Order.payments` (seção 5.3).
 
 ## 5.1 Histórico Geral (Gestão > aba Histórico)
 
@@ -148,6 +170,9 @@ chave de módulo `contas`).
   em itens de `orders` (únicos que gravam `paymentMethod` hoje, via
   `finalizeOrder` — seção 5) — itens de PDV/Comanda no feed não têm esse
   campo.
+  `'misto'` entra como opção do filtro de forma de pagamento. Venda/pedido
+  entregue e ainda não concluído não tem forma gravada e só aparece com o
+  filtro em "todas".
 - **Limitação conhecida**: vendas de PDV e Comandas não têm `customerId`
   vinculado (só `orders` tem cliente cadastrado) — ao filtrar por cliente,
   itens de PDV/Comanda simplesmente não aparecem, mesmo que sejam do mesmo
@@ -184,11 +209,231 @@ chave de módulo `contas`).
   `vendidoItem` de todos os itens qualificados — **exclui `shippingCost`**
   (frete nunca entra na base de cálculo de comissão, decisão fechada com o
   usuário). `totalComissao` = soma de `comissaoItem`.
+  Com a seção 5.3, `status === 'finished'` passa a significar "entregue E
+  saldo = 0": a comissão só entra quando o pedido está totalmente pago.
+  Pedido `delivered` com saldo > 0 e pedido `canceled` (mesmo com sinal
+  retido) nunca geram comissão. Nenhuma mudança de fórmula.
 - **UI**: cadastro de vendedor e sub-aba "Vendedores" vivem dentro de
   `product-inventory.ts`/`.html` (mesmo componente de Gestão, não um
   componente novo) — uma aba de CRUD (`activeTab`) e uma sub-aba de
   relatório (`reportTab`) exibindo `totalVendido`/`totalComissao` por
   vendedor no período filtrado.
+
+## 5.3 Pagamentos, parcelas e A receber de Pedidos — [CRÍTICA]
+
+> Escopo: só Pedidos. PDV e Comandas não mudam. Sem coleção nova no Firestore:
+> pagamentos e parcelas vivem no próprio documento `orders/{id}`. Decisões do
+> usuário de 2026-10-20 incorporadas abaixo.
+
+### Modelo
+- `Order.payments?: OrderPayment[]` e `Order.saleId?: string`.
+- `OrderPayment = { id, amount, method, installments, dueDate?, paidDate?,
+  status }`. `status`: `'previsto'` (parcela agendada, ainda não paga), `'pago'`,
+  `'cancelado'` (parcela prevista cancelada), `'estornado'` (pagamento
+  devolvido). `amount > 0`, 2 casas (comparações em centavos inteiros).
+  `method` nunca é `'misto'`. `installments` é só informativo (cartão/
+  maquininha/Pix parcelado), `>= 1`, forçado a `1` só em `previsto`. `dueDate` só nas
+  parcelas da agenda; `paidDate` só em `pago` (default hoje, editável).
+  Datas são `Timestamp.fromDate(...)` do cliente (serverTimestamp não vale
+  dentro de array).
+- Derivados (nunca gravados): `pago` = soma dos `pago`; `saldo` = `total - pago`;
+  `previsto` = soma dos `previsto`; `saldoDescoberto` = `saldo - previsto`.
+  `total` = `order.total` gravado (inclui frete).
+- Leitura de pedido antigo (sem migração): `status === 'finished'` e sem
+  `payments` = um pagamento `pago` de valor cheio (`method`=`order.paymentMethod`,
+  `installments`, `paidDate`=`paymentDate`). Pedido `delivered` sem `saleId` =
+  "entregue antes do deploy" (regra antiga de venda, ver seção 5).
+
+### Registrar pagamento
+- Permitido em qualquer status exceto `canceled` (e `finished`, onde o saldo já
+  é 0). Pagamento antes da entrega é permitido.
+- `0 < valor <= saldo`; acima do saldo é bloqueado NA CAMADA DE SERVIÇO.
+- Cartão (decisão do usuário): um pagamento de qualquer valor `<= saldo`,
+  sempre lançado `pago` na hora, nunca vira parcela prevista; `installments` é
+  informativo. Pix não tem trava: `installments` informativo como qualquer
+  forma (trava removida em `333d386`).
+- Pagou diferente do previsto (pagamento de uma parcela específica): a
+  diferença vai para a próxima parcela prevista; se não houver, cria-se nova
+  parcela em `dueDate` da paga + 30 dias. Pagamento avulso com parcelas
+  previstas existentes abate das mais antigas. Invariante: se existem
+  `previsto`, `soma(previsto) == saldo` sempre; parcela que chega a 0 é removida.
+  ⚠️ cascata e base de +30 dias: ver seção 12.
+- Atomicidade: pagamento + eventual conclusão + atualização da `Sale` numa única
+  `runTransaction`.
+
+### Conclusão e competência
+- Pedido vira `finished` quando `status === 'delivered'` E `saldo === 0`
+  (automático; substitui o clique de finalizar). Se o saldo zerar ANTES da
+  entrega, o pedido só conclui dentro de `markAsDelivered`.
+- Competência: a `Sale` (`sale_type: 'order'`, `status: 'completed'`, valor
+  cheio, itens com snapshot, `date` = data da entrega) nasce em `markAsDelivered`,
+  na MESMA transação da baixa de estoque, sem `paymentMethod`; `Order.saleId`
+  guarda o vínculo. Pagamentos são indicador separado (Recebido / A receber).
+- Na conclusão (decisão do usuário): `Sale.paymentMethod`/`installments` e
+  `Order.paymentMethod`/`installments` = forma e parcelas do último pagamento
+  `pago` (por `paidDate`), ou `paymentMethod = 'misto'` e `installments = 1` se
+  houve mais de uma forma distinta entre os `pago`. Também grava
+  `paymentDate`/`closingDate`.
+- Pedido já `delivered` no deploy: a `Sale` é criada na conclusão (regra antiga,
+  data = conclusão). Sem script retroativo.
+- Comissão (seção 5.2): só `finished`.
+
+### Parcelas previstas (formas que não são cartão)
+- "Montar parcelas" substitui TODAS as parcelas `previsto` do pedido (as `pago`
+  são preservadas). Dois modos: N parcelas iguais mensais a partir da data X
+  (centavos sobrantes na última; mês sem o dia usa o último dia do mês), ou
+  lançamento livre. A soma TEM que ser igual ao saldo, cada parcela `> 0` e com
+  `dueDate`, senão não salva (validação no serviço). Forma `cartao` não pode ser
+  parcela prevista.
+- **Limite (decisão do usuário, 2026-10-20)**: no máximo **60** parcelas
+  `previsto` por pedido, nos dois modos e no reajuste da edição; acima disso o
+  serviço rejeita com `PARCELAS_ACIMA_DO_LIMITE`. No modo iguais, a quantidade
+  também não pode deixar parcela abaixo de R$ 0,01 (quantidade > saldo em
+  centavos → `VALOR_INVALIDO`), e a validação acontece ANTES de montar a lista.
+- Atraso é só destaque visual ("vencida há X dias"; vencida = `dueDate` anterior
+  ao início do dia de hoje); sem juros/multa.
+- Editar itens/frete com pagamentos lançados: permitido só se `novoTotal >=
+  pago`; se existem `previsto`, a soma deles tem que ser igual ao novo saldo,
+  então a edição obriga reajustar as parcelas na mesma operação (atômica).
+
+### Decisões de 2026-10-20 (pós-PR #35, confirmadas pelo usuário)
+- **Pedido de total 0**: entregue sem nenhum pagamento conclui automaticamente
+  na entrega (saldo 0), com forma final `dinheiro` e `installments = 1` (não há
+  pagamento de onde derivar a forma).
+- **Edição só de frete**: `updateOrder` recalcula `itemsTotal`/`total` sempre
+  que `items` OU `shippingCost` mudam (`total = itens + frete`), usando os itens
+  gravados quando só o frete vem; com pagamentos, a mesma validação de
+  `novoTotal >= pago` e reajuste de parcelas vale.
+- **Edição de pedido**: `updateOrder` só aceita pedido em
+  `open|pending|preparing|ready|delivering` (antes da entrega). Pedido
+  `delivered`/`finished`/`canceled` é rejeitado (a `Sale` e o estoque já
+  refletem o pedido). Só campos editáveis entram (itens, frete, endereço e
+  coordenadas, tipo de entrega, observações, cliente, vendedor, data
+  agendada); `status`, `saleId`, `payments`, totais e datas de ciclo vindos de
+  fora são ignorados/rejeitados — essas mudanças só acontecem pelos métodos
+  próprios (pagamento, parcelas, entrega, cancelamento).
+- **Validação de pagamento no serviço**: `method` tem que ser um valor do enum
+  `PaymentMethod` (exceto `misto`), senão `FORMA_INVALIDA`; `installments`
+  não finito (NaN/Infinity/não numérico) é rejeitado com `VALOR_INVALIDO`;
+  finito é normalizado como antes (`Math.floor`, mínimo 1; ausente = 1).
+- `OrderService.updateStatus` (sem uso, sem validação) foi removido: status só
+  muda pelos métodos com regra.
+
+### Cancelamento com pagamentos
+- `cancelOrder(orderId, { estornar })`, uma transação: estoque (regra
+  existente, só se `delivered`) + `status: 'canceled'` + parcelas `previsto` →
+  `cancelado` + se tinha `saleId`, a `Sale` → `status: 'canceled'` (decisão do
+  usuário; sem devolver estoque pela venda) + pagamentos `pago` conforme
+  `estornar`: `true` → `estornado` (saem do Recebido); `false` → ficam `pago`
+  (sinal retido).
+- Sinal retido (decisão do usuário): conta só como Recebido; NÃO gera `Sale`;
+  Vendas/lucro não mudam; sem comissão.
+
+### Visões derivadas (funções puras únicas, sem coleção)
+- Recebido (por período, base `paidDate`) = soma dos `pago` de todos os pedidos
+  (inclui `finished`, sinal retido e antigos derivados). A receber = soma dos
+  `previsto` de pedidos não cancelados. Vencido = `previsto` com `dueDate`
+  anterior a hoje.
+- Kanban: pedido `delivered` com `saldo > 0` e `saldoDescoberto == 0` sai de
+  Pedidos > kanban e é acompanhado só na aba A receber. `finished`/`canceled`
+  continuam fora (seção 5).
+- Aba "A receber" em Pedidos (mobile incluso): cards Vencido / Vence este mês /
+  Próximos; grupos VENCIDAS / ESTE MÊS / PRÓXIMOS MESES; linha com cliente,
+  `#numero`, parcela k/n (posição entre os pagamentos com `dueDate` do pedido),
+  valor, "venceu há X dias"/"vence dd/mm" e [Recebi], que abre Registrar
+  pagamento com o valor da parcela preenchido e editável.
+- Relatório > sub-aba "A receber" (panorama anual): 12 meses empilhados
+  recebido / previsto / vencido não pago; cards Recebido no ano, A receber no
+  ano, Vencido total; clique no mês abre as parcelas. Decisão (2026-10-22): as
+  abas Vendas e Balanço NÃO exibem cards de Recebido no período / A receber; o
+  acompanhamento de recebíveis fica só nesta sub-aba e na aba A receber de
+  Pedidos. Todos usam as MESMAS funções de cálculo da aba de Pedidos.
+- Valor estimado em Pedidos: total / pago / saldo sobre `filteredOrders$`
+  (respeita filtros); pedidos que saíram do kanban não entram.
+
+## 5.4 Pedido recorrente (`recurringOrders`) — [CRÍTICA]
+
+Decisões do usuário (2026-10-20/21). Um **modelo** (`recurringOrders`, com
+`companyId`) gera pedidos comuns em `orders` numa agenda.
+
+### Onde vive
+- Nasce no **detalhe do pedido**, ação "Repetir pedido" (frequência, dias da
+  semana, 1ª data, fim opcional). Nenhum botão novo no card da lista.
+- Pedido gerado cai no kanban como pedido normal (`pending`), com selo discreto
+  de recorrente (`Order.recurringOrderId` preenchido).
+- "Repetir pedido" (Kira, 2026-10-21): não aparece em pedido gerado por
+  recorrência; aparece no original enquanto ele não tiver modelo `active` ou
+  `paused` (se só houver modelos encerrados, pode repetir de novo).
+- Gestão de todos: pill "Recorrentes" ao lado de "Pedidos | A receber", só
+  aparece se existir algum modelo. Tela do cliente: só lista de leitura
+  "Pedidos recorrentes deste cliente" com atalho pausar/editar.
+
+### Agenda
+- Frequências: `weekly` (a cada 7 dias de `startDate`), `biweekly` (14 dias),
+  `monthly` (dia de `startDate`; mês sem o dia usa o último dia do mês; sempre
+  ancorado em `startDate`, nunca no resultado anterior), `weekdays` (toda semana
+  nos dias marcados, 0=domingo..6; sem "a cada N semanas").
+- `endDate` opcional e **inclusivo**. Datas da agenda são strings civis
+  `yyyy-MM-dd` no calendário local (BR), sem fuso.
+- O pedido original **não** conta como ocorrência: a 1ª gerada é `startDate`
+  (padrão no modal: a 1ª data da agenda depois da `scheduledDate` do original).
+- Validação: frequência do enum; `weekdays` só em `weekdays`, não vazio, valores
+  0..6; datas válidas; `endDate >= startDate`.
+
+### Geração (automática, idempotente)
+- **Mecanismo atual: no cliente**, ao abrir Pedidos (uma vez por sessão, com o
+  módulo pedidos ligado). Funciona igual em homolog e prod. A **Cloud Function
+  agendada** (gera sem ninguém abrir o app) entra **só em produção**, quando a
+  feature for para prod (decisão do usuário) — homolog é Spark e não roda
+  Functions. As duas usam o mesmo núcleo e a mesma idempotência.
+- Gera ocorrências com data `<= hoje + 2 dias` (antecedência). Catch-up: só
+  datas `>= hoje - 3 dias` (mais antigas são ignoradas), `>= generateFrom` e
+  depois de `lastGeneratedDate`; no máximo 14 por modelo por execução.
+  A janela é `[maior(generateFrom, lastGeneratedDate+1, hoje-3), menor(hoje+2,
+  endDate)]`; vazia → nada a gerar. Logo, `endDate` recém-passado ainda gera o
+  que ficou para trás dentro do catch-up (ex.: fim 09, hoje 10 → janela 07..09).
+  O teto de 14 pega as 14 primeiras datas da janela, em ordem crescente.
+  `weekdays` preenchido em frequência diferente de `weekdays` →
+  `DIAS_DA_SEMANA_INVALIDOS`. Próxima ocorrência depois de uma data anterior a
+  `startDate` é a própria `startDate`.
+- Pausar → não gera; **retomar** grava `generateFrom = hoje` (nunca gera o
+  período pausado). **Encerrar** é definitivo (não reabre). Sem próxima data
+  (passou do `endDate`) → modelo vira `ended` automaticamente.
+- Idempotência: id do pedido gerado = `rec_{recurringOrderId}_{yyyyMMdd}`;
+  criação em transação que lê o contador e o modelo e usa o **cursor**
+  (`lastGeneratedDate`, monotônico) como trava: data `<=` cursor → já gerada
+  (não escreve). Grava pedido + contador (`orderNumber`) + cursor
+  (`lastGeneratedDate`, `generatedCount`) juntos; corrida entre dispositivos
+  colide no doc do modelo e o perdedor relê o cursor. Não se lê doc
+  inexistente (as rules negam leitura sem `companyId`, e isso NÃO é afrouxado);
+  produtos atuais vêm de consulta filtrada por `companyId` antes da transação
+  (produto excluído simplesmente não volta → ocorrência pulada). Pedido gerado que
+  foi cancelado/excluído **não** é regenerado.
+
+### Conteúdo do pedido gerado
+- Itens do modelo (sem preço); **preço e custo atuais** do produto no momento da
+  geração. Produto por peso: kg fixo no modelo, preço por kg atual; total pela
+  mesma fórmula de Pedidos (`calcularTotalDoPedido`).
+- Produto do item excluído, de outra empresa ou com preço inválido → a
+  ocorrência inteira é **pulada** (cursor avança, `lastIssue` grava o motivo e a
+  UI avisa); sem consumir `orderNumber`. Falta de estoque **não** impede: o
+  estoque segue validado/baixado só na entrega (seção 5).
+- Detalhes (Kira, derivados de "dados atuais do produto", 2026-10-21; o
+  usuário pode revisar): nome do item = título **atual** do produto; se o
+  produto mudou entre unidade e peso desde o modelo (`soldByWeight` diverge), a
+  ocorrência é **pulada** (`PRODUTO_INDISPONIVEL`), porque a quantidade do
+  modelo perde o sentido; preço **ou custo** inválido = não finito (inclui
+  ausente) ou **negativo** (zero é aceito, como no cadastro manual) — custo
+  quebrado contaminaria lucro e comissão. Modelo exige itens não vazios com
+  `quantity` finita > 0 (senão `ITENS_INVALIDOS` na criação). `sourceOrderId`
+  só é gravado se o pedido tiver id. O `detail` do problema cita o nome do
+  produto.
+- Cliente, endereço, coordenadas, frete, tipo de entrega, observações e
+  vendedor vêm do modelo (snapshot; cliente excluído não impede). Comissão pela
+  regra normal (5.2).
+- Cada pedido gerado é independente: pagamentos/parcelas pela seção 5.3, por
+  pedido (sem mensalidade). Editar um gerado não muda o modelo; editar o modelo
+  só afeta ocorrências ainda não geradas.
 
 ## 6. Rotas de entrega
 
@@ -380,7 +625,7 @@ depois do cutover (ver §14).
 - Isolamento entre empresas é feito por campo `companyId: string` em cada
   documento das coleções operacionais (`products`, `sales`, `orders`,
   `comandas`, `customers`, `purchases`, `vendedores`, `expenses`,
-  `expenseCategories`, `expenseSeries`; `bills` e `purchaseProducts`
+  `expenseCategories`, `expenseSeries`, `recurringOrders`; `bills` e `purchaseProducts`
   permanecem como legado até a purga, §14) — não por
   subcoleção `companies/{id}/...`. Motivo: mesmo nível de proteção contra
   vazamento entre empresas que subcoleção daria — o Firestore rejeita
@@ -504,6 +749,17 @@ depois do cutover (ver §14).
   composto (`firestore.indexes.json`) no Firestore real (o emulador não
   cobra). Deploy de índices (`npm run deploy:rules:staging`) é pré-requisito
   de cada ambiente antes do hosting novo.
+- **Pagamentos/parcelas de Pedidos (seção 5.3) — pontos assumidos, confirmar:**
+  (1) pagamento avulso com parcelas existentes abate das mais antigas; (2) pagar
+  mais que a parcela reduz as próximas em cascata; (3) nova parcela "+30 dias" é
+  contada a partir da `dueDate` da parcela paga; (4) pedido com saldo sem parcelas
+  NÃO entra em "A receber" (fica no kanban); (5) "A receber no ano" = parcelas
+  previstas não vencidas com `dueDate` no ano, e "Vencido total" soma todos os
+  anos; (6) pedido `finished` antigo sem `paymentMethod` é derivado como
+  `dinheiro`; (7) `paidDate` futura não é bloqueada; (8) estorno só tira o valor
+  do Recebido, sem lançamento de saída em Contas.
+- ~~Fechar Sale de pedido cancelado após entrega~~ — resolvido pela seção 5.3
+  (decisão do usuário de 2026-10-20: a `Sale` é cancelada junto).
 
 ## 13. Super-admin da plataforma — [CRÍTICA]
 

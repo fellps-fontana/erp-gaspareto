@@ -68,7 +68,8 @@ Table sales {
   total          number
   date           timestamp
   items          json      [note: 'array de SaleItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
-  paymentMethod  string    [note: 'enum: dinheiro | pix']
+  paymentMethod  string    [null, note: 'enum: dinheiro | pix | cartao | cheque | boleto | misto. Venda de pedido nasce sem forma (null) e recebe na conclusão; misto = mais de uma forma']
+  installments   number    [null, note: 'informativo; Pix = 1']
   sale_type      string    [note: 'pdv | order']
   customerId     string    [null, ref: > customers.id, note: 'só preenchido quando sale_type = order']
   status         string    [note: 'completed | canceled — não está na interface TS, escrito direto pelo service']
@@ -97,7 +98,41 @@ Table orders {
   actualDeliveryDate    timestamp [null]
   paymentDate           timestamp [null]
   closingDate           timestamp [null]
+  saleId                string    [null, ref: > sales.id, note: 'Sale criada na entrega (regra 5.3). Ausente em pedido delivered antes do deploy']
+  payments              json      [null, note: 'array embutido de OrderPayment: id, amount, method, installments, dueDate?, paidDate?, status (previsto|pago|cancelado|estornado). Ausente = pedido antigo; finished antigo = 1 pagamento derivado']
+  paymentMethod         string    [null, note: 'preenchido na conclusão; pode ser misto']
+  installments          number    [null]
   observations          string    [null]
+  recurringOrderId      string    [null, ref: > recurringOrders.id, note: 'pedido gerado por recorrência (regra 5.4); id do doc = rec_{recurringOrderId}_{yyyyMMdd}']
+  occurrenceDate        string    [null, note: 'yyyy-MM-dd da ocorrência']
+}
+
+Table recurringOrders {
+  id                string    [pk]
+  companyId         string    [ref: > companies.id, note: 'isolamento multi-tenant, regra 10']
+  sourceOrderId     string    [null, ref: > orders.id]
+  status            string    [note: 'active | paused | ended']
+  frequency         string    [note: 'weekly | biweekly | monthly | weekdays']
+  weekdays          json      [null, note: 'number[] 0..6, só em frequency=weekdays']
+  startDate         string    [note: 'yyyy-MM-dd civil']
+  endDate           string    [null, note: 'yyyy-MM-dd inclusivo']
+  generateFrom      string    [note: 'limite inferior de geração; retomar = hoje']
+  lastGeneratedDate string    [null, note: 'cursor, gravado na mesma transação do pedido gerado']
+  generatedCount    number    [null]
+  lastIssue         json      [null, note: '{date, code, detail} ocorrência pulada']
+  customerId        string    [ref: > customers.id]
+  customerName      string
+  customerPhone     string    [null]
+  items             json      [note: 'idProduct, productName, quantity, soldByWeight? — SEM preço']
+  shippingCost      number
+  deliveryType      string    [note: 'pickup | delivery']
+  address           string    [null]
+  addressLat        number    [null]
+  addressLng        number    [null]
+  observations      string    [null]
+  vendedorId        string    [null, ref: > vendedores.id]
+  vendedorName      string    [null]
+  createdAt         timestamp
 }
 
 Table comandas {

@@ -7,7 +7,9 @@
 ## Visão geral
 
 SPA Angular standalone, hospedada no Firebase Hosting, com Firestore como banco
-principal (tempo real via `onSnapshot`). Sem backend próprio — toda a lógica de
+principal (tempo real via `onSnapshot`). Backend próprio mínimo: só Cloud
+Functions pontuais em `functions/` (callables; rodam **só em PROD** — homolog
+`hologaerp` está no plano Spark e não executa Functions). Toda a lógica de
 negócio roda no cliente (services Angular) e escreve direto no Firestore, inclusive
 transações (`runTransaction`) para operações que envolvem estoque.
 

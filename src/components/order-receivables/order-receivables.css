@@ -1,0 +1,142 @@
+/* Aba A receber — cores carregam significado: vencido (danger), mês (warning), próximos (info) */
+.receivables {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-lg);
+  padding: var(--sp-md);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-md);
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  padding: var(--sp-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left-width: 4px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.card-value {
+  font-size: 1.4rem;
+  color: var(--text-primary);
+}
+
+.summary-card.overdue,
+.group.overdue .group-title { border-color: var(--color-danger); }
+.summary-card.month,
+.group.month .group-title { border-color: var(--color-warning); }
+.summary-card.upcoming,
+.group.upcoming .group-title { border-color: var(--color-info); }
+
+.summary-card.overdue .card-value { color: var(--color-danger); }
+
+.group-title {
+  margin: 0 0 var(--sp-sm);
+  padding-left: var(--sp-sm);
+  border-left: 4px solid var(--border-color);
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+}
+
+.group-count {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.installment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.installment-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: var(--sp-sm) var(--sp-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.installment-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-xs) var(--sp-sm);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.sep { opacity: 0.5; }
+
+.customer-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.amount { color: var(--text-primary); }
+
+.due.late {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.btn-receive {
+  flex-shrink: 0;
+  padding: 10px var(--sp-md);
+  background: var(--color-success);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--sp-xl);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .summary-cards {
+    grid-template-columns: 1fr;
+    gap: var(--sp-sm);
+  }
+
+  .installment-line {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-receive {
+    width: 100%;
+    min-height: 44px;
+  }
+}
