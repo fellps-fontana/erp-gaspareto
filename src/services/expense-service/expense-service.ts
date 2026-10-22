@@ -51,8 +51,11 @@ const MSG_DESPESA_JA_PAGA = 'Despesa já está paga; não é possível registrar
 const MSG_CATEGORIA_INVALIDA = 'Categoria inválida para esta empresa.';
 const MSG_CATEGORIA_ARQUIVADA = 'Categoria arquivada não pode ser usada em nova despesa.';
 
-/** Campos de dominio que nunca mudam por patch ou por input: status so por markAsPaid, proveniencia e vinculos fixos. */
-const CAMPOS_PROTEGIDOS_NO_UPDATE: ReadonlySet<string> = new Set([
+/**
+ * Campos de dominio gerenciados pelo service: nunca vem do caller, nem na criacao nem no update.
+ * Status so muda por markAsPaid; proveniencia e vinculos fixos.
+ */
+const CAMPOS_GERENCIADOS_PELO_SERVICE: ReadonlySet<string> = new Set([
   'id',
   'companyId',
   'createdAt',
@@ -85,7 +88,7 @@ export class ExpenseService extends FirestoreBaseService {
   /** Todas as escritas lancam se companyId() for nulo. Retorna o id. */
   async addExpense(input: NewExpenseInput): Promise<string> {
     const companyId = this.companyIdDaSessao();
-    validarValorEVencimento(input);
+    validarCamposDeCriacao(input);
     await this.assertCategoriaAtiva(input.categoryId, companyId);
     const ref = await addDoc(
       collection(this.firestore, this.COL),
@@ -97,7 +100,7 @@ export class ExpenseService extends FirestoreBaseService {
   /** Batch atomico de N despesas (ExpenseScheduleService.buildInstallments); retorna os ids. */
   async addInstallments(input: NewExpenseInput, count: number): Promise<string[]> {
     const companyId = this.companyIdDaSessao();
-    validarValorEVencimento(input);
+    validarCamposDeCriacao(input);
     const parcelas = ExpenseScheduleService.buildInstallments(
       Number(input.value),
       count,
@@ -160,7 +163,7 @@ export class ExpenseService extends FirestoreBaseService {
     }
     const editaveis = omitFields(
       { ...patch, value: converterValorOpcional(patch.value) },
-      CAMPOS_PROTEGIDOS_NO_UPDATE,
+      CAMPOS_GERENCIADOS_PELO_SERVICE,
     );
     await updateDoc(ref, stripUndefined(editaveis));
   }
@@ -233,7 +236,7 @@ export class ExpenseService extends FirestoreBaseService {
     campos: Partial<Expense> = {},
   ): DocumentData {
     return stripUndefined({
-      ...omitFields(input, CAMPOS_PROTEGIDOS_NO_UPDATE),
+      ...omitFields(input, CAMPOS_GERENCIADOS_PELO_SERVICE),
       value: Number(input.value),
       companyId,
       status: STATUS_A_PAGAR,
@@ -244,9 +247,10 @@ export class ExpenseService extends FirestoreBaseService {
   }
 }
 
-function validarValorEVencimento(input: NewExpenseInput): void {
+function validarCamposDeCriacao(input: NewExpenseInput): void {
   assertExpenseValue(input.value);
   assertDateKey(input.dueDate, 'dueDate');
+  validarGoodsReceivedDate(input);
 }
 
 /** Valida apenas os campos presentes no patch. */
@@ -256,6 +260,14 @@ function validarPatch(patch: Partial<NewExpenseInput>): void {
   }
   if (patch.dueDate !== undefined) {
     assertDateKey(patch.dueDate, 'dueDate');
+  }
+  validarGoodsReceivedDate(patch);
+}
+
+/** goodsReceivedDate e opcional; quando presente precisa ser data valida. */
+function validarGoodsReceivedDate(campos: { goodsReceivedDate?: DateKey }): void {
+  if (campos.goodsReceivedDate !== undefined) {
+    assertDateKey(campos.goodsReceivedDate, 'goodsReceivedDate');
   }
 }
 

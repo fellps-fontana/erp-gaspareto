@@ -18,6 +18,8 @@ const MONTHS_PER_YEAR = 12;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_MIN = 1;
 const MONTH_MAX = 12;
+const ANO_MIN = 2000;
+const ANO_MAX = 2100;
 
 const MSG_INSTALLMENT_COUNT_INVALID = `Quantidade de parcelas deve ser um inteiro entre ${MIN_INSTALLMENTS} e ${MAX_INSTALLMENTS}.`;
 const MSG_TOTAL_NOT_POSITIVE = 'Valor total da despesa deve ser um número maior que zero.';
@@ -173,7 +175,7 @@ function isAfterWatermark(ocorrencia: DateKey, generatedThrough: DateKey | null)
   return generatedThrough === null || ocorrencia > generatedThrough;
 }
 
-function toCentavos(reais: number): number {
+export function toCentavos(reais: number): number {
   return Math.round(reais * CENTS_PER_REAL);
 }
 
@@ -196,7 +198,9 @@ function assertTotalValid(total: number): void {
 
 export function assertDateKeyValid(date: DateKey, campo: string): void {
   if (!isDateKeyValid(date)) {
-    throw new Error(`Data inválida em ${campo}: "${date}". Use o formato AAAA-MM-DD.`);
+    throw new Error(
+      `Data inválida em ${campo}: "${date}". Use o formato AAAA-MM-DD, com ano entre ${ANO_MIN} e ${ANO_MAX}.`,
+    );
   }
 }
 
@@ -206,5 +210,6 @@ function isDateKeyValid(date: DateKey): boolean {
   }
   const { year, month, day } = parseDateKey(date);
   const mesValido = month >= MONTH_MIN && month <= MONTH_MAX;
-  return mesValido && day >= 1 && day <= lastDayOfMonth(year, month);
+  const anoValido = year >= ANO_MIN && year <= ANO_MAX;
+  return anoValido && mesValido && day >= 1 && day <= lastDayOfMonth(year, month);
 }

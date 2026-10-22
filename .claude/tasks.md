@@ -823,7 +823,7 @@ HISTORICO: 2026-10-22 — mike: GREEN 68/68 (schedule+report). Criterio (2) suit
 
 
 ## TASK-041 — [TDD RED] ExpenseService + ExpenseCategoryService (emulador, isolamento)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-040
 ESCOPO: escrever specs de integração (Firestore/Auth Emulator, helpers existentes) dos dois services e confirmar RED por lógica ausente.
@@ -833,10 +833,11 @@ CRITERIO DE ACEITE: (1) ExpenseService: getExpenses só retorna da empresa da se
 ARQUIVOS PERMITIDOS: src/services/expense-service/expense-service.spec.ts, src/services/expense-category-service/expense-category-service.spec.ts
 NAO FAZER: não editar services nem test-helpers; não usar IDs fixos de documento; não editar .claude/tasks.md.
 RETORNO ESPERADO: lista de testes + saída RED + comando (emuladores Firestore+Auth no ar).
-HISTORICO:
+HISTORICO: 2026-10-22 — mike: 41 testes RED (isolamento, companyId nulo, parcelamento, markAsPaid, ensureDefaults, deleteCategory). Corrigiu 6 falsos positivos (toBeRejected aceitava not implemented -> expectRejeicaoDeRegra). Licao: rules negam getDoc E query por documentId() de doc inexistente -> prova de exclusao por listagem da empresa. Rodadas de correcao pos-style/gon: +3 (patch protegido, seed unico), +22 (validacao de entrada, input sujo, categoria da empresa), +8 (goodsReceivedDate, valor < 1 centavo). Setup passou a usar categoria real da empresa. Final 76 testes.
+
 
 ## TASK-042 — Implementar ExpenseService + ExpenseCategoryService
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-041
 ESCOPO: implementar os dois services até os specs da TASK-041 ficarem GREEN (padrão BillService/TenantService; `runTransaction` em markAsPaid; batch em addInstallments).
@@ -846,7 +847,8 @@ CRITERIO DE ACEITE: (1) specs das TASK-041 passam; (2) `getExpenses` filtra por 
 ARQUIVOS PERMITIDOS: src/services/expense-service/expense-service.ts, src/services/expense-category-service/expense-category-service.ts
 NAO FAZER: não alterar specs; não alterar firestore.rules (TASK-044); não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivos implementados + saída do runner. Gate: style + gon (isolamento).
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: ExpenseService + ExpenseCategoryService. style 4 rodadas, gon 2 rodadas. Achados e decisoes: (1) updateExpense gravava status/paidDate em runtime -> CAMPOS_GERENCIADOS_PELO_SERVICE (inclui proveniencia) filtrado em create e update; (2) ensureDefaults ressuscitava padrao excluida -> SEED UNICO (decisao do Kira: so cria as 12 se a empresa nao tem nenhuma categoria); (3) gon: valor/data sem validacao nos caminhos simples, input sujo na criacao, categoryId de outra empresa -> modulo novo src/services/expense-validation (assertExpenseValue >= 1 centavo, assertDateKey com ano 2000..2100, assertRecurrencePeriod, stripUndefined, omitFields); categoria validada (existe, da empresa, nao arquivada na criacao; no update so quando muda); permission-denied -> "Categoria inválida para esta empresa." (sem oraculo de existencia); (4) goodsReceivedDate validado nos 3 caminhos. migracaoRevisar/migracaoMotivo editaveis por design. Convencao reforcada: comentario sem acento (briefing do Kira errou uma vez). Aceitos/registrados: corrida minima no seed; checagem de vinculo de deleteCategory fora de transacao; valor com >2 casas gravado cru; sem teto maximo de valor; duplicacao de helpers de categoria com recurrence -> task de Melhoria. Runner final 110/110 (76 + schedule 34).
+
 
 ## TASK-043 — [TDD RED] firestore.rules para expenses/expenseCategories/expenseSeries
 STATUS: CONCLUIDA

@@ -2,18 +2,25 @@
 // Sem Angular e sem Firestore: lancam Error com mensagem em portugues.
 
 import { ExpenseRecurrencePeriod } from '../../models/expense-model';
+import {
+  assertDateKeyValid,
+  toCentavos,
+} from '../expense-schedule-service/expense-schedule-service';
 
-export { assertDateKeyValid as assertDateKey } from '../expense-schedule-service/expense-schedule-service';
+export { assertDateKeyValid as assertDateKey };
 
 const PERIODOS_DE_RECORRENCIA: readonly string[] = ['semanal', 'mensal'];
 
 const MSG_VALOR_INVALIDO = 'Valor da despesa deve ser um número maior que zero.';
 const MSG_PERIODO_INVALIDO = 'Período de recorrência inválido. Use semanal ou mensal.';
 
-/** Valor em reais: finito e maior que zero. Aceita string numerica vinda de formulario. */
+/**
+ * Valor em reais: finito e com pelo menos 1 centavo. A conversao em centavos e a
+ * mesma do ExpenseScheduleService; o valor gravado nao e normalizado aqui.
+ */
 export function assertExpenseValue(value: number): void {
   const numero = Number(value);
-  if (!Number.isFinite(numero) || numero <= 0) {
+  if (!Number.isFinite(numero) || toCentavos(numero) <= 0) {
     throw new Error(MSG_VALOR_INVALIDO);
   }
 }

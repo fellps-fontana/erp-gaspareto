@@ -600,6 +600,90 @@ describe('ExpenseService - isolamento e escritas', () => {
     });
   });
 
+  describe('Regra: validacao de entrada - goodsReceivedDate e valor minimo (CRITICA)', () => {
+    describe('goodsReceivedDate invalido', () => {
+      for (const data of ['2026-02-30', '01/02/2026']) {
+        it(`[RED] addExpense rejeita goodsReceivedDate '${data}' e nao grava`, async () => {
+          const descricao = `Chegou invalido ${idUnico()}`;
+
+          await expectRejeicaoDeRegra(() =>
+            service.addExpense(novaDespesa({ description: descricao, goodsReceivedDate: data })),
+          );
+
+          expect(await existeDespesaComDescricao(setup, setup.mockCompanyId as string, descricao))
+            .withContext('nada deve ser gravado')
+            .toBeFalse();
+        });
+
+        it(`[RED] addInstallments rejeita goodsReceivedDate '${data}' e nao grava nenhuma parcela`, async () => {
+          const descricao = `Parcela chegou invalido ${idUnico()}`;
+
+          await expectRejeicaoDeRegra(() =>
+            service.addInstallments(
+              novaDespesa({
+                description: descricao,
+                value: 100,
+                dueDate: '2026-01-31',
+                goodsReceivedDate: data,
+              }),
+              3,
+            ),
+          );
+
+          expect(await existeDespesaComDescricao(setup, setup.mockCompanyId as string, descricao))
+            .withContext('nenhuma parcela deve ser gravada')
+            .toBeFalse();
+        });
+
+        it(`[RED] updateExpense rejeita goodsReceivedDate '${data}' e mantem o doc inalterado`, async () => {
+          const id = await semearDespesa(setup, setup.mockCompanyId as string, {
+            goodsReceivedDate: '2026-10-01',
+          });
+
+          await expectRejeicaoDeRegra(() => service.updateExpense(id, { goodsReceivedDate: data }));
+
+          expect((await lerDespesa(setup, id))?.goodsReceivedDate).toBe('2026-10-01');
+        });
+      }
+    });
+
+    describe('goodsReceivedDate valido (guarda)', () => {
+      it('addExpense aceita goodsReceivedDate valido e grava a data', async () => {
+        const id = await service.addExpense(novaDespesa({ goodsReceivedDate: '2026-10-20' }));
+
+        expect((await lerDespesa(setup, id))?.goodsReceivedDate).toBe('2026-10-20');
+      });
+    });
+
+    describe('valor abaixo de 1 centavo', () => {
+      it('[RED] addExpense rejeita value 0.004 e nao grava', async () => {
+        const descricao = `Centavo invalido ${idUnico()}`;
+
+        await expectRejeicaoDeRegra(() =>
+          service.addExpense(novaDespesa({ description: descricao, value: 0.004 })),
+        );
+
+        expect(await existeDespesaComDescricao(setup, setup.mockCompanyId as string, descricao))
+          .withContext('nada deve ser gravado')
+          .toBeFalse();
+      });
+
+      it('[RED] updateExpense rejeita patch value 0.004 e mantem o valor original', async () => {
+        const id = await semearDespesa(setup, setup.mockCompanyId as string, { value: 100 });
+
+        await expectRejeicaoDeRegra(() => service.updateExpense(id, { value: 0.004 }));
+
+        expect((await lerDespesa(setup, id))?.value).toBe(100);
+      });
+
+      it('addExpense aceita value 0.01 (menor valor valido, guarda)', async () => {
+        const id = await service.addExpense(novaDespesa({ value: 0.01 }));
+
+        expect((await lerDespesa(setup, id))?.value).toBe(0.01);
+      });
+    });
+  });
+
   describe('Regra: escrita exige companyId da sessao (CRITICA)', () => {
     let semEmpresa: EmulatorTestSetup;
     let servicoSemEmpresa: ExpenseService;

@@ -271,6 +271,17 @@ depois do cutover (ver §14).
   série. Editar uma ocorrência afeta só ela; editar a série afeta as futuras.
 - **Encerrar recorrência** = `active=false` (+ `endedAt`); ocorrências já
   geradas ficam.
+- **Limites (decididos 2026-10-22, achado de segurança do gon)**:
+  - Toda data de despesa/série (`dueDate`, `paidDate`, `goodsReceivedDate`,
+    `anchorDate`) tem ano entre 2000 e 2100.
+  - `createSeries` rejeita âncora mais de 24 meses no passado (mesmo limite
+    do aviso do formulário, que vira erro).
+  - Catch-up gera no máximo 1 lote (399 ocorrências) por série por
+    carregamento; o restante sai nos carregamentos seguintes.
+  - O catch-up revalida `template.value` e a categoria do template (existe,
+    é da empresa) antes de gerar; série inválida entra nas falhas agregadas
+    e não bloqueia as demais.
+  - `generateDueOccurrences` só aceita o `companyId` da sessão.
 
 ### 7.4 Tela Despesas (`/contas`)
 - Navegação por mês (◀ out/2026 ▶). Três cards e três grupos usam **a mesma
