@@ -28,6 +28,13 @@ Ver `.claude/context/regra-de-negocio.md` seção 7 (Contas a pagar/receber
   recém-criada ficava invisível — corrigido nos 3 pontos de criação de bill
   do sistema (`bills.ts`, `confirmarCompra()` e `gerarBillDeProdutoCompra()`
   em `product-inventory.ts`).
+- **Entrada de estoque não gera mais conta a pagar** (PR #33, 2026-10-20):
+  a opção "gerar conta a pagar" da entrada de estoque (Gestão > Estoque >
+  📦) foi removida. A bill gerada, quando paga, caía em **Gastos** no
+  Balanço, e o custo do mesmo produto caía de novo no **CMV** na venda —
+  compra de mercadoria descontada duas vezes do Resultado Final. Hoje só
+  `bills.ts` (manual) e `gerarBillDeProdutoCompra()` criam bill.
+  Ver `regra-de-negocio.md` §2/§7/§8.
 
 ## Causa raiz dos bugs de produção reportados
 
@@ -65,13 +72,19 @@ rodar.
 - **`src/components/product-inventory/product-inventory.ts`**: método
   privado `resetFiltroContasStatusSeNecessario()` (reset condicional, só
   mexe se o filtro estava em `'recebido'`/`'pago'`), chamado em
-  `confirmarCompra()` e `gerarBillDeProdutoCompra()`.
+  `gerarBillDeProdutoCompra()` (a chamada em `confirmarCompra()` saiu no
+  PR #33, junto com a geração de bill pela entrada de estoque).
 - **`firestore.indexes.json`** / **`firestore.rules`**: já existiam
   corretos no repo — só precisaram ser publicados em produção (nenhuma
   mudança de conteúdo nesta entrega).
 
 ## Lacunas conhecidas / pendências
 
+- Contas antigas geradas pela entrada de estoque (antes do PR #33) seguem
+  no banco, sem `purchaseProductId`, com nome `Compra: <produto>` ou
+  descrição livre. Se já pagas, ainda inflam **Gastos** nos meses em que
+  caíram. Tratamento previsto na migração do módulo Despesas (categoria
+  "Compra de mercadoria").
 - 4 pontos de `.subscribe(data => ...)` sem callback de erro em
   `product-inventory.ts` (listas de produto/estoque/compras/clientes,
   ~linhas 203-229) continuam sem tratamento — mesmo padrão já corrigido em
