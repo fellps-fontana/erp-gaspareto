@@ -8,8 +8,6 @@ import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
 import { CustomerService } from '../../services/customer-service/customer-service';
-import { BillService } from '../../services/bill-service/bill-service';
-import { PurchaseProductService } from '../../services/purchase-product-service/purchase-product-service';
 import { ExpenseService } from '../../services/expense-service/expense-service';
 import { ExpenseCategoryService } from '../../services/expense-category-service/expense-category-service';
 import { ExpenseRecurrenceService } from '../../services/expense-recurrence-service/expense-recurrence-service';
@@ -35,8 +33,6 @@ describe('ProductInventoryComponent', () => {
     purchaseService: { getPurchases: () => of([]) },
     saleService: { getSales: () => of([]), getSalesByDate: () => of([]) },
     customerService: { getCustomers: () => of([]) },
-    billService: { getBills: () => of([]) },
-    purchaseProductService: { getPurchaseProducts: () => of([]) },
     expenseService: { getExpenses: () => of([]) },
     expenseCategoryService: { getCategories: () => of([]) },
     expenseRecurrenceService: {
@@ -54,10 +50,10 @@ describe('ProductInventoryComponent', () => {
       warning: jasmine.createSpy('warning'),
     },
     config: {
-      modules$: of({ gestao: true, clientes: true, compras: true }),
+      modules$: of({ gestao: true, clientes: true }),
       // O template chama config.modules()/companyName() (signals) diretamente —
       // necessário só pra suites que disparam fixture.detectChanges() (ex.: modal de detalhe).
-      modules: () => ({ gestao: true, clientes: true, compras: true, vendedores: true }),
+      modules: () => ({ gestao: true, clientes: true, vendedores: true }),
       companyName: () => '',
     },
     geocodingService: { reverseGeocode: () => of(null) },
@@ -83,8 +79,6 @@ describe('ProductInventoryComponent', () => {
         { provide: SaleService, useValue: mockServices.saleService },
         { provide: PurchaseService, useValue: mockServices.purchaseService },
         { provide: CustomerService, useValue: mockServices.customerService },
-        { provide: BillService, useValue: mockServices.billService },
-        { provide: PurchaseProductService, useValue: mockServices.purchaseProductService },
         { provide: ExpenseService, useValue: mockServices.expenseService },
         { provide: ExpenseCategoryService, useValue: mockServices.expenseCategoryService },
         { provide: ExpenseRecurrenceService, useValue: mockServices.expenseRecurrenceService },
@@ -588,20 +582,6 @@ describe('ProductInventoryComponent', () => {
       component.filtroDataFim = '2026-03-31';
       component.relatorio = { ...component.relatorio, faturamento: 1000, custoTotal: 400 };
       (component as any).categoriasDespesa = categorias();
-      // Bill pago DENTRO do periodo: a implementacao atual (le bills) devolve 999 nos
-      // getters, entao os casos de "fora do periodo" nao passam por acidente no RED.
-      component.bills = [
-        {
-          id: 'bill-legado',
-          companyId: 'emp-1',
-          name: 'Conta legada',
-          value: 999,
-          status: 'pago',
-          recurring: false,
-          paidAt: new Date('2026-03-10T12:00:00') as any,
-          createdAt: null as any,
-        },
-      ];
     });
 
     it('[RED] gastosPeriodo soma despesa operacional a_pagar com dueDate no periodo', () => {

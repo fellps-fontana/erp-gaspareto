@@ -31,8 +31,7 @@ export class ConfigComponent {
     { key: 'pdv', label: 'PDV', description: 'Vendas no balcão' },
     { key: 'pedidos', label: 'Pedidos', description: 'Encomendas e cozinha' },
     { key: 'rotas', label: 'Rotas', description: 'Entregas e navegação' },
-    { key: 'contas', label: 'Contas', description: 'Contas a pagar' },
-    { key: 'compras', label: 'Compras', description: 'Entrada de estoque (sub-módulo do Gestão)', sub: true },
+    { key: 'contas', label: 'Despesas', description: 'Despesas e contas a pagar' },
     { key: 'vendedores', label: 'Vendedores', description: 'Comissão por vendedor (sub-módulo do Gestão)', sub: true },
   ];
 

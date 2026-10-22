@@ -907,7 +907,7 @@ HISTORICO: 2026-10-22 — levi: ExpenseRecurrenceService. style 4 rodadas, gon 2
 
 
 ## TASK-047 — [TDD GREEN] Services, recurrence e rules de Despesas
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-042, TASK-044, TASK-046
 ESCOPO: rodar (sem reescrever) os specs das TASK-041/043/045 e a suíte completa; confirmar GREEN ou devolver relatório de bug.
@@ -917,7 +917,8 @@ CRITERIO DE ACEITE: (1) os três specs de service e `npm run test:rules` em GREE
 ARQUIVOS PERMITIDOS: nenhum (somente execução)
 NAO FAZER: não editar specs nem código; não editar .claude/tasks.md.
 RETORNO ESPERADO: contagem exata e veredito.
-HISTORICO:
+HISTORICO: 2026-10-22 — Verificacao consolidada na rodada final da TASK-061 (levi, sem reescrever specs): suite Karma completa no emulador 408/408 SUCCESS (era 428 antes da remocao dos specs legados), test:rules 99/99, test:migration 68/68, ng build producao ok. Sem falha AppComponent/SwUpdate. Specs de expense/category (76) e recurrence (46) inclusos.
+
 
 ## TASK-048 — [TDD RED] Núcleo e script da migração bills/purchaseProducts -> expenses
 STATUS: CONCLUIDA
@@ -1045,7 +1046,7 @@ HISTORICO: 2026-10-22 — levi: getters gastosPeriodo/custoProducaoPeriodo/gasto
 
 
 ## TASK-057 — [TDD GREEN] Balanço por despesas
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-056
 ESCOPO: rodar (sem reescrever) o spec do ProductInventory e a suíte completa; confirmar GREEN ou relatório de bug.
@@ -1055,7 +1056,8 @@ CRITERIO DE ACEITE: (1) testes da TASK-055 GREEN; (2) suíte completa sem regres
 ARQUIVOS PERMITIDOS: nenhum (somente execução)
 NAO FAZER: não editar spec nem código; não editar .claude/tasks.md.
 RETORNO ESPERADO: contagem e veredito.
-HISTORICO:
+HISTORICO: 2026-10-22 — product-inventory.spec 37/37 confirmado em varias rodadas (levi TASK-056/059) e dentro da suite completa 408/408 da TASK-061.
+
 
 ## TASK-058 — Componentes do relatório de Despesas (pizza, barras 12 meses, modal Gastos)
 STATUS: CONCLUIDA
@@ -1086,7 +1088,7 @@ HISTORICO: 2026-10-22 — hanzo: removidas aba Compras, modal de produto de comp
 
 
 ## TASK-060 — Remover módulo `compras` do ModuleConfig e de Configurações
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-054, TASK-059
 ESCOPO: remover `compras` do ModuleConfig/DEFAULT_MODULES e o toggle em Configurações, e renomear o rótulo do módulo `contas` para "Despesas" (descrição "Despesas e contas a pagar"), garantindo que documentos antigos com `compras` não quebrem o merge.
@@ -1096,10 +1098,11 @@ CRITERIO DE ACEITE: (1) `grep -r "compras" src` sem ocorrência funcional (excet
 ARQUIVOS PERMITIDOS: src/models/company-config.ts, src/components/config/config.ts, src/components/config/config.html, src/services/config/config.service.ts, src/components/product-inventory/product-inventory.spec.ts (somente remover `compras` dos mocks)
 NAO FAZER: não migrar companies/*; não tocar nas regras de gestao/clientes obrigatórios; não editar .claude/tasks.md.
 RETORNO ESPERADO: diff + build + suíte.
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: compras removido de ModuleConfig/DEFAULT_MODULES e do toggle de Configuracoes; rotulo contas -> "Despesas"; mocks do spec sem compras; remocao minima de m.compras no product-inventory.ts (autorizada pelo Kira). Doc legado com compras: true fica inerte (spread apos DEFAULT_MODULES). style APROVADO; lacuna baixa: sem spec de ConfigService para o doc legado (config.service fora dos arquivos permitidos).
+
 
 ## TASK-061 — Remover código legado de Contas a Pagar e Produtos de Compra
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-054, TASK-059, TASK-060
 ESCOPO: apagar BillsComponent, BillService, BillRecurrenceService, PurchaseProductService, seus specs e models, e os providers/imports órfãos; manter intactos bills/purchaseProducts no banco, em firestore.rules, firestore.indexes.json e scripts/backfill-companyid.mjs.
@@ -1109,10 +1112,11 @@ CRITERIO DE ACEITE: (1) `grep -rn "BillService\|BillRecurrenceService\|PurchaseP
 ARQUIVOS PERMITIDOS: src/components/bills/ (remover), src/services/bill-service/ (remover), src/services/bill-recurrence-service/ (remover), src/services/purchase-product-service/ (remover), src/models/bill-model.ts (remover), src/models/purchase-product-model.ts (remover), src/components/product-inventory/product-inventory.spec.ts, src/app/app.routes.ts
 NAO FAZER: não remover bills/purchaseProducts de firestore.rules nem de firestore.indexes.json (rollback preservado até a purga em produção); não tocar em scripts/backfill-companyid.mjs; não editar .claude/tasks.md.
 RETORNO ESPERADO: lista de arquivos removidos + saída de build e suítes.
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: limpeza de todos os membros de Compras/Contas no product-inventory.ts e spec (confirmarCompra, PurchaseService e getters de despesas preservados). rm negado ao agent -> Kira removeu os arquivos legados via git rm (bills/, bill-service, bill-recurrence-service, purchase-product-service, bill-model, purchase-product-model). grep limpo; firestore.rules e indexes intactos (rollback). Suite 408/408, rules 99/99, migration 68/68, build prod ok. style APROVADO; Kira removeu comentario residual "Compras" em busca-por-nome.ts.
+
 
 ## TASK-062 — seed-demo no novo modelo de Despesas
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-047
 ESCOPO: atualizar scripts/seed-demo.mjs para semear categorias padrão, despesas (a pagar, vencida, paga, parcelada, mercadoria recebida), séries recorrentes e `expenseCategories`, em vez de bills/purchaseProducts, mantendo alvo emulator/hml e recusa de PROD.
@@ -1122,7 +1126,8 @@ CRITERIO DE ACEITE: (1) seed no emulador gera categorias com ids `${companyId}_$
 ARQUIVOS PERMITIDOS: scripts/seed-demo.mjs
 NAO FAZER: não rodar contra hml sem pedido do usuário; não alterar a migração; não editar .claude/tasks.md.
 RETORNO ESPERADO: diff + saída da execução no emulador.
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: seed-demo grava 12 categorias (ids deterministicos lidos de expense-category-defaults.ts), 20 despesas em todos os estados, parcelada 3x (333,33/333,33/333,34), 2 series com ocorrencias `${seriesId}_${dueDate}` e generatedThrough coerente; datas relativas a hoje em America/Sao_Paulo; sem bills/purchaseProducts; recusa de PROD intacta. Validado no emulador (2a execucao aborta sem duplicar). style APROVADO; Kira removeu compras: true residual do DEFAULT_MODULES do seed. Nao rodado em hml.
+
 
 ## TASK-063 — [MANUAL / USUARIO] Validação do módulo Despesas com a cliente em homolog
 STATUS: PENDENTE

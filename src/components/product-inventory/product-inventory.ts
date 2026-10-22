@@ -10,8 +10,6 @@ Chart.register(...registerables);
 // Models e Services
 import { Product } from '../../models/product-model';
 import { Customer } from '../../models/customer-model';
-import { Bill } from '../../models/bill-model';
-import { PurchaseProduct } from '../../models/purchase-product-model';
 import { Expense, ExpenseCategory } from '../../models/expense-model';
 import { Order } from '../../models/order-model';
 import { Vendedor, ComissaoVendedorResultado } from '../../models/vendedor-model';
@@ -20,8 +18,6 @@ import { ProductService } from '../../services/product-service/product-service';
 import { SaleService } from '../../services/sale-service/sale-service';
 import { PurchaseService } from '../../services/purchase-service/purchase-service';
 import { CustomerService } from '../../services/customer-service/customer-service';
-import { BillService } from '../../services/bill-service/bill-service';
-import { PurchaseProductService } from '../../services/purchase-product-service/purchase-product-service';
 import { ExpenseService } from '../../services/expense-service/expense-service';
 import { ExpenseCategoryService } from '../../services/expense-category-service/expense-category-service';
 import { ExpenseRecurrenceService } from '../../services/expense-recurrence-service/expense-recurrence-service';
@@ -97,9 +93,8 @@ export class ProductInventoryComponent implements OnInit {
   private geocodingService = inject(GeocodingService);
 
   // Controle das Abas
-  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' | 'vendedores' = 'relatorio';
-  // 'contas' segue no union enquanto o html (aba legado) existir — remover na TASK-059.
-  reportTab: 'vendas' | 'contas' | 'despesas' | 'balanco' | 'vendedores' = 'vendas';
+  activeTab: 'relatorio' | 'estoque' | 'clientes' | 'historico' | 'vendedores' = 'relatorio';
+  reportTab: 'vendas' | 'despesas' | 'balanco' | 'vendedores' = 'vendas';
 
   // Controle de Visualização do Formulário
   exibirFormularioNovo: boolean = false;
@@ -153,32 +148,14 @@ export class ProductInventoryComponent implements OnInit {
     novoPrecoCusto: 0
   };
 
-  // --- CONTAS A PAGAR ---
-  bills: Bill[] = [];
-  filtroContasStatus: 'todos' | 'pendente' | 'recebido' | 'pago' = 'todos';
-
   // --- DESPESAS (substitui Contas a Pagar; competencia por dueDate, ver ExpenseReportService) ---
   despesas: Expense[] = [];
   categoriasDespesa: ExpenseCategory[] = [];
   isGastosModalOpen = false;
 
-  // --- PRODUTOS DE COMPRA ---
-  purchaseProducts: PurchaseProduct[] = [];
-  exibirFormularioCompra: boolean = false;
-  produtoCompraEmEdicao: PurchaseProduct | null = null;
-  isDeleteCompraModalOpen: boolean = false;
-  produtoCompraToDelete: PurchaseProduct | null = null;
-  novoProdutoCompra: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'> = {
-    name: '',
-    defaultValue: 0,
-    recurring: false,
-    recurrencePeriod: undefined
-  };
-
   // --- BUSCA NAS LISTAS (estado de UI; filtro puro em busca-por-nome.ts) ---
   buscaCliente = '';
   buscaProduto = '';
-  buscaCompra = '';
 
   get customersFiltrados(): Customer[] {
     return filtrarPorTermo(this.customers, this.buscaCliente, c => [c.name, c.phone]);
@@ -186,10 +163,6 @@ export class ProductInventoryComponent implements OnInit {
 
   get productsFiltrados(): Product[] {
     return filtrarPorTermo(this.products, this.buscaProduto, p => [p.title]);
-  }
-
-  get purchaseProductsFiltrados(): PurchaseProduct[] {
-    return filtrarPorTermo(this.purchaseProducts, this.buscaCompra, p => [p.name]);
   }
 
   // --- CLIENTES ---
@@ -271,8 +244,6 @@ export class ProductInventoryComponent implements OnInit {
     private purchaseService: PurchaseService,
     private saleService: SaleService,
     private customerService: CustomerService,
-    private billService: BillService,
-    private purchaseProductService: PurchaseProductService,
     private expenseService: ExpenseService,
     private expenseCategoryService: ExpenseCategoryService,
     private expenseRecurrenceService: ExpenseRecurrenceService,
@@ -287,7 +258,6 @@ export class ProductInventoryComponent implements OnInit {
     // 0. Se a aba/sub-aba ativa for de um módulo desativado, volta para o relatório
     this.config.modules$.subscribe(m => {
       if ((this.activeTab === 'clientes' && !m.clientes) ||
-          (this.activeTab === 'compras' && !m.compras) ||
           (this.activeTab === 'vendedores' && !m.vendedores)) {
         this.activeTab = 'relatorio';
       }
@@ -315,17 +285,7 @@ export class ProductInventoryComponent implements OnInit {
       this.customers = data;
     });
 
-    // 5. Carrega contas a pagar em tempo real
-    this.billService.getBills().subscribe(data => {
-      this.bills = data;
-    });
-
-    // 6. Carrega produtos de compra em tempo real
-    this.purchaseProductService.getPurchaseProducts().subscribe(data => {
-      this.purchaseProducts = data;
-    });
-
-    // 6b. Carrega despesas e categorias em tempo real
+    // 5. Carrega despesas e categorias em tempo real
     this.expenseService.getExpenses().subscribe((data) => {
       this.despesas = data;
     });
@@ -547,16 +507,8 @@ export class ProductInventoryComponent implements OnInit {
   }
 
   // ==========================================================
-  // GETTERS: CONTAS A PAGAR (aba relatorio sub-tab)
+  // GETTERS: DESPESAS (aba relatorio sub-tab)
   // ==========================================================
-
-  get totalContasPendentes(): number {
-    return this.bills.filter(b => b.status === 'pendente').reduce((s, b) => s + b.value, 0);
-  }
-
-  get totalContasRecebidas(): number {
-    return this.bills.filter(b => b.status === 'recebido').reduce((s, b) => s + b.value, 0);
-  }
 
   /** Card Gastos = despesas operacionais com dueDate no periodo (competencia, D5). */
   get gastosPeriodo(): number {
@@ -597,19 +549,6 @@ export class ProductInventoryComponent implements OnInit {
     );
   }
 
-  get billsFiltradosRelatorio(): Bill[] {
-    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
-    const fim = new Date(this.filtroDataFim + 'T23:59:59');
-    let filtered = this.bills.filter(b => {
-      const d = (b.createdAt as any)?.toDate ? (b.createdAt as any).toDate() : new Date();
-      return d >= inicio && d <= fim;
-    });
-    if (this.filtroContasStatus !== 'todos') {
-      filtered = filtered.filter(b => b.status === this.filtroContasStatus);
-    }
-    return filtered;
-  }
-
   /** Catch-up de recorrencias (D2): UMA chamada por carregamento; falha vira aviso, nao derruba a tela. */
   private async gerarRecorrenciasAteHoje(): Promise<void> {
     const companyId = this.tenantService.companyId();
@@ -632,29 +571,6 @@ export class ProductInventoryComponent implements OnInit {
 
   fecharGastosModal() {
     this.isGastosModalOpen = false;
-  }
-
-  async avancarStatusBill(bill: Bill) {
-    if (!bill.id || bill.status === 'pago') return;
-    const next: Bill['status'] = bill.status === 'pendente' ? 'recebido' : 'pago';
-    try {
-      await this.billService.updateBillStatus(bill.id, next);
-    } catch {
-      this.notif.error('Erro ao atualizar status da conta.');
-    }
-  }
-
-  billStatusLabel(status: Bill['status']): string {
-    const labels: Record<Bill['status'], string> = {
-      pendente: 'Pendente', recebido: 'Recebido', pago: 'Pago'
-    };
-    return labels[status];
-  }
-
-  formatBillDate(ts: any): string {
-    if (!ts) return '';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString('pt-BR');
   }
 
   openDeleteModal(product: Product) {
@@ -1201,104 +1117,6 @@ export class ProductInventoryComponent implements OnInit {
 
   trackByPedido(index: number, pedido: Order): string {
     return pedido.id || index.toString();
-  }
-
-  // ==========================================================
-  // ABA 4: COMPRAS (PRODUTOS DE COMPRA)
-  // ==========================================================
-
-  abrirNovoCompra() {
-    this.produtoCompraEmEdicao = null;
-    this.novoProdutoCompra = { name: '', defaultValue: 0, recurring: false, recurrencePeriod: undefined };
-    this.exibirFormularioCompra = true;
-  }
-
-  abrirEdicaoCompra(p: PurchaseProduct) {
-    this.produtoCompraEmEdicao = p;
-    this.novoProdutoCompra = {
-      name: p.name,
-      defaultValue: p.defaultValue,
-      recurring: p.recurring,
-      recurrencePeriod: p.recurrencePeriod
-    };
-    this.exibirFormularioCompra = true;
-  }
-
-  fecharFormularioCompra() {
-    this.exibirFormularioCompra = false;
-    this.produtoCompraEmEdicao = null;
-  }
-
-  async salvarProdutoCompra() {
-    if (!this.novoProdutoCompra.name.trim() || this.novoProdutoCompra.defaultValue <= 0) {
-      this.notif.warning('Preencha nome e valor.');
-      return;
-    }
-    const data: Omit<PurchaseProduct, 'id' | 'createdAt' | 'companyId'> = {
-      name: this.novoProdutoCompra.name.trim(),
-      defaultValue: Number(this.novoProdutoCompra.defaultValue),
-      recurring: this.novoProdutoCompra.recurring,
-      ...(this.novoProdutoCompra.recurring && this.novoProdutoCompra.recurrencePeriod
-        ? { recurrencePeriod: this.novoProdutoCompra.recurrencePeriod }
-        : {})
-    };
-    try {
-      if (this.produtoCompraEmEdicao?.id) {
-        await this.purchaseProductService.updatePurchaseProduct(this.produtoCompraEmEdicao.id, data);
-        this.notif.success('Produto atualizado!');
-      } else {
-        const newId = await this.purchaseProductService.addPurchaseProduct(data);
-        await this.gerarBillDeProdutoCompra({ id: newId, ...data } as PurchaseProduct);
-        this.notif.success('Produto cadastrado e fatura gerada!');
-      }
-      this.fecharFormularioCompra();
-    } catch {
-      this.notif.error('Erro ao salvar produto de compra.');
-    }
-  }
-
-  async gerarBillDeProdutoCompra(p: PurchaseProduct) {
-    const recPeriodMap: Record<string, 'semanal' | 'mensal'> = { weekly: 'semanal', monthly: 'mensal' };
-    await this.billService.addBill({
-      name: p.name,
-      value: p.defaultValue,
-      status: 'pendente',
-      recurring: p.recurring,
-      ...(p.recurring && p.recurrencePeriod ? { recurrencePeriod: recPeriodMap[p.recurrencePeriod!] } : {}),
-      purchaseProductId: p.id
-    });
-    this.resetFiltroContasStatusSeNecessario();
-  }
-
-  private resetFiltroContasStatusSeNecessario() {
-    if (this.filtroContasStatus === 'recebido' || this.filtroContasStatus === 'pago') {
-      this.filtroContasStatus = 'todos';
-    }
-  }
-
-  openDeleteCompraModal(p: PurchaseProduct) {
-    this.produtoCompraToDelete = p;
-    this.isDeleteCompraModalOpen = true;
-  }
-
-  closeDeleteCompraModal() {
-    this.isDeleteCompraModalOpen = false;
-    this.produtoCompraToDelete = null;
-  }
-
-  async confirmDeleteCompra() {
-    if (!this.produtoCompraToDelete?.id) return;
-    try {
-      await this.purchaseProductService.deletePurchaseProduct(this.produtoCompraToDelete.id);
-      this.notif.success('Produto removido!');
-      this.closeDeleteCompraModal();
-    } catch {
-      this.notif.error('Erro ao excluir produto de compra.');
-    }
-  }
-
-  recurrenceLabel(period?: 'weekly' | 'monthly'): string {
-    return period === 'weekly' ? 'Semanal' : period === 'monthly' ? 'Mensal' : '';
   }
 
   // ==========================================================
