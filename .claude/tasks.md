@@ -1143,7 +1143,7 @@ RETORNO ESPERADO: o usuário confirma no chat (aprovado/ajustes); ajustes viram 
 HISTORICO:
 
 ## TASK-064 — Extrair helpers duplicados dos services de Despesas
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-046, TASK-056
 ESCOPO: eliminar a duplicacao entre expense-service, expense-category-service e expense-recurrence-service (leitura/validacao de categoria da empresa, deteccao de permission-denied, constantes de colecao e guarda de sessao) e o codigo morto de faixa de ano no recurrence, sem mudar comportamento.
@@ -1153,4 +1153,4 @@ CRITERIO DE ACEITE: (1) lerCategoriaDaEmpresa/assertCategoriaAtiva/ehNegacaoDePe
 ARQUIVOS PERMITIDOS: os tres services, src/services/expense-validation/expense-validation.ts, novo src/services/expense-firestore-guards/expense-firestore-guards.ts
 NAO FAZER: nao mudar comportamento nem mensagens verificadas pelos specs; nao alterar specs; nao editar .claude/tasks.md.
 RETORNO ESPERADO: diff resumido + saida dos runners. Gate: style.
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: novo src/services/expense-firestore-guards (COLECAO_*, MSG_CATEGORIA_*, exigirCompanyId com mensagem do chamador, lerCategoriaDaEmpresa, assertCategoriaAtiva, ehNegacaoDePermissao) usado pelos 3 services; assertDataDeNegocio/ANO_* removidos do recurrence; RecurrenceCatchUpError com partial + failures (mesma message). +79/-152 linhas + modulo novo. expense-*.spec 204/204. style APROVADO; sugestoes futuras (nao bloqueantes): helper unico "categoria ativa da empresa" nos guards, renomear pasta para expense-firestore-helpers (colide com src/guards), esclarecer partial.seriesProcessed.

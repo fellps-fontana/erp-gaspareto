@@ -24,6 +24,12 @@ import {
   DefaultExpenseCategoryDef,
   defaultCategoryId,
 } from '../../models/expense-category-defaults';
+import {
+  COLECAO_CATEGORIAS,
+  COLECAO_DESPESAS,
+  COLECAO_SERIES,
+  exigirCompanyId,
+} from '../expense-firestore-guards/expense-firestore-guards';
 import { FirestoreBaseService } from '../firestore-base.service';
 import { TenantService } from '../tenant-service/tenant-service';
 
@@ -31,8 +37,6 @@ const TIPOS_DE_CATEGORIA: readonly ExpenseCategoryType[] = [
   'custo_producao',
   'despesa_operacional',
 ];
-const COLECAO_DESPESAS = 'expenses';
-const COLECAO_SERIES = 'expenseSeries';
 
 const MSG_SEM_EMPRESA =
   'Não é possível salvar categoria sem uma empresa (companyId) associada à sessão atual.';
@@ -46,12 +50,11 @@ const MSG_CATEGORIA_VINCULADA =
 export class ExpenseCategoryService extends FirestoreBaseService {
   private firestore = inject(Firestore);
   private tenantService = inject(TenantService);
-  private readonly COL = 'expenseCategories';
 
   /** where(companyId); ordenacao por name client-side (sem indice composto). */
   getCategories(): Observable<ExpenseCategory[]> {
     const q = query(
-      collection(this.firestore, this.COL),
+      collection(this.firestore, COLECAO_CATEGORIAS),
       where('companyId', '==', this.tenantService.companyId()),
     );
     return this.collectionDataObservable<ExpenseCategory>(q).pipe(
@@ -73,7 +76,7 @@ export class ExpenseCategoryService extends FirestoreBaseService {
     const lote = writeBatch(this.firestore);
     for (const def of DEFAULT_EXPENSE_CATEGORIES) {
       lote.set(
-        doc(this.firestore, this.COL, defaultCategoryId(companyId, def.systemKey)),
+        doc(this.firestore, COLECAO_CATEGORIAS, defaultCategoryId(companyId, def.systemKey)),
         this.montarCategoriaPadrao(def, companyId),
       );
     }
@@ -85,7 +88,7 @@ export class ExpenseCategoryService extends FirestoreBaseService {
     if (!TIPOS_DE_CATEGORIA.includes(type)) {
       throw new Error(MSG_TIPO_INVALIDO);
     }
-    const ref = await addDoc(collection(this.firestore, this.COL), {
+    const ref = await addDoc(collection(this.firestore, COLECAO_CATEGORIAS), {
       companyId,
       name,
       type,
@@ -98,14 +101,14 @@ export class ExpenseCategoryService extends FirestoreBaseService {
   /** Renomeia. O tipo nao e alteravel: o metodo grava somente o name. */
   async renameCategory(id: string, name: string): Promise<void> {
     const companyId = this.companyIdDaSessao();
-    const ref = doc(this.firestore, this.COL, id);
+    const ref = doc(this.firestore, COLECAO_CATEGORIAS, id);
     await this.garantirCategoriaDaEmpresa(ref, companyId);
     await updateDoc(ref, { name });
   }
 
   async setArchived(id: string, archived: boolean): Promise<void> {
     const companyId = this.companyIdDaSessao();
-    const ref = doc(this.firestore, this.COL, id);
+    const ref = doc(this.firestore, COLECAO_CATEGORIAS, id);
     await this.garantirCategoriaDaEmpresa(ref, companyId);
     await updateDoc(ref, { archived });
   }
@@ -113,7 +116,7 @@ export class ExpenseCategoryService extends FirestoreBaseService {
   /** Lanca se houver expense ou serie vinculada (so arquivar). */
   async deleteCategory(id: string): Promise<void> {
     const companyId = this.companyIdDaSessao();
-    const ref = doc(this.firestore, this.COL, id);
+    const ref = doc(this.firestore, COLECAO_CATEGORIAS, id);
     await this.garantirCategoriaDaEmpresa(ref, companyId);
     if (await this.possuiVinculo(companyId, id)) {
       throw new Error(MSG_CATEGORIA_VINCULADA);
@@ -122,16 +125,16 @@ export class ExpenseCategoryService extends FirestoreBaseService {
   }
 
   private companyIdDaSessao(): string {
-    const companyId = this.tenantService.companyId();
-    if (!companyId) {
-      throw new Error(MSG_SEM_EMPRESA);
-    }
-    return companyId;
+    return exigirCompanyId(this.tenantService.companyId(), MSG_SEM_EMPRESA);
   }
 
   private async empresaTemCategorias(companyId: string): Promise<boolean> {
     const snap = await getDocs(
-      query(collection(this.firestore, this.COL), where('companyId', '==', companyId), limit(1)),
+      query(
+        collection(this.firestore, COLECAO_CATEGORIAS),
+        where('companyId', '==', companyId),
+        limit(1),
+      ),
     );
     return !snap.empty;
   }
