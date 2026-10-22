@@ -8,11 +8,11 @@
       <button type="button" class="link-texto" (click)="abrirCategorias()">Categorias</button>
       <button
         type="button"
-        class="btn-novo"
+        class="btn-novo btn-novo-header"
         [disabled]="!categoriasProntas"
         (click)="abrirNovaDespesa()"
       >
-        + Despesa
+        + Nova despesa
       </button>
     </div>
   </div>
@@ -32,190 +32,255 @@
   ></app-expense-category-manager>
 
   <ng-container *ngIf="view === 'lista'">
-    <!-- NAVEGAÇÃO DE MÊS -->
+    <!-- SELETOR DE MÊS -->
     <div class="month-nav">
-      <button type="button" class="btn-mes" aria-label="Mês anterior" (click)="mudarMes(-1)">
-        ‹
-      </button>
-      <span class="month-label">{{ rotuloMes }}</span>
-      <button type="button" class="btn-mes" aria-label="Próximo mês" (click)="mudarMes(1)">
-        ›
-      </button>
-    </div>
-    <div class="month-sub" *ngIf="!ehMesCorrente">
-      <button type="button" class="link-texto" (click)="irParaMesCorrente()">Hoje</button>
-    </div>
-
-    <!-- RESUMO (ignora filtros) -->
-    <div class="resumo">
-      <div class="resumo-item">
-        <span class="resumo-label">Vencidas</span>
-        <strong class="resumo-valor" [class.valor-vencida]="grupos.totals.vencidas > 0">
-          R$ {{ grupos.totals.vencidas | number: '1.2-2' }}
-        </strong>
+      <div class="month-pill">
+        <button type="button" class="btn-mes" aria-label="Mês anterior" (click)="mudarMes(-1)">
+          ‹
+        </button>
+        <span class="month-label">{{ rotuloMes }}</span>
+        <button type="button" class="btn-mes" aria-label="Próximo mês" (click)="mudarMes(1)">
+          ›
+        </button>
       </div>
-      <div class="resumo-item">
-        <span class="resumo-label">A pagar no mês</span>
-        <strong class="resumo-valor">R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong>
-      </div>
-      <div class="resumo-item">
-        <span class="resumo-label">Pago no mês</span>
-        <strong class="resumo-valor">R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong>
-      </div>
-    </div>
-
-    <!-- FILTROS (só a lista) -->
-    <div class="filtros-barra">
-      <button
-        type="button"
-        class="link-texto"
-        [attr.aria-expanded]="filtrosAbertos"
-        (click)="alternarFiltros()"
-      >
-        Filtros<span *ngIf="quantidadeFiltrosAtivos > 0"> ({{ quantidadeFiltrosAtivos }})</span>
-      </button>
-      <button type="button" class="link-texto" *ngIf="filtrosAtivos" (click)="limparFiltros()">
-        Limpar
+      <button type="button" class="link-texto" *ngIf="!ehMesCorrente" (click)="irParaMesCorrente()">
+        Mês atual
       </button>
     </div>
-    <div class="filters" *ngIf="filtrosAbertos">
-      <div class="filter-group">
-        <label for="filtro-categoria">Categoria</label>
-        <select
-          id="filtro-categoria"
-          [(ngModel)]="filtroCategoria"
-          (ngModelChange)="aoMudarFiltro()"
-        >
-          <option value="">Todas</option>
-          <option *ngFor="let c of categorias" [value]="c.id">{{ c.name }}</option>
-        </select>
+
+    <!-- CARDS DE RESUMO (ignoram filtros) -->
+    <div class="cards-resumo">
+      <div class="card-resumo">
+        <span class="card-icone tom-warning" aria-hidden="true">⏳</span>
+        <div class="card-texto">
+          <span class="card-label">A pagar no mês</span>
+          <strong class="card-valor">R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong>
+        </div>
       </div>
-      <div class="filter-group">
-        <label for="filtro-status">Status</label>
-        <select id="filtro-status" [(ngModel)]="filtroStatus" (ngModelChange)="aoMudarFiltro()">
-          <option value="todos">Todos</option>
-          <option value="a_pagar">A pagar</option>
-          <option value="pago">Pago</option>
-        </select>
+      <div class="card-resumo">
+        <span class="card-icone tom-success" aria-hidden="true">✓</span>
+        <div class="card-texto">
+          <span class="card-label">Pago no mês</span>
+          <strong class="card-valor">R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong>
+        </div>
       </div>
-      <label class="filter-check">
-        <input
-          type="checkbox"
-          [(ngModel)]="filtroAPagarJaRecebida"
-          (ngModelChange)="aoMudarFiltro()"
-        />
-        A pagar e já recebida
-      </label>
-      <label class="filter-check">
-        <input type="checkbox" [(ngModel)]="filtroRevisar" (ngModelChange)="aoMudarFiltro()" />
-        Revisar migração
-      </label>
-    </div>
-
-    <p class="vazio" *ngIf="totalVisivel === 0">
-      Nenhuma despesa neste mês
-      <button type="button" class="link-texto" (click)="abrirNovaDespesa()">+ Despesa</button>
-    </p>
-
-    <!-- GRUPOS -->
-    <section class="group" *ngFor="let g of gruposVisiveis">
-      <ng-container *ngIf="g.items.length > 0">
-        <h2 class="group-title">
-          <span>{{ g.title }}</span>
-          <span *ngIf="totalDoGrupo(g.key) !== null">
-            R$ {{ totalDoGrupo(g.key) | number: '1.2-2' }}
-          </span>
-        </h2>
-
-        <div class="expense-row" *ngFor="let e of g.items">
-          <span class="dot" [class.dot-producao]="ehCustoProducao(e)" aria-hidden="true"></span>
-
-          <div class="expense-info">
-            <span class="expense-name">{{ e.description }}</span>
-            <span class="expense-meta">
-              {{ nomeCategoria(e.categoryId) }} ·
-              <ng-container *ngIf="e.paidDate; else vence"
-                >pago {{ formatarData(e.paidDate) }}</ng-container
-              >
-              <ng-template #vence>vence {{ formatarData(e.dueDate) }}</ng-template>
-              <ng-container *ngIf="e.paymentMethod">
-                · {{ paymentLabels[e.paymentMethod] }}</ng-container
-              >
-              <ng-container *ngIf="e.supplier"> · {{ e.supplier }}</ng-container>
-              <ng-container *ngIf="e.goodsReceivedDate">
-                · chegou {{ formatarData(e.goodsReceivedDate) }}</ng-container
-              >
-              <ng-container *ngIf="e.origin === 'parcelamento'">
-                · parcela {{ e.installmentNumber }}/{{ e.installmentTotal }}</ng-container
-              >
-              <ng-container *ngIf="e.origin === 'recorrencia'"> · recorrente</ng-container>
-              <span class="meta-revisar" *ngIf="e.migracaoRevisar" [title]="e.migracaoMotivo ?? ''">
-                · <span class="dot-alerta" aria-hidden="true"></span>revisar migração
-              </span>
-            </span>
-          </div>
-
-          <div
-            class="expense-valor"
-            [class.valor-vencida]="estaVencida(e)"
-            [class.valor-paga]="e.status === 'pago'"
+      <div class="card-resumo" [class.card-alerta]="grupos.totals.vencidas > 0">
+        <span class="card-icone tom-danger" aria-hidden="true">!</span>
+        <div class="card-texto">
+          <span class="card-label">Vencidas</span>
+          <strong class="card-valor valor-vencida"
+            >R$ {{ grupos.totals.vencidas | number: '1.2-2' }}</strong
           >
-            R$ {{ e.value | number: '1.2-2' }}
-          </div>
+        </div>
+      </div>
+      <div class="card-resumo">
+        <span class="card-icone tom-info" aria-hidden="true">Σ</span>
+        <div class="card-texto">
+          <span class="card-label">Total do mês</span>
+          <strong class="card-valor">R$ {{ totalDoMes | number: '1.2-2' }}</strong>
+        </div>
+      </div>
+    </div>
 
-          <div class="expense-actions">
+    <div class="layout">
+      <!-- PAINEL: DESPESAS POR CATEGORIA -->
+      <aside class="painel">
+        <div class="card-base">
+          <h2 class="painel-titulo">Despesas por categoria</h2>
+          <p class="painel-vazio" *ngIf="fatias.length === 0">Sem despesas neste mês.</p>
+          <ng-container *ngIf="fatias.length > 0">
+            <div class="rosca-wrap">
+              <canvas #roscaCanvas aria-label="Gráfico de despesas por categoria"></canvas>
+            </div>
+            <ul class="legenda">
+              <li *ngFor="let f of fatias">
+                <span class="legenda-bolinha" [style.background]="f.cor"></span>
+                <span class="legenda-nome">{{ f.name }}</span>
+                <span class="legenda-valor">R$ {{ f.total | number: '1.2-2' }}</span>
+                <span class="legenda-pct">{{ f.percentual | number: '1.0-0' }}%</span>
+              </li>
+            </ul>
+          </ng-container>
+        </div>
+      </aside>
+
+      <!-- LANÇAMENTOS -->
+      <main class="lancamentos">
+        <!-- ALERTA DE VENCIDAS -->
+        <section class="alerta-vencidas" *ngIf="vencidasVisiveis.length > 0">
+          <h2 class="alerta-titulo">
+            {{ vencidasVisiveis.length }}
+            {{ vencidasVisiveis.length === 1 ? 'despesa vencida' : 'despesas vencidas' }} · R$
+            {{ grupos.totals.vencidas | number: '1.2-2' }}
+          </h2>
+          <ng-container *ngFor="let e of vencidasVisiveis">
+            <ng-container *ngTemplateOutlet="linha; context: { $implicit: e }"></ng-container>
+          </ng-container>
+        </section>
+
+        <!-- FILTROS -->
+        <div class="filtros">
+          <div class="chips" role="group" aria-label="Filtrar despesas">
             <button
               type="button"
-              class="link-texto link-acao"
-              *ngIf="e.status === 'a_pagar'"
-              (click)="abrirPagamento(e)"
+              class="chip"
+              *ngFor="let c of chips"
+              [class.chip-ativo]="chipAtivo(c.key)"
+              [attr.aria-pressed]="chipAtivo(c.key)"
+              (click)="selecionarChip(c.key)"
             >
-              Paguei
+              {{ c.label }}
             </button>
-            <div class="menu-wrap">
-              <button
-                type="button"
-                class="btn-menu"
-                aria-label="Mais ações"
-                aria-haspopup="menu"
-                [attr.aria-expanded]="menuAbertoId === e.id"
-                (click)="alternarMenu(e, $event)"
-              >
-                ⋯
-              </button>
-              <div class="menu" role="menu" *ngIf="menuAbertoId === e.id">
-                <button
-                  type="button"
-                  role="menuitem"
-                  *ngIf="podeMarcarChegada(e)"
-                  (click)="marcarChegada(e)"
-                >
-                  Chegou
-                </button>
-                <button type="button" role="menuitem" (click)="editar(e)">Editar</button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  *ngIf="podeEncerrarSerie(e)"
-                  (click)="abrirEncerramento(e)"
-                >
-                  Encerrar recorrência
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  class="menu-excluir"
-                  (click)="abrirExclusao(e)"
-                >
-                  Excluir
-                </button>
-              </div>
-            </div>
+          </div>
+          <select
+            class="filtro-categoria"
+            aria-label="Filtrar por categoria"
+            [(ngModel)]="filtroCategoria"
+            (ngModelChange)="aoMudarFiltro()"
+          >
+            <option value="">Todas as categorias</option>
+            <option *ngFor="let c of categorias" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </div>
+
+        <!-- ESTADO VAZIO -->
+        <div class="vazio" *ngIf="totalVisivel === 0">
+          <span class="vazio-emoji" aria-hidden="true">🗓️</span>
+          <p>Nenhuma despesa em {{ nomeMes }}</p>
+          <button
+            type="button"
+            class="btn-novo"
+            [disabled]="!categoriasProntas"
+            (click)="abrirNovaDespesa()"
+          >
+            + Nova despesa
+          </button>
+        </div>
+
+        <!-- LISTA POR DIA -->
+        <div class="card-base lista" *ngIf="dias.length > 0">
+          <section class="dia" *ngFor="let d of dias">
+            <h3 class="dia-titulo">{{ d.rotulo }}</h3>
+            <ng-container *ngFor="let e of d.items">
+              <ng-container *ngTemplateOutlet="linha; context: { $implicit: e }"></ng-container>
+            </ng-container>
+          </section>
+          <div class="lista-rodape">
+            <span
+              >Pago <strong>R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong></span
+            >
+            <span
+              >A pagar <strong>R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong></span
+            >
+            <span
+              >Total <strong>R$ {{ totalDoMes | number: '1.2-2' }}</strong></span
+            >
           </div>
         </div>
-      </ng-container>
-    </section>
+      </main>
+    </div>
+
+    <!-- BOTÃO FLUTUANTE (mobile) -->
+    <button
+      type="button"
+      class="fab"
+      aria-label="Nova despesa"
+      [disabled]="!categoriasProntas"
+      (click)="abrirNovaDespesa()"
+    >
+      +
+    </button>
   </ng-container>
+
+  <!-- LINHA DE LANÇAMENTO -->
+  <ng-template #linha let-e>
+    <div class="linha" [class.linha-paga]="e.status === 'pago'">
+      <span class="avatar" aria-hidden="true" [style.background]="corCategoria(e.categoryId)">{{
+        iconeCategoria(e.categoryId)
+      }}</span>
+
+      <div class="linha-info">
+        <span class="linha-nome">
+          {{ e.description }}
+          <span class="selo-revisar" *ngIf="e.migracaoRevisar" [title]="e.migracaoMotivo ?? ''"
+            >Revisar</span
+          >
+        </span>
+        <span class="linha-meta">
+          {{ nomeCategoria(e.categoryId) }}
+          <ng-container *ngIf="e.supplier"> · {{ e.supplier }}</ng-container>
+          <ng-container *ngIf="e.paymentMethod"> · {{ rotuloPagamento(e) }}</ng-container>
+          <ng-container *ngIf="e.origin === 'parcelamento'">
+            · Parcela {{ e.installmentNumber }}/{{ e.installmentTotal }}</ng-container
+          >
+          <ng-container *ngIf="e.origin === 'recorrencia'"> · Recorrente</ng-container>
+          <ng-container *ngIf="e.goodsReceivedDate">
+            · Chegou {{ formatarData(e.goodsReceivedDate) }}</ng-container
+          >
+          <ng-container *ngIf="e.status === 'a_pagar' && estaVencida(e)">
+            · Venceu {{ formatarData(e.dueDate) }}</ng-container
+          >
+        </span>
+      </div>
+
+      <span class="linha-valor">R$ {{ e.value | number: '1.2-2' }}</span>
+
+      <button
+        type="button"
+        class="check"
+        *ngIf="e.status === 'a_pagar'"
+        aria-label="Marcar como paga"
+        title="Marcar como paga"
+        (click)="abrirPagamento(e)"
+      >
+        <span class="check-circulo"></span>
+      </button>
+      <span
+        class="check check-pago"
+        *ngIf="e.status === 'pago'"
+        role="img"
+        [attr.aria-label]="'Pago em ' + formatarData(e.paidDate)"
+        [title]="'Pago em ' + formatarData(e.paidDate)"
+      >
+        <span class="check-circulo">✓</span>
+      </span>
+
+      <div class="menu-wrap">
+        <button
+          type="button"
+          class="btn-menu"
+          aria-label="Mais ações"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="menuAbertoId === e.id"
+          (click)="alternarMenu(e, $event)"
+        >
+          ⋯
+        </button>
+        <div class="menu" role="menu" *ngIf="menuAbertoId === e.id">
+          <button
+            type="button"
+            role="menuitem"
+            *ngIf="podeMarcarChegada(e)"
+            (click)="marcarChegada(e)"
+          >
+            Chegou
+          </button>
+          <button type="button" role="menuitem" (click)="editar(e)">Editar</button>
+          <button
+            type="button"
+            role="menuitem"
+            *ngIf="podeEncerrarSerie(e)"
+            (click)="abrirEncerramento(e)"
+          >
+            Encerrar recorrência
+          </button>
+          <button type="button" role="menuitem" class="menu-excluir" (click)="abrirExclusao(e)">
+            Excluir
+          </button>
+        </div>
+      </div>
+    </div>
+  </ng-template>
 
   <!-- MODAL DE PAGAMENTO -->
   <div class="modal-overlay" *ngIf="despesaParaPagar" (click)="fecharPagamento()">
