@@ -12,6 +12,7 @@ import { Product } from '../../models/product-model';
 import { Customer } from '../../models/customer-model';
 import { Bill } from '../../models/bill-model';
 import { PurchaseProduct } from '../../models/purchase-product-model';
+import { Expense, ExpenseCategory } from '../../models/expense-model';
 import { Order } from '../../models/order-model';
 import { Vendedor, ComissaoVendedorResultado } from '../../models/vendedor-model';
 import { PaymentMethod, PAYMENT_METHOD_LABELS } from '../../models/sell-model';
@@ -21,6 +22,15 @@ import { PurchaseService } from '../../services/purchase-service/purchase-servic
 import { CustomerService } from '../../services/customer-service/customer-service';
 import { BillService } from '../../services/bill-service/bill-service';
 import { PurchaseProductService } from '../../services/purchase-product-service/purchase-product-service';
+import { ExpenseService } from '../../services/expense-service/expense-service';
+import { ExpenseCategoryService } from '../../services/expense-category-service/expense-category-service';
+import { ExpenseRecurrenceService } from '../../services/expense-recurrence-service/expense-recurrence-service';
+import { ExpenseScheduleService } from '../../services/expense-schedule-service/expense-schedule-service';
+import { TenantService } from '../../services/tenant-service/tenant-service';
+import {
+  CategoryBreakdownRow,
+  ExpenseReportService,
+} from '../../services/expense-report-service/expense-report-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 import { ConfigService } from '../../services/config/config.service';
 import { OrderService } from '../../services/order-service/order-service';
@@ -79,7 +89,8 @@ export class ProductInventoryComponent implements OnInit {
 
   // Controle das Abas
   activeTab: 'relatorio' | 'estoque' | 'clientes' | 'compras' | 'historico' | 'vendedores' = 'relatorio';
-  reportTab: 'vendas' | 'contas' | 'balanco' | 'vendedores' = 'vendas';
+  // 'contas' segue no union enquanto o html (aba legado) existir — remover na TASK-059.
+  reportTab: 'vendas' | 'contas' | 'despesas' | 'balanco' | 'vendedores' = 'vendas';
 
   // Controle de Visualização do Formulário
   exibirFormularioNovo: boolean = false;
@@ -136,6 +147,11 @@ export class ProductInventoryComponent implements OnInit {
   // --- CONTAS A PAGAR ---
   bills: Bill[] = [];
   filtroContasStatus: 'todos' | 'pendente' | 'recebido' | 'pago' = 'todos';
+
+  // --- DESPESAS (substitui Contas a Pagar; competencia por dueDate, ver ExpenseReportService) ---
+  despesas: Expense[] = [];
+  categoriasDespesa: ExpenseCategory[] = [];
+  isGastosModalOpen = false;
 
   // --- PRODUTOS DE COMPRA ---
   purchaseProducts: PurchaseProduct[] = [];
@@ -248,6 +264,10 @@ export class ProductInventoryComponent implements OnInit {
     private customerService: CustomerService,
     private billService: BillService,
     private purchaseProductService: PurchaseProductService,
+    private expenseService: ExpenseService,
+    private expenseCategoryService: ExpenseCategoryService,
+    private expenseRecurrenceService: ExpenseRecurrenceService,
+    private tenantService: TenantService,
     private orderService: OrderService,
     private comandaService: ComandaService,
     private vendedorService: VendedorService,
@@ -295,6 +315,15 @@ export class ProductInventoryComponent implements OnInit {
     this.purchaseProductService.getPurchaseProducts().subscribe(data => {
       this.purchaseProducts = data;
     });
+
+    // 6b. Carrega despesas e categorias em tempo real
+    this.expenseService.getExpenses().subscribe((data) => {
+      this.despesas = data;
+    });
+    this.expenseCategoryService.getCategories().subscribe((data) => {
+      this.categoriasDespesa = data;
+    });
+    this.gerarRecorrenciasAteHoje();
 
     // 7. Carrega e combina Histórico Geral (PDV + Pedidos + Comandas)
     combineLatest([
@@ -520,20 +549,43 @@ export class ProductInventoryComponent implements OnInit {
     return this.bills.filter(b => b.status === 'recebido').reduce((s, b) => s + b.value, 0);
   }
 
+  /** Card Gastos = despesas operacionais com dueDate no periodo (competencia, D5). */
   get gastosPeriodo(): number {
-    const inicio = new Date(this.filtroDataInicio + 'T00:00:00');
-    const fim = new Date(this.filtroDataFim + 'T23:59:59');
-    return this.bills
-      .filter(b => b.status === 'pago' && b.paidAt)
-      .filter(b => {
-        const d = (b.paidAt as any)?.toDate ? (b.paidAt as any).toDate() : new Date(b.paidAt as any);
-        return d >= inicio && d <= fim;
-      })
-      .reduce((s, b) => s + b.value, 0);
+    return ExpenseReportService.sumOperacionalPorVencimento(
+      this.despesas,
+      this.categoriasDespesa,
+      this.filtroDataInicio,
+      this.filtroDataFim,
+    );
+  }
+
+  /** Informativo: custo de producao do periodo, ja incluso no CMV (D1). Nao entra no Resultado. */
+  get custoProducaoPeriodo(): number {
+    return ExpenseReportService.sumCustoProducaoPorVencimento(
+      this.despesas,
+      this.categoriasDespesa,
+      this.filtroDataInicio,
+      this.filtroDataFim,
+    );
+  }
+
+  /** Breakdown por categoria operacional do periodo (modal Gastos), maior total primeiro. */
+  get gastosPorCategoria(): CategoryBreakdownRow[] {
+    return ExpenseReportService.breakdownPorCategoria(
+      this.despesas,
+      this.categoriasDespesa,
+      this.filtroDataInicio,
+      this.filtroDataFim,
+      'despesa_operacional',
+    );
   }
 
   get resultadoFinal(): number {
-    return this.relatorio.faturamento - this.relatorio.custoTotal - this.gastosPeriodo;
+    return ExpenseReportService.calcResultado(
+      this.relatorio.faturamento,
+      this.relatorio.custoTotal,
+      this.gastosPeriodo,
+    );
   }
 
   get billsFiltradosRelatorio(): Bill[] {
@@ -547,6 +599,30 @@ export class ProductInventoryComponent implements OnInit {
       filtered = filtered.filter(b => b.status === this.filtroContasStatus);
     }
     return filtered;
+  }
+
+  /** Catch-up de recorrencias (D2): UMA chamada por carregamento; falha vira aviso, nao derruba a tela. */
+  private async gerarRecorrenciasAteHoje(): Promise<void> {
+    const companyId = this.tenantService.companyId();
+    if (!companyId) {
+      return;
+    }
+    try {
+      await this.expenseRecurrenceService.generateDueOccurrences(
+        companyId,
+        ExpenseScheduleService.toDateKey(new Date()),
+      );
+    } catch {
+      this.notif.warning('Não foi possível gerar as recorrências de despesas. ⚠️');
+    }
+  }
+
+  abrirGastosModal() {
+    this.isGastosModalOpen = true;
+  }
+
+  fecharGastosModal() {
+    this.isGastosModalOpen = false;
   }
 
   async avancarStatusBill(bill: Bill) {

@@ -1030,7 +1030,7 @@ HISTORICO: 2026-10-22 — mike: 12 testes RED em product-inventory.spec.ts (sem 
 
 
 ## TASK-056 — product-inventory.ts: lógica de Despesas/Balanço e remoção da aba Compras
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-055
 ESCOPO: no product-inventory.ts, trocar bills/purchaseProducts por despesas: assinar ExpenseService/ExpenseCategoryService, chamar o catch-up de recorrência, implementar os getters do contrato da TASK-055 via ExpenseReportService, `reportTab: 'vendas'|'despesas'|'balanco'|'vendedores'`, `isGastosModalOpen` + abrir/fechar, e remover aba/estado/métodos de Compras e Contas a Pagar.
@@ -1040,7 +1040,8 @@ CRITERIO DE ACEITE: (1) testes da TASK-055 GREEN e suíte do componente sem regr
 ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.ts
 NAO FAZER: não editar .html/.css (TASK-059); não alterar o spec; não alterar PurchaseService; não editar .claude/tasks.md.
 RETORNO ESPERADO: diff + saída do runner. Gate: style.
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: getters gastosPeriodo/custoProducaoPeriodo/gastosPorCategoria/resultadoFinal via ExpenseReportService; assinatura de despesas/categorias; reportTab + "despesas"; isGastosModalOpen; catch-up gerarRecorrenciasAteHoje no init (companyId da sessao, erro -> notif.warning generico). AJUSTE DO KIRA: remocao dos membros de Compras/Contas adiada para depois da TASK-059 (strictTemplates — html ainda os usa); lista de obsoletos no retorno do levi (bills, purchaseProducts, produtoCompra*, gerarBillDeProdutoCompra, filtroContasStatus, billsFiltradosRelatorio, totalContas*, avancarStatusBill, billStatusLabel, formatBillDate, recurrenceLabel, *Compra* modal/form, activeTab compras, reportTab contas, injecoes BillService/PurchaseProductService). Bloqueio intermediario: TenantService sem provider no spec -> mike adicionou mock + 2 RED do catch-up. Runner 37/37. style APROVADO; ressalvas: subscriptions sem cleanup (padrao do componente inteiro — task futura), reformat do spec veio do prettier do mike na 055.
+
 
 ## TASK-057 — [TDD GREEN] Balanço por despesas
 STATUS: PENDENTE
