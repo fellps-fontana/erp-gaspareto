@@ -194,7 +194,7 @@ function assertTotalValid(total: number): void {
   }
 }
 
-function assertDateKeyValid(date: DateKey, campo: string): void {
+export function assertDateKeyValid(date: DateKey, campo: string): void {
   if (!isDateKeyValid(date)) {
     throw new Error(`Data inválida em ${campo}: "${date}". Use o formato AAAA-MM-DD.`);
   }
