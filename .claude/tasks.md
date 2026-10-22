@@ -1071,7 +1071,7 @@ HISTORICO: 2026-10-22 — hanzo: ExpenseReportPanelComponent (rosca por categori
 
 
 ## TASK-059 — product-inventory.html/.css: sub-aba Despesas, Balanço e modal Gastos
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: hanzo
 DEPENDENCIAS: TASK-056, TASK-057, TASK-058
 ESCOPO: no template, remover a aba Compras e a sub-aba Contas a Pagar, adicionar a sub-aba "Despesas" (expense-report-panel), tornar o card Gastos clicável abrindo gastos-breakdown-modal, e ajustar rótulos do Balanço ("Gastos (despesas operacionais por vencimento)").
@@ -1081,7 +1081,8 @@ CRITERIO DE ACEITE: (1) nenhuma referência no html a `compras`, `produtoCompra*
 ARQUIVOS PERMITIDOS: src/components/product-inventory/product-inventory.html, src/components/product-inventory/product-inventory.css
 NAO FAZER: não editar o .ts nem o spec; não alterar a aba Estoque/entrada 📦; não editar .claude/tasks.md.
 RETORNO ESPERADO: diff + `ng build` sem erro. Gate: style.
-HISTORICO:
+HISTORICO: 2026-10-22 — hanzo: removidas aba Compras, modal de produto de compra e sub-aba Contas a Pagar do template; sub-aba Despesas com app-expense-report-panel; card Gastos clicavel (click/Enter/Espaco) + app-gastos-breakdown-modal (closed); formula Faturamento − CMV − Despesas operacionais + nota CMV. Componente standalone exigiu imports no .ts (fora dos arquivos permitidos): Kira fez o ajuste minimo (2 imports). Build ok; spec 37/37. style APROVADO; prettier tolerado (arquivos ja eram nao formatados — formatar = ~6k linhas de ruido; debito separado). Obs: membros orfaos no .ts (totalContas*, reportTab contas etc.) vao na TASK-061.
+
 
 ## TASK-060 — Remover módulo `compras` do ModuleConfig e de Configurações
 STATUS: PENDENTE

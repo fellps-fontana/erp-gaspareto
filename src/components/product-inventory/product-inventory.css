@@ -424,6 +424,27 @@ h1 {
   border-left: 6px solid var(--color-danger);
 }
 
+.kpi-clicavel {
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.kpi-clicavel:hover {
+  transform: translateY(-2px);
+}
+
+.kpi-clicavel:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.formula-nota {
+  display: block;
+  margin-top: 0.8rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .kpi-prejuizo {
   background: var(--bg-card);
   border-left: 6px solid var(--color-danger);
