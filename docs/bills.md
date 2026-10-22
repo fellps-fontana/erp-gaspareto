@@ -1,3 +1,5 @@
+> **OBSOLETO (2026-10-22):** substituído pelo módulo Despesas — ver `docs/despesas.md`.
+
 # Módulo: Contas a Pagar (`bills`)
 
 ## Visão geral
