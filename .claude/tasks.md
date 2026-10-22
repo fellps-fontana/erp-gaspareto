@@ -930,7 +930,7 @@ HISTORICO: 2026-10-22 — mike: test/expense-migration-core.test.mjs (53 testes;
 
 
 ## TASK-049 — Implementar núcleo e script de migração (hml only)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: levi
 DEPENDENCIAS: TASK-048
 ESCOPO: implementar scripts/lib/expense-migration-core.mjs e criar scripts/migrate-bills-to-expenses.mjs (Admin SDK; dry-run padrão; --apply; --rollback; --company=<id> opcional; recusa projeto != hologaerp; suporta FIRESTORE_EMULATOR_HOST) até os testes da TASK-048 ficarem GREEN.
@@ -940,10 +940,11 @@ CRITERIO DE ACEITE: (1) `npm run test:migration` e `npm run test:migration:emula
 ARQUIVOS PERMITIDOS: scripts/lib/expense-migration-core.mjs, scripts/migrate-bills-to-expenses.mjs, package.json (somente scripts npm `migrate:expenses:hml`)
 NAO FAZER: não habilitar produção (projetosfelipe-9e458); não alterar os testes; não rodar contra projeto real; não editar .claude/tasks.md.
 RETORNO ESPERADO: arquivos + saída dos dois runners. Gate: style + gon (script que escreve dado de cliente).
-HISTORICO:
+HISTORICO: 2026-10-22 — levi: core + script (Admin SDK, dry-run padrao, --apply, --rollback, --company, guard hologaerp antes do initializeApp; projectId fixo). style: 3 rodadas. R1 PRECISA CORRIGIR: serie aplicava regras de bill ("Compra:" e receivedAt) na categoria; bill sem data abortava o run inteiro; "cartao" isolado capturava "Fatura cartao de credito"; constantes duplicadas entre core e script; project_id da service account nao validado. Kira decidiu tambem: rollback apaga ocorrencias geradas de series mig_pp_*. mike escreveu RED (+12 core, +2 emulador) antes da correcao. R2: serie sem bills e sem defaultValue gravava template.value NaN (mike +2 RED) + sentinela U+F8FF cru -> escape. R3 APROVADO. Decisao registrada: palavras-chave genericas compra/compras removidas de matchCategoryKey (falso positivo em series); bills livres "compra fornecedor X" sem prefixo caem em Outros+revisar (ou compra_mercadoria+revisar se receivedAt) — aceito pela §14. report.skipped numerico + skippedByKind (teste prevaleceu sobre o briefing do Kira); report.unmigratable {kind,id,motivo}. gon APROVADO; obs baixas: companyId legado nao validado como id seguro (defesa em profundidade), rollback apaga despesas migradas mesmo editadas/pagas depois (documentado no cabecalho; decisao de produto), FIRESTORE_EMULATOR_HOST nao restrito a loopback.
+
 
 ## TASK-050 — [TDD GREEN] Confirmar migração
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: mike
 DEPENDENCIAS: TASK-049
 ESCOPO: rodar (sem reescrever) os testes de migração e o emulador; confirmar GREEN ou relatório de bug.
@@ -953,7 +954,8 @@ CRITERIO DE ACEITE: (1) ambos GREEN; (2) 2ª execução do script no emulador cr
 ARQUIVOS PERMITIDOS: nenhum (somente execução)
 NAO FAZER: não editar testes nem código; não editar .claude/tasks.md.
 RETORNO ESPERADO: contagens e veredito.
-HISTORICO:
+HISTORICO: 2026-10-22 — mike: GREEN core 53/53 + emulador 7/7 na 1a rodada; apos as correcoes do style o executor/mike confirmaram core 68/68 e emulador 9/9 (2a execucao cria 0 docs, rollback restrito, legado intacto).
+
 
 ## TASK-051 — [MANUAL / USUARIO] Deploy de rules+índices e migração em homolog (hologaerp)
 STATUS: PENDENTE

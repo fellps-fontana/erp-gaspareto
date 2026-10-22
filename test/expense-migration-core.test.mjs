@@ -448,3 +448,173 @@ describe('paridade com o app (secao 8.1)', () => {
     assert.deepEqual(fromCore, fromApp);
   });
 });
+
+// Acentos montados por codigo para manter o arquivo ASCII.
+const A_TIL = String.fromCharCode(0xe3);
+const E_ACUTE = String.fromCharCode(0xe9);
+
+describe('correcao pos-style: serie sem casamento nao vira compra de mercadoria', () => {
+  it('serie sem casamento de nome com ultimo bill recebido -> outros + revisar (nao compra_mercadoria)', () => {
+    const pp = purchaseProduct({ name: 'Fornecedor Desconhecido' });
+    const linked = [bill({
+      id: 'b1', purchaseProductId: 'pp1', name: 'Fornecedor Desconhecido', status: 'recebido',
+      dueDate: ts('2026-10-05T15:00:00Z'), receivedAt: ts('2026-10-05T15:00:00Z'),
+    })];
+    const { data } = mapPurchaseProductToSeries(pp, linked, CTX);
+    assert.equal(data.template.categoryId, 'comp-1_outros');
+    assert.equal(data.migracaoRevisar, true);
+  });
+
+  it('serie cujo ultimo bill se chama "Compra: X" sem casamento de produto -> outros + revisar', () => {
+    const pp = purchaseProduct({ name: 'Frigorifico Chapeco' });
+    const linked = [bill({
+      id: 'b1', purchaseProductId: 'pp1', name: 'Compra: Carne bovina', status: 'recebido',
+      dueDate: ts('2026-10-05T15:00:00Z'), receivedAt: ts('2026-10-05T15:00:00Z'),
+    })];
+    const { data } = mapPurchaseProductToSeries(pp, linked, CTX);
+    assert.equal(data.template.categoryId, 'comp-1_outros');
+    assert.equal(data.migracaoRevisar, true);
+  });
+
+  it('planMigration: serie sem casamento com bill recebido sai como outros + revisar', () => {
+    const pps = [purchaseProduct({ id: 'pp1', name: 'Fornecedor Desconhecido' })];
+    const bills = [bill({
+      id: 'b1', purchaseProductId: 'pp1', name: 'Fornecedor Desconhecido', status: 'recebido',
+      dueDate: ts('2026-10-05T15:00:00Z'), receivedAt: ts('2026-10-05T15:00:00Z'),
+    })];
+    const plan = planMigration({ companyId: COMPANY, bills, purchaseProducts: pps, existingIds: emptyExistingIds() });
+    const serie = byId(plan.series, 'mig_pp_pp1').data;
+    assert.equal(serie.template.categoryId, 'comp-1_outros');
+    assert.equal(serie.migracaoRevisar, true);
+  });
+
+  it('serie com nome que casa ("Aluguel loja") -> aluguel', () => {
+    const pp = purchaseProduct({ name: 'Aluguel loja' });
+    const { data } = mapPurchaseProductToSeries(pp, [], CTX);
+    assert.equal(data.template.categoryId, 'comp-1_aluguel');
+  });
+});
+
+describe('correcao pos-style: matchCategoryKey com cartao', () => {
+  it('"Fatura cartao de credito" nao casa taxas_cartao (retorna null)', () => {
+    assert.equal(matchCategoryKey(`Fatura cart${A_TIL}o de cr${E_ACUTE}dito`), null);
+  });
+
+  it('"Taxa da maquininha" casa taxas_cartao', () => {
+    assert.equal(matchCategoryKey('Taxa da maquininha'), 'taxas_cartao');
+  });
+
+  it('"Taxas cartao debito" casa taxas_cartao', () => {
+    assert.equal(matchCategoryKey(`Taxas cart${A_TIL}o d${E_ACUTE}bito`), 'taxas_cartao');
+  });
+});
+
+describe('correcao pos-style: itens nao migraveis vao para report.unmigratable', () => {
+  function stripDates(b) {
+    return withoutField(withoutField(withoutField(withoutField(b, 'dueDate'), 'createdAt'), 'paidAt'), 'receivedAt');
+  }
+
+  it('report.unmigratable existe e e lista vazia quando tudo migra', () => {
+    const plan = planMigration({
+      companyId: COMPANY,
+      bills: [bill({ id: 'b1' })],
+      purchaseProducts: [],
+      existingIds: emptyExistingIds(),
+    });
+    assert.deepEqual(plan.report.unmigratable, []);
+  });
+
+  it('bill sem nenhuma data utilizavel nao lanca, fica fora de expenses e vai pra unmigratable; os demais migram', () => {
+    const semData = stripDates(bill({ id: 'bx', name: 'Festa de aniversario' }));
+    let plan;
+    assert.doesNotThrow(() => {
+      plan = planMigration({
+        companyId: COMPANY,
+        bills: [semData, bill({ id: 'bok' })],
+        purchaseProducts: [],
+        existingIds: emptyExistingIds(),
+      });
+    });
+    assert.equal(byId(plan.expenses, 'mig_bill_bx'), undefined);
+    assert.ok(byId(plan.expenses, 'mig_bill_bok'), 'bill com data deve continuar migrando');
+    const entry = plan.report.unmigratable.find((u) => u.id === 'bx');
+    assert.ok(entry, 'bill sem data deve constar em unmigratable');
+    assert.equal(entry.kind, 'bill');
+    assert.ok(typeof entry.motivo === 'string' && entry.motivo.length > 0, 'motivo preenchido');
+  });
+
+  for (const invalidValue of ['abc', NaN]) {
+    it(`bill com value nao numerico (${String(invalidValue)}) fica fora de expenses e vai pra unmigratable`, () => {
+      let plan;
+      assert.doesNotThrow(() => {
+        plan = planMigration({
+          companyId: COMPANY,
+          bills: [bill({ id: 'bnan', value: invalidValue }), bill({ id: 'bok' })],
+          purchaseProducts: [],
+          existingIds: emptyExistingIds(),
+        });
+      });
+      assert.equal(byId(plan.expenses, 'mig_bill_bnan'), undefined);
+      assert.ok(byId(plan.expenses, 'mig_bill_bok'), 'bill valido deve continuar migrando');
+      const entry = plan.report.unmigratable.find((u) => u.id === 'bnan');
+      assert.ok(entry, 'bill com value invalido deve constar em unmigratable');
+      assert.equal(entry.kind, 'bill');
+    });
+  }
+
+  it('purchaseProduct recurring sem createdAt e sem bills com data nao lanca e vai pra unmigratable', () => {
+    const pp = withoutField(purchaseProduct({ id: 'ppx', recurring: true }), 'createdAt');
+    let plan;
+    assert.doesNotThrow(() => {
+      plan = planMigration({
+        companyId: COMPANY,
+        bills: [],
+        purchaseProducts: [pp],
+        existingIds: emptyExistingIds(),
+      });
+    });
+    assert.equal(byId(plan.series, 'mig_pp_ppx'), undefined);
+    const entry = plan.report.unmigratable.find((u) => u.id === 'ppx');
+    assert.ok(entry, 'purchaseProduct sem data deve constar em unmigratable');
+    assert.equal(entry.kind, 'purchaseProduct');
+    assert.ok(typeof entry.motivo === 'string' && entry.motivo.length > 0, 'motivo preenchido');
+  });
+});
+
+describe('correcao pos-style: serie sem bills e defaultValue invalido', () => {
+  for (const [label, defaultValue] of [['ausente', undefined], ["'abc'", 'abc']]) {
+    it(`purchaseProduct recurring sem bills e defaultValue ${label} nao gera serie e vai pra unmigratable`, () => {
+      const base = purchaseProduct({ id: 'ppv', recurring: true });
+      const pp = defaultValue === undefined
+        ? withoutField(base, 'defaultValue')
+        : { ...base, defaultValue };
+      let plan;
+      assert.doesNotThrow(() => {
+        plan = planMigration({
+          companyId: COMPANY,
+          bills: [],
+          purchaseProducts: [pp],
+          existingIds: emptyExistingIds(),
+        });
+      });
+      assert.equal(byId(plan.series, 'mig_pp_ppv'), undefined, 'serie com valor invalido nao pode ser gerada');
+      const entry = plan.report.unmigratable.find((u) => u.id === 'ppv');
+      assert.ok(entry, 'purchaseProduct com defaultValue invalido deve constar em unmigratable');
+      assert.equal(entry.kind, 'purchaseProduct');
+      assert.ok(typeof entry.motivo === 'string' && entry.motivo.length > 0, 'motivo preenchido');
+    });
+  }
+
+  it('guarda: purchaseProduct recurring sem bills e defaultValue valido (150) gera serie com template.value 150', () => {
+    const pp = purchaseProduct({ id: 'ppok', recurring: true, defaultValue: 150 });
+    const plan = planMigration({
+      companyId: COMPANY,
+      bills: [],
+      purchaseProducts: [pp],
+      existingIds: emptyExistingIds(),
+    });
+    const serie = byId(plan.series, 'mig_pp_ppok');
+    assert.ok(serie, 'serie deve ser gerada');
+    assert.equal(serie.data.template.value, 150);
+  });
+});

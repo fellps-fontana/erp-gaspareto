@@ -240,3 +240,56 @@ describe('migrate-bills-to-expenses (Firestore Emulator, projeto hologaerp)', ()
     assert.ok(r.stdout.includes(`${cid}-semcompany`), 'bill sem companyId deve constar no relatorio');
   }));
 });
+
+describe('correcao pos-style: rollback de ocorrencias e unmigratable no stdout', () => {
+  it('--rollback --apply apaga ocorrencias de series migradas (qualquer origin) e preserva as de series nao migradas', () => scenario('rbocc', async (cid) => {
+    const r0 = runScript(['--apply', `--company=${cid}`]);
+    assert.equal(r0.status, 0, r0.stderr);
+
+    await db.collection('expenses').doc(`${cid}-occ-mig`).set({
+      companyId: cid, description: 'Ocorrencia de serie migrada', value: 1850, categoryId: `${cid}_outros`,
+      dueDate: '2026-11-14', status: 'a_pagar', origin: 'recorrencia',
+      seriesId: `mig_pp_${cid}-pp1`, createdAt: at('2026-10-22T12:00:00Z'),
+    });
+    await db.collection('expenseSeries').doc(`${cid}-manual-serie`).set({
+      companyId: cid, active: true, period: 'mensal', anchorDate: '2026-10-01',
+      template: { description: 'Serie manual', value: 10, categoryId: `${cid}_outros` },
+      createdAt: at('2026-10-01T12:00:00Z'),
+    });
+    await db.collection('expenses').doc(`${cid}-occ-manual`).set({
+      companyId: cid, description: 'Ocorrencia de serie manual', value: 10, categoryId: `${cid}_outros`,
+      dueDate: '2026-11-01', status: 'a_pagar', origin: 'recorrencia',
+      seriesId: `${cid}-manual-serie`, createdAt: at('2026-10-01T12:00:00Z'),
+    });
+
+    const r = runScript(['--rollback', '--apply', `--company=${cid}`]);
+    assert.equal(r.status, 0, r.stderr);
+
+    const remaining = await idsOf('expenses', cid);
+    assert.ok(!remaining.includes(`${cid}-occ-mig`), 'ocorrencia de serie migrada deve ser apagada');
+    assert.ok(remaining.includes(`${cid}-occ-manual`), 'ocorrencia de serie nao migrada deve ser preservada');
+    assert.equal(remaining.filter((id) => id.startsWith('mig_bill_')).length, 0, 'despesas migradas apagadas');
+    assert.deepEqual(await idsOf('expenseSeries', cid), [`${cid}-manual-serie`]);
+  }));
+
+  it('bill sem data utilizavel e bill com value invalido: ids vao pro stdout e os demais migram', () => scenario('unmig', async (cid) => {
+    const bills = db.collection('bills');
+    await bills.doc(`${cid}-nodate`).set({
+      companyId: cid, name: 'Sem data', value: 100, status: 'pendente', recurring: false,
+    });
+    await bills.doc(`${cid}-nan`).set({
+      companyId: cid, name: 'Valor invalido', value: 'abc', status: 'pendente', recurring: false,
+      dueDate: at('2026-10-03T15:00:00Z'), createdAt: at('2026-08-01T12:00:00Z'),
+    });
+
+    const r = runScript(['--apply', `--company=${cid}`]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.stdout.includes(`${cid}-nodate`), 'id da bill sem data deve constar no stdout');
+    assert.ok(r.stdout.includes(`${cid}-nan`), 'id da bill com value invalido deve constar no stdout');
+
+    const expenseIds = await idsOf('expenses', cid);
+    assert.ok(!expenseIds.includes(`mig_bill_${cid}-nodate`), 'bill sem data nao migra');
+    assert.ok(!expenseIds.includes(`mig_bill_${cid}-nan`), 'bill com value invalido nao migra');
+    assert.ok(expenseIds.includes(`mig_bill_${cid}-b1`), 'bills validos da empresa continuam migrando');
+  }));
+});
