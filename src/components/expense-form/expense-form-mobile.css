@@ -1,15 +1,26 @@
 @media (max-width: 600px) {
-  .expense-form {
-    padding: var(--sp-md);
+  .form-overlay {
+    padding: 0;
+    align-items: stretch;
   }
 
-  .row {
-    flex-direction: column;
+  .form-modal {
+    width: 100%;
+    border-radius: 0;
+  }
+
+  .form-header,
+  .form-body,
+  .form-actions {
+    padding-inline: var(--sp-md);
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 
   .modo-tabs button {
-    padding: var(--sp-sm);
-    font-size: 0.85rem;
+    min-height: 44px;
   }
 
   .form-actions {
