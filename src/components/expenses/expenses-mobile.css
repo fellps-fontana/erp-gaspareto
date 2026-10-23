@@ -32,13 +32,40 @@
     display: none;
   }
 
+  .expenses-header,
+  .month-nav {
+    flex-wrap: wrap;
+  }
+
+  .header-left,
+  .header-actions {
+    gap: var(--sp-xs);
+  }
+
+  .month-label {
+    min-width: 0;
+    padding: 0 var(--sp-xs);
+  }
+
+  /* Card estreito (2 por linha): sem icone, para o valor caber inteiro */
   .card-resumo {
     padding: var(--sp-sm) var(--sp-md);
-    gap: var(--sp-sm);
+  }
+
+  .card-icone {
+    display: none;
   }
 
   .card-valor {
-    font-size: 1.05rem;
+    font-size: clamp(0.9rem, 4.2vw, 1.05rem);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Painel ocupa a largura toda: nome da categoria pode quebrar */
+  .legenda-nome {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .filtro-categoria {
