@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { ModuleConfig } from '../../models/company-config';
+import { ModuleConfig, NotificationConfig } from '../../models/company-config';
 import { ConfigService } from '../../services/config/config.service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 
@@ -47,14 +47,26 @@ export class ConfigComponent {
     }
   }
 
-  // Toggle dedicado: `notificacoes` é objeto aninhado ({ aniversario: boolean }),
-  // não pode passar por toggleModule (que faz !valor direto e corromperia o dado).
-  async toggleNotificacaoAniversario() {
+  // Toggles dedicados: `notificacoes` e objeto aninhado, nao pode passar por toggleModule
+  // (que faz !valor direto e corromperia o dado). Monta o objeto completo via spread.
+  toggleNotificacaoAniversario() {
+    return this.toggleNotificacao('aniversario');
+  }
+
+  toggleNotificacaoDespesas() {
+    return this.toggleNotificacao('despesasVencendo');
+  }
+
+  toggleNotificacaoParcelas() {
+    return this.toggleNotificacao('parcelasVencendo');
+  }
+
+  private async toggleNotificacao(campo: keyof NotificationConfig) {
     if (this.saving()) return;
     this.saving.set('notificacoes');
     try {
       const atual = this.config.modules().notificacoes;
-      await this.config.updateModules({ notificacoes: { ...atual, aniversario: !atual.aniversario } });
+      await this.config.updateModules({ notificacoes: { ...atual, [campo]: !atual[campo] } });
     } catch {
       this.notif.error('Erro ao salvar configuração. ❌');
     } finally {

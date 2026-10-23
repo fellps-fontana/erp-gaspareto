@@ -1555,7 +1555,7 @@ HISTORICO: 2026-10-22 — mike: GREEN core 53/53 + emulador 7/7 na 1a rodada; ap
 
 
 ## TASK-089 — [MANUAL / USUARIO] Deploy de rules+índices e migração em homolog (hologaerp)
-STATUS: PENDENTE
+STATUS: CONCLUIDA
 AGENT: usuario (manual; Kira apenas orienta, não executa)
 DEPENDENCIAS: TASK-085, TASK-088
 ESCOPO: publicar rules/índices no hml, rodar a migração em dry-run, conferir o relatório e só então aplicar com --apply.
@@ -1565,7 +1565,8 @@ CRITERIO DE ACEITE: (1) `npm run deploy:rules:staging` concluído e índice de e
 ARQUIVOS PERMITIDOS: nenhum (operação manual em hml)
 NAO FAZER: nada em produção (projetosfelipe-9e458); não apagar bills/purchaseProducts.
 RETORNO ESPERADO: o usuário confirma no chat + cola o relatório do script.
-HISTORICO:
+HISTORICO: 2026-10-22 — executado pelo Kira a pedido do usuario ("manda pro hologa apenas"), apos merge do PR #39 em homologacao (3a207db): deploy:rules:staging ok (rules + indice expenses); migracao dry-run revisada (3 empresas, 16 despesas, 8 series, 36 categorias, 21 migracaoRevisar, 0 nao migraveis, 0 sem companyId) -> --apply -> 2a passada criou 0 (idempotente); deploy:hosting:staging ok (build-info commit 1f78a7d, mesmo tree do merge). Nada em producao.
+
 
 ## TASK-090 — Componente ExpenseForm (única / parcelada / recorrente)
 STATUS: CONCLUIDA

@@ -1,135 +1,158 @@
-<div class="expense-form">
-  <h2>{{ emEdicao ? 'Editar Despesa' : 'Nova Despesa' }}</h2>
+<div class="form-overlay">
+  <div class="form-modal" role="dialog" aria-modal="true" aria-labelledby="expense-form-titulo">
+    <header class="form-header">
+      <h2 id="expense-form-titulo">{{ emEdicao ? 'Editar despesa' : 'Nova despesa' }}</h2>
+      <button
+        type="button"
+        class="modal-fechar"
+        aria-label="Fechar"
+        title="Fechar"
+        (click)="cancelar()"
+      >
+        ✕
+      </button>
+    </header>
 
-  <div class="modo-tabs" *ngIf="!emEdicao">
-    <button type="button" [class.active]="modo === 'unica'" (click)="selecionarModo('unica')">
-      Única
-    </button>
-    <button
-      type="button"
-      [class.active]="modo === 'parcelada'"
-      (click)="selecionarModo('parcelada')"
-    >
-      Parcelada
-    </button>
-    <button
-      type="button"
-      [class.active]="modo === 'recorrente'"
-      (click)="selecionarModo('recorrente')"
-    >
-      Recorrente
-    </button>
-  </div>
-
-  <div class="row">
-    <div class="form-group grow">
-      <label>Descrição *</label>
-      <input
-        type="text"
-        name="description"
-        [(ngModel)]="novaDespesa.description"
-        placeholder="Ex: Aluguel do galpão"
-      />
-    </div>
-    <div class="form-group">
-      <label>{{ modo === 'parcelada' ? 'Valor total (R$) *' : 'Valor (R$) *' }}</label>
-      <input type="number" name="value" [(ngModel)]="novaDespesa.value" min="0.01" step="0.01" />
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="form-group grow">
-      <label>Categoria *</label>
-      <select name="categoryId" [(ngModel)]="novaDespesa.categoryId">
-        <option value="">Selecione...</option>
-        <option *ngFor="let c of categoriasSelecionaveis" [value]="c.id">{{ c.name }}</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label *ngIf="modo === 'unica'">Vencimento *</label>
-      <label *ngIf="modo === 'parcelada'">1º vencimento *</label>
-      <label *ngIf="modo === 'recorrente'">Primeiro vencimento (âncora) *</label>
-      <input type="date" name="dueDate" [(ngModel)]="novaDespesa.dueDate" />
-    </div>
-  </div>
-
-  <!-- PARCELADA -->
-  <div class="modo-box" *ngIf="modo === 'parcelada'">
-    <div class="form-group">
-      <label>Número de parcelas *</label>
-      <input
-        type="number"
-        name="parcelas"
-        [(ngModel)]="parcelas"
-        [min]="minInstallments"
-        [max]="maxInstallments"
-        step="1"
-      />
-    </div>
-    <div class="preview" *ngIf="previewParcelas.length > 0">
-      <p class="preview-titulo">
-        {{ previewParcelas.length }} x
-        <strong>R$ {{ previewParcelas[0].value | number: '1.2-2' }}</strong>
-        <span
-          *ngIf="previewParcelas[previewParcelas.length - 1].value !== previewParcelas[0].value"
+    <div class="form-body">
+      <div class="modo-tabs" *ngIf="!emEdicao">
+        <button type="button" [class.active]="modo === 'unica'" (click)="selecionarModo('unica')">
+          Única
+        </button>
+        <button
+          type="button"
+          [class.active]="modo === 'parcelada'"
+          (click)="selecionarModo('parcelada')"
         >
-          (última R$ {{ previewParcelas[previewParcelas.length - 1].value | number: '1.2-2' }})
-        </span>
-      </p>
-      <ul class="preview-lista">
-        <li *ngFor="let p of previewParcelas">
-          <span>{{ p.installmentNumber }}/{{ p.installmentTotal }}</span>
-          <span>{{ p.dueDate | date: 'dd/MM/yyyy' }}</span>
-          <span>R$ {{ p.value | number: '1.2-2' }}</span>
-        </li>
-      </ul>
-    </div>
-  </div>
+          Parcelada
+        </button>
+        <button
+          type="button"
+          [class.active]="modo === 'recorrente'"
+          (click)="selecionarModo('recorrente')"
+        >
+          Recorrente
+        </button>
+      </div>
 
-  <!-- RECORRENTE -->
-  <div class="modo-box" *ngIf="modo === 'recorrente'">
-    <div class="form-group">
-      <label>Período *</label>
-      <select name="periodo" [(ngModel)]="periodo">
-        <option value="semanal">Semanal</option>
-        <option value="mensal">Mensal</option>
-      </select>
-    </div>
-    <p class="aviso" *ngIf="ancoraMuitoAntiga">
-      ⚠️ A data está a mais de {{ maxAnchorMonthsInPast }} meses no passado: serão geradas todas as
-      ocorrências desde essa data até o fim do mês atual.
-    </p>
-  </div>
+      <div class="form-grid">
+        <div class="form-group span-2">
+          <label for="ef-description">Descrição</label>
+          <input
+            id="ef-description"
+            type="text"
+            name="description"
+            [(ngModel)]="novaDespesa.description"
+            placeholder="Ex: Aluguel do galpão"
+          />
+        </div>
 
-  <div class="row">
-    <div class="form-group grow">
-      <label>Fornecedor</label>
-      <input type="text" name="supplier" [(ngModel)]="novaDespesa.supplier" />
-    </div>
-    <div class="form-group">
-      <label>Forma de pagamento</label>
-      <select name="paymentMethod" [(ngModel)]="novaDespesa.paymentMethod">
-        <option value="">—</option>
-        <option *ngFor="let m of paymentMethods" [value]="m.value">{{ m.label }}</option>
-      </select>
-    </div>
-  </div>
+        <div class="form-group">
+          <label for="ef-value">{{
+            modo === 'parcelada' ? 'Valor total (R$)' : 'Valor (R$)'
+          }}</label>
+          <input
+            id="ef-value"
+            type="number"
+            name="value"
+            [(ngModel)]="novaDespesa.value"
+            min="0.01"
+            step="0.01"
+          />
+        </div>
+        <div class="form-group">
+          <label for="ef-due" *ngIf="modo === 'unica'">Vencimento</label>
+          <label for="ef-due" *ngIf="modo === 'parcelada'">1º vencimento</label>
+          <label for="ef-due" *ngIf="modo === 'recorrente'">Primeiro vencimento</label>
+          <input id="ef-due" type="date" name="dueDate" [(ngModel)]="novaDespesa.dueDate" />
+          <small class="aviso" *ngIf="ancoraMuitoAntiga">
+            ⚠️ Data a mais de {{ maxAnchorMonthsInPast }} meses no passado: serão geradas todas as
+            ocorrências até o fim do mês atual.
+          </small>
+        </div>
 
-  <div class="row">
-    <div class="form-group" *ngIf="modo === 'unica'">
-      <label>Mercadoria recebida em</label>
-      <input type="date" name="goodsReceivedDate" [(ngModel)]="novaDespesa.goodsReceivedDate" />
-    </div>
-    <div class="form-group grow">
-      <label>Observação</label>
-      <textarea name="notes" rows="2" [(ngModel)]="novaDespesa.notes"></textarea>
-    </div>
-  </div>
+        <div class="form-group">
+          <label for="ef-category">Categoria</label>
+          <select id="ef-category" name="categoryId" [(ngModel)]="novaDespesa.categoryId">
+            <option value="">Selecione...</option>
+            <option *ngFor="let c of categoriasSelecionaveis" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="ef-payment">
+            Forma de pagamento <span class="opcional">(opcional)</span>
+          </label>
+          <select id="ef-payment" name="paymentMethod" [(ngModel)]="novaDespesa.paymentMethod">
+            <option value="">—</option>
+            <option *ngFor="let m of paymentMethods" [value]="m.value">{{ m.label }}</option>
+          </select>
+        </div>
 
-  <div class="form-actions">
-    <button type="button" class="btn-cancelar" (click)="cancelar()">CANCELAR</button>
-    <button type="button" class="btn-salvar" (click)="salvar()">
-      {{ emEdicao ? 'SALVAR ALTERAÇÕES' : 'CADASTRAR DESPESA' }}
-    </button>
+        <div class="form-group" *ngIf="modo === 'parcelada'">
+          <label for="ef-parcelas">Parcelas</label>
+          <input
+            id="ef-parcelas"
+            type="number"
+            name="parcelas"
+            [(ngModel)]="parcelas"
+            [min]="minInstallments"
+            [max]="maxInstallments"
+            step="1"
+          />
+        </div>
+        <div class="form-group" *ngIf="modo === 'recorrente'">
+          <label for="ef-periodo">Período</label>
+          <select id="ef-periodo" name="periodo" [(ngModel)]="periodo">
+            <option value="semanal">Semanal</option>
+            <option value="mensal">Mensal</option>
+          </select>
+        </div>
+        <div class="form-group" *ngIf="modo === 'unica'">
+          <label for="ef-received">
+            Mercadoria recebida em <span class="opcional">(opcional)</span>
+          </label>
+          <input
+            id="ef-received"
+            type="date"
+            name="goodsReceivedDate"
+            [(ngModel)]="novaDespesa.goodsReceivedDate"
+          />
+        </div>
+
+        <div class="preview span-2" *ngIf="modo === 'parcelada' && previewParcelas.length > 0">
+          <p class="preview-titulo">
+            {{ previewParcelas.length }} × R$ {{ previewParcelas[0].value | number: '1.2-2' }}
+            <span
+              *ngIf="previewParcelas[previewParcelas.length - 1].value !== previewParcelas[0].value"
+            >
+              (última R$ {{ previewParcelas[previewParcelas.length - 1].value | number: '1.2-2' }})
+            </span>
+          </p>
+          <ul class="preview-lista">
+            <li *ngFor="let p of previewParcelas">
+              <span>
+                {{ p.installmentNumber }}/{{ p.installmentTotal }} ·
+                {{ p.dueDate | date: 'dd/MM/yyyy' }}
+              </span>
+              <span>R$ {{ p.value | number: '1.2-2' }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="form-group span-2">
+          <label for="ef-supplier">Fornecedor <span class="opcional">(opcional)</span></label>
+          <input id="ef-supplier" type="text" name="supplier" [(ngModel)]="novaDespesa.supplier" />
+        </div>
+
+        <div class="form-group span-2">
+          <label for="ef-notes">Observação <span class="opcional">(opcional)</span></label>
+          <textarea id="ef-notes" name="notes" rows="3" [(ngModel)]="novaDespesa.notes"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <footer class="form-actions">
+      <button type="button" class="btn-cancelar" (click)="cancelar()">Cancelar</button>
+      <button type="button" class="btn-salvar" (click)="salvar()">Salvar</button>
+    </footer>
   </div>
 </div>

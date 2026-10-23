@@ -1,8 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  HostListener,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Chart, registerables } from 'chart.js';
 import {
   DateKey,
   Expense,
@@ -27,13 +37,28 @@ import { TenantService } from '../../services/tenant-service/tenant-service';
 import { ExpenseCategoryManagerComponent } from '../expense-category-manager/expense-category-manager';
 import { ExpenseFormComponent, ExpenseFormSaveEvent } from '../expense-form/expense-form';
 
-type ExpensesView = 'lista' | 'formulario' | 'categorias';
-type GroupKey = 'vencidas' | 'aVencer' | 'pagas';
+Chart.register(...registerables);
 
-interface GroupView {
-  key: GroupKey;
-  title: string;
+type ExpensesView = 'lista' | 'formulario' | 'categorias';
+type ChipKey = 'todas' | 'a_pagar' | 'pagas' | 'recebidas' | 'revisar';
+
+interface DiaView {
+  chave: DateKey;
+  rotulo: string;
   items: Expense[];
+}
+
+interface FatiaCategoria {
+  categoryId: string;
+  name: string;
+  total: number;
+  percentual: number;
+  cor: string;
+}
+
+interface ChipView {
+  key: ChipKey;
+  label: string;
 }
 
 const EMPTY_GROUPS: MonthGroups = {
@@ -43,13 +68,40 @@ const EMPTY_GROUPS: MonthGroups = {
   totals: { vencidas: 0, aPagarNoMes: 0, pagoNoMes: 0 },
 };
 
-const GROUP_TITLES: Record<GroupKey, string> = {
-  vencidas: 'Vencidas',
-  aVencer: 'A vencer',
-  pagas: 'Pagas',
+// Apresentacao: icone por categoria padrao (systemKey)
+const ICONES_CATEGORIA: Record<string, string> = {
+  compra_mercadoria: '🛒',
+  insumos_embalagem: '📦',
+  aluguel: '🏠',
+  energia_agua_gas: '💡',
+  internet_telefone: '📶',
+  transporte_combustivel: '⛽',
+  pessoal: '👥',
+  impostos_taxas: '🧾',
+  taxas_cartao: '💳',
+  marketing: '📣',
+  manutencao_equipamentos: '🔧',
+  outros: '📌',
 };
 
-const GROUP_KEYS: GroupKey[] = ['vencidas', 'aVencer', 'pagas'];
+// Mesma paleta de grafico do expense-report-panel
+const PALETA_GRAFICO = [
+  '#f4c042',
+  '#3498db',
+  '#2ecc71',
+  '#e74c3c',
+  '#9b59b6',
+  '#f39c12',
+  '#00FF7F',
+];
+
+const CHIPS: ChipView[] = [
+  { key: 'todas', label: 'Todas' },
+  { key: 'a_pagar', label: 'A pagar' },
+  { key: 'pagas', label: 'Pagas' },
+  { key: 'recebidas', label: 'Já recebidas' },
+  { key: 'revisar', label: 'Revisar' },
+];
 
 @Component({
   selector: 'app-expenses',
@@ -64,7 +116,7 @@ const GROUP_KEYS: GroupKey[] = ['vencidas', 'aVencer', 'pagas'];
   templateUrl: './expenses.html',
   styleUrls: ['./expenses.css', './expenses-mobile.css'],
 })
-export class ExpensesComponent implements OnInit {
+export class ExpensesComponent implements OnInit, OnDestroy {
   private expenseService = inject(ExpenseService);
   private categoryService = inject(ExpenseCategoryService);
   private recurrenceService = inject(ExpenseRecurrenceService);
@@ -90,8 +142,13 @@ export class ExpensesComponent implements OnInit {
   filtroAPagarJaRecebida = false;
   filtroRevisar = false;
 
+  readonly chips = CHIPS;
+  menuAbertoId: string | null = null;
+
   grupos: MonthGroups = EMPTY_GROUPS;
-  gruposVisiveis: GroupView[] = [];
+  vencidasVisiveis: Expense[] = [];
+  dias: DiaView[] = [];
+  fatias: FatiaCategoria[] = [];
   categoryIdsInUse: ReadonlySet<string> = new Set<string>();
   despesaEmEdicao: Expense | null = null;
 
@@ -102,9 +159,16 @@ export class ExpensesComponent implements OnInit {
   despesaParaExcluir: Expense | null = null;
   despesaParaEncerrar: Expense | null = null;
 
+  private roscaCanvas?: ElementRef<HTMLCanvasElement>;
+  private rosca?: Chart;
   private despesas: Expense[] = [];
   private series: ExpenseSeries[] = [];
   private categoriaPorId = new Map<string, ExpenseCategory>();
+
+  @ViewChild('roscaCanvas') set roscaRef(ref: ElementRef<HTMLCanvasElement> | undefined) {
+    this.roscaCanvas = ref;
+    this.desenharRosca();
+  }
 
   async ngOnInit(): Promise<void> {
     this.assinarDados();
@@ -112,12 +176,24 @@ export class ExpensesComponent implements OnInit {
     await this.gerarRecorrencias();
   }
 
-  get rotuloMes(): string {
+  ngOnDestroy(): void {
+    this.rosca?.destroy();
+    this.rosca = undefined;
+  }
+
+  get nomeMes(): string {
     const [ano, mesNumero] = this.mes.split('-').map(Number);
-    return new Date(ano, mesNumero - 1, 1).toLocaleDateString('pt-BR', {
-      month: 'long',
-      year: 'numeric',
-    });
+    return new Date(ano, mesNumero - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
+  }
+
+  get rotuloMes(): string {
+    return `${this.nomeMes} ${this.mes.split('-')[0]}`;
+  }
+
+  /** Soma de dois totais ja calculados pelo service (apresentacao). */
+  get totalDoMes(): number {
+    const { aPagarNoMes, pagoNoMes } = this.grupos.totals;
+    return Math.round((aPagarNoMes + pagoNoMes) * 100) / 100;
   }
 
   get ehMesCorrente(): boolean {
@@ -133,8 +209,55 @@ export class ExpensesComponent implements OnInit {
     );
   }
 
+  chipAtivo(chave: ChipKey): boolean {
+    switch (chave) {
+      case 'a_pagar':
+        return (
+          this.filtroStatus === 'a_pagar' && !this.filtroAPagarJaRecebida && !this.filtroRevisar
+        );
+      case 'pagas':
+        return this.filtroStatus === 'pago';
+      case 'recebidas':
+        return this.filtroAPagarJaRecebida;
+      case 'revisar':
+        return this.filtroRevisar;
+      default:
+        return this.filtroStatus === 'todos' && !this.filtroAPagarJaRecebida && !this.filtroRevisar;
+    }
+  }
+
+  selecionarChip(chave: ChipKey): void {
+    this.filtroStatus = chave === 'a_pagar' ? 'a_pagar' : chave === 'pagas' ? 'pago' : 'todos';
+    this.filtroAPagarJaRecebida = chave === 'recebidas';
+    this.filtroRevisar = chave === 'revisar';
+    this.recalcular();
+  }
+
+  rotuloPagamento(despesa: Expense): string {
+    return despesa.paymentMethod ? this.paymentLabels[despesa.paymentMethod] : '';
+  }
+
+  iconeCategoria(id: string): string {
+    const categoria = this.categoriaPorId.get(id);
+    if (categoria?.systemKey && ICONES_CATEGORIA[categoria.systemKey]) {
+      return ICONES_CATEGORIA[categoria.systemKey];
+    }
+    return (categoria?.name ?? '?').trim().charAt(0).toUpperCase() || '?';
+  }
+
+  alternarMenu(despesa: Expense, evento: Event): void {
+    evento.stopPropagation();
+    this.menuAbertoId = this.menuAbertoId === despesa.id ? null : (despesa.id ?? null);
+  }
+
+  @HostListener('document:click')
+  @HostListener('document:keydown.escape')
+  fecharMenu(): void {
+    this.menuAbertoId = null;
+  }
+
   get totalVisivel(): number {
-    return this.gruposVisiveis.reduce((soma, g) => soma + g.items.length, 0);
+    return this.dias.reduce((soma, d) => soma + d.items.length, this.vencidasVisiveis.length);
   }
 
   mudarMes(delta: number): void {
@@ -379,14 +502,97 @@ export class ExpensesComponent implements OnInit {
   private recalcular(): void {
     this.grupos = ExpenseReportService.groupForMonth(this.despesas, this.mes, this.hoje);
     const filtros = this.montarFiltros();
-    this.gruposVisiveis = GROUP_KEYS.map((key) => ({
-      key,
-      title: GROUP_TITLES[key],
-      items: ExpenseReportService.applyFilters(this.grupos[key], filtros),
-    }));
+    this.vencidasVisiveis = ExpenseReportService.applyFilters(this.grupos.vencidas, filtros);
+    const doMes = ExpenseReportService.applyFilters(
+      [...this.grupos.aVencer, ...this.grupos.pagas],
+      filtros,
+    );
+    this.dias = this.agruparPorDia(doMes);
     const emUso = new Set<string>(this.despesas.map((d) => d.categoryId));
     this.series.forEach((s) => emUso.add(s.template.categoryId));
     this.categoryIdsInUse = emUso;
+    this.fatias = this.montarFatias();
+    this.desenharRosca();
+  }
+
+  /** Dia de agrupamento: pago usa paidDate (o que o coloca no mes); a pagar usa dueDate. */
+  private diaDe(despesa: Expense): DateKey {
+    return despesa.status === 'pago' && despesa.paidDate ? despesa.paidDate : despesa.dueDate;
+  }
+
+  private agruparPorDia(lista: Expense[]): DiaView[] {
+    const ordenada = [...lista].sort((a, b) => this.diaDe(a).localeCompare(this.diaDe(b)));
+    const dias: DiaView[] = [];
+    for (const despesa of ordenada) {
+      const dia = this.diaDe(despesa);
+      const ultimo = dias[dias.length - 1];
+      if (ultimo && ultimo.chave === dia) {
+        ultimo.items.push(despesa);
+      } else {
+        dias.push({ chave: dia, rotulo: this.rotuloDia(dia), items: [despesa] });
+      }
+    }
+    return dias;
+  }
+
+  private rotuloDia(data: DateKey): string {
+    if (data === this.hoje) {
+      return 'Hoje';
+    }
+    if (data === ExpenseScheduleService.addDays(this.hoje, 1)) {
+      return 'Amanhã';
+    }
+    const [ano, mesNumero, dia] = data.split('-').map(Number);
+    return new Date(ano, mesNumero - 1, dia).toLocaleDateString('pt-BR', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'long',
+    });
+  }
+
+  private montarFatias(): FatiaCategoria[] {
+    const inicio: DateKey = `${this.mes}-01`;
+    const linhas = ExpenseReportService.breakdownPorCategoria(
+      this.despesas,
+      this.categorias,
+      inicio,
+      ExpenseScheduleService.endOfMonth(inicio),
+    );
+    const soma = linhas.reduce((acc, l) => acc + l.total, 0);
+    return linhas.map((l, indice) => ({
+      categoryId: l.categoryId,
+      name: l.name,
+      total: l.total,
+      percentual: soma > 0 ? (l.total / soma) * 100 : 0,
+      cor: PALETA_GRAFICO[indice % PALETA_GRAFICO.length],
+    }));
+  }
+
+  private desenharRosca(): void {
+    this.rosca?.destroy();
+    this.rosca = undefined;
+    const canvas = this.roscaCanvas?.nativeElement;
+    if (!canvas || this.fatias.length === 0) {
+      return;
+    }
+    this.rosca = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: this.fatias.map((f) => f.name),
+        datasets: [
+          {
+            data: this.fatias.map((f) => f.total),
+            backgroundColor: this.fatias.map((f) => f.cor),
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        cutout: '65%',
+        plugins: { legend: { display: false } },
+        maintainAspectRatio: false,
+      },
+    });
   }
 
   private montarFiltros(): ExpenseFilters {

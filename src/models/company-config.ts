@@ -1,5 +1,7 @@
 export interface NotificationConfig {
   aniversario: boolean;
+  despesasVencendo: boolean;
+  parcelasVencendo: boolean;
 }
 
 export interface ModuleConfig {
@@ -21,6 +23,8 @@ export interface CompanyConfig {
 
 export const DEFAULT_NOTIFICATIONS: NotificationConfig = {
   aniversario: true,
+  despesasVencendo: true,
+  parcelasVencendo: true,
 };
 
 export const DEFAULT_MODULES: ModuleConfig = {

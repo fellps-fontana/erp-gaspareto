@@ -122,7 +122,7 @@
              (keydown.enter)="abrirDetalhe('faturamento', 'vendas')">
           <span class="kpi-label">Faturamento</span>
           <strong class="kpi-value">R$ {{ relatorio.faturamento | number:'1.2-2' }}</strong>
-          <small class="kpi-meta">{{ relatorio.qtdVendas }} vendas</small>
+          <small class="kpi-meta">{{ legendaVendasCard }}</small>
         </div>
 
         <div class="card kpi-custo kpi-clicavel" role="button" tabindex="0" title="Ver detalhes"

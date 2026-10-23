@@ -297,6 +297,17 @@ export function calcularCards(vendas: readonly VendaFiltrada[]): CardsRelatorio 
   };
 }
 
+/** Soma item.quantity dos itens do produto (unidades ou kg, 3 casas) nas vendas filtradas. */
+export function somarQuantidadeDoProduto(
+  vendas: readonly VendaFiltrada[],
+  produtoId: string,
+): number {
+  const milesimos = itensDe(vendas)
+    .filter((item) => item.idProduct === produtoId)
+    .reduce((acc, item) => acc + paraMilesimos(item.quantity), 0);
+  return deMilesimos(milesimos);
+}
+
 // ---------- modal Faturamento ----------
 
 /** 'produto' se filtro.produtoId nao vazio, senao 'geral'. */
