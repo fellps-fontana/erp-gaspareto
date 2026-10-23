@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, Injector, OnDestroy, OnInit, afterNextRender, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -116,6 +116,7 @@ export interface HistoricoItem {
 export class ProductInventoryComponent implements OnInit, OnDestroy {
   readonly config = inject(ConfigService);
   private geocodingService = inject(GeocodingService);
+  private injector = inject(Injector);
 
   // Controle das Abas
   activeTab: 'relatorio' | 'estoque' | 'clientes' | 'historico' | 'vendedores' = 'relatorio';
@@ -793,7 +794,7 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     if (this.mesDetalheAberto !== null) {
       this.movimentosMesDetalhe = listarMovimentoDoMes(this.orders, this.anoPanorama, this.mesDetalheAberto, hoje);
     }
-    setTimeout(() => this.renderReceberChart());
+    afterNextRender(() => this.renderReceberChart(), { injector: this.injector });
   }
 
   private lerToken(nome: string): string {
@@ -883,7 +884,7 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
 
   /** Canvas dentro de *ngIf só existe após o render: cria os gráficos num tick seguinte. */
   private agendarGraficosVendas() {
-    setTimeout(() => this.renderCharts());
+    afterNextRender(() => this.renderCharts(), { injector: this.injector });
   }
 
   renderCharts() {
@@ -1096,7 +1097,7 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     }
 
     this.montarCabecalhoDetalhe(balanco);
-    setTimeout(() => this.renderGraficosDetalhe());
+    afterNextRender(() => this.renderGraficosDetalhe(), { injector: this.injector });
   }
 
   /** Período + filtros ativos do escopo (Balanço só tem período). */
