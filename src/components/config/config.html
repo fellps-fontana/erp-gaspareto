@@ -59,6 +59,46 @@
           <span class="slider"></span>
         </label>
       </li>
+
+      <li
+        class="module-item module-item--sub"
+        [class.module-item--saving]="saving() === 'notificacoes'"
+      >
+        <div class="module-info">
+          <span class="module-label">Despesas a vencer</span>
+          <span class="module-description">Aviso na Home de despesas a pagar vencendo ou vencidas (exige o módulo Despesas)</span>
+        </div>
+        <label class="switch">
+          <input
+            type="checkbox"
+            [checked]="config.modules().notificacoes.despesasVencendo"
+            [disabled]="saving() !== null"
+            (change)="toggleNotificacaoDespesas()"
+            aria-label="Ativar ou desativar notificação de despesas a vencer"
+          />
+          <span class="slider"></span>
+        </label>
+      </li>
+
+      <li
+        class="module-item module-item--sub"
+        [class.module-item--saving]="saving() === 'notificacoes'"
+      >
+        <div class="module-info">
+          <span class="module-label">Parcelas de clientes a vencer</span>
+          <span class="module-description">Aviso na Home de parcelas de pedidos vencendo ou vencidas (exige o módulo Pedidos)</span>
+        </div>
+        <label class="switch">
+          <input
+            type="checkbox"
+            [checked]="config.modules().notificacoes.parcelasVencendo"
+            [disabled]="saving() !== null"
+            (change)="toggleNotificacaoParcelas()"
+            aria-label="Ativar ou desativar notificação de parcelas de clientes a vencer"
+          />
+          <span class="slider"></span>
+        </label>
+      </li>
     </ul>
 
     <button class="btn-voltar" [routerLink]="['/']">⬅ Voltar</button>
