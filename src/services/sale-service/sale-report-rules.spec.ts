@@ -34,6 +34,7 @@ import {
   ROTULO_PRODUTO_SEM_NOME,
   ROTULO_SEM_CLIENTE,
   serieDiaria,
+  somarQuantidadeDoProduto,
   valorDoItem,
   VendaFiltrada,
   VendaRelatorio
@@ -591,6 +592,48 @@ describe('calcularCards', () => {
 
   it('lista vazia devolve tudo zero', () => {
     expect(calcularCards([])).toEqual({ faturamento: 0, custoTotal: 0, lucro: 0, qtdVendas: 0, margem: 0 });
+  });
+});
+
+// ---------- quantidade vendida do produto ----------
+
+describe('somarQuantidadeDoProduto', () => {
+  it('soma unidades do produto em todas as vendas', () => {
+    const vs = [
+      vf('a', [item({ idProduct: 'p-pizza', quantity: 2 })]),
+      vf('b', [item({ idProduct: 'p-pizza', quantity: 3 })])
+    ];
+    expect(somarQuantidadeDoProduto(vs, 'p-pizza')).toBe(5);
+  });
+
+  it('soma kg com decimais: 2.5 + 0.25 = 2.75', () => {
+    const vs = [
+      vf('a', [item({ idProduct: 'p-queijo', productName: 'Queijo', quantity: 2.5, soldByWeight: true })]),
+      vf('b', [item({ idProduct: 'p-queijo', productName: 'Queijo', quantity: 0.25, soldByWeight: true })])
+    ];
+    expect(somarQuantidadeDoProduto(vs, 'p-queijo')).toBe(2.75);
+  });
+
+  it('sem erro de ponto flutuante: 0.1 + 0.2 = 0.3', () => {
+    const vs = [
+      vf('a', [item({ idProduct: 'p-queijo', productName: 'Queijo', quantity: 0.1, soldByWeight: true })]),
+      vf('b', [item({ idProduct: 'p-queijo', productName: 'Queijo', quantity: 0.2, soldByWeight: true })])
+    ];
+    expect(somarQuantidadeDoProduto(vs, 'p-queijo')).toBe(0.3);
+  });
+
+  it('ignora itens de outro produto', () => {
+    const vs = [
+      vf('a', [
+        item({ idProduct: 'p-pizza', quantity: 4 }),
+        item({ idProduct: 'p-refri', productName: 'Refrigerante', quantity: 9 })
+      ])
+    ];
+    expect(somarQuantidadeDoProduto(vs, 'p-pizza')).toBe(4);
+  });
+
+  it('lista vazia devolve 0', () => {
+    expect(somarQuantidadeDoProduto([], 'p-pizza')).toBe(0);
   });
 });
 

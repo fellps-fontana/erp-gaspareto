@@ -23,6 +23,9 @@ const TOKENS_PALETA = ['--color-primary', '--color-info', '--color-secondary-dar
 
 const CARDS_VAZIOS: CardsRelatorio = { faturamento: 0, custoTotal: 0, lucro: 0, qtdVendas: 0, margem: 0 };
 
+/** Quantidade vendida no card (kg ate 3 casas, sem zeros a direita; pt-BR com virgula). */
+const FORMATO_QUANTIDADE_VENDIDA = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
+
 // Models e Services
 import { Product } from '../../models/product-model';
 import { Customer } from '../../models/customer-model';
@@ -60,7 +63,8 @@ import {
   CardsRelatorio, DetalheFaturamento, FatiaProduto, FiltroRelatorio, LinhaCmv, LinhaLucro, ModoTop,
   NomesClientes, OrigemVenda, ProdutosPorId, RankingQuantidade, VendaFiltrada, VendaRelatorio,
   calcularCards, filtrarVendas, filtroSomentePeriodo, modoTopEfetivo, montarDetalheCmv,
-  montarDetalheFaturamento, montarDetalheLucro, rankingTopQuantidade, serieDiaria
+  montarDetalheFaturamento, montarDetalheLucro, rankingTopQuantidade, serieDiaria,
+  somarQuantidadeDoProduto
 } from '../../services/sale-service/sale-report-rules';
 
 // --- HISTÓRICO GERAL: item de produto dentro de um lançamento unificado ---
@@ -951,6 +955,23 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
         }
       }
     });
+  }
+
+  // --- CARD FATURAMENTO (sub-aba Vendas) ---
+
+  /** Sem produto no filtro: "N vendas". Com produto: quantidade vendida dele ("20 kg de Queijo" / "5 un de Pizza"). */
+  get legendaVendasCard(): string {
+    if (!this.filtroProdutoId) {
+      return `${this.relatorio.qtdVendas} vendas`;
+    }
+    const produto = this.products.find(p => p.id === this.filtroProdutoId);
+    const itemDoProduto = this.vendasFiltradas
+      .flatMap(venda => venda.itens)
+      .find(item => item.idProduct === this.filtroProdutoId);
+    const porPeso = produto?.soldByWeight ?? itemDoProduto?.soldByWeight ?? false;
+    const quantidade = somarQuantidadeDoProduto(this.vendasFiltradas, this.filtroProdutoId);
+    const nome = produto?.title ?? itemDoProduto?.productName ?? '';
+    return `${FORMATO_QUANTIDADE_VENDIDA.format(quantidade)} ${porPeso ? 'kg' : 'un'} de ${nome}`;
   }
 
   // --- TOP 5 PRODUTOS (unidade x kg) ---
