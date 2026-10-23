@@ -484,4 +484,37 @@
     align-items: flex-start;
     gap: 0.15rem;
   }
+
+  /* Modal de detalhe do Relatório (Faturamento/CMV/Lucro Bruto): tabelas rolam na
+     horizontal dentro do wrapper, pizza e legenda empilham. */
+  .detalhe-relatorio-modal {
+    padding: 1.25rem;
+    max-height: 92vh;
+  }
+
+  .detalhe-pizza {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .detalhe-pizza-canvas {
+    width: 100%;
+    max-width: 14rem;
+    align-self: center;
+  }
+
+  .detalhe-tabela th,
+  .detalhe-tabela td {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.8rem;
+  }
+
+  .detalhe-rodape-valor {
+    font-size: 1.15rem;
+  }
+
+  .top-cabecalho {
+    flex-direction: column;
+    gap: 0;
+  }
 }

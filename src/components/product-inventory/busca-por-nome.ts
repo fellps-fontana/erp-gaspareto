@@ -1,5 +1,5 @@
 /**
- * Regra pura de busca por texto nas listas da tela de Estoque/Clientes/Compras.
+ * Regra pura de busca por texto nas listas da tela de Estoque/Clientes.
  *
  * É regra de EXIBIÇÃO, não crítica: não toca estoque, dinheiro nem transição
  * de estado. Sem Angular e sem Firestore — funções puras, testáveis isoladas.

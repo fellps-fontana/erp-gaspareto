@@ -23,7 +23,7 @@ service cloud.firestore {
     }
 
     function isOperationalCollection(collection) {
-      return collection in ['products', 'sales', 'comandas', 'orders', 'bills', 'customers', 'purchases', 'purchaseProducts', 'vendedores'];
+      return collection in ['products', 'sales', 'comandas', 'orders', 'bills', 'customers', 'purchases', 'purchaseProducts', 'vendedores', 'expenses', 'expenseCategories', 'expenseSeries', 'recurringOrders'];
     }
 
     match /users/{uid} {

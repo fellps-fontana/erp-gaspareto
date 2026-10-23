@@ -285,6 +285,9 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
       'customers',
       'purchases',
       'purchaseProducts',
+      'expenses',
+      'expenseCategories',
+      'expenseSeries',
     ];
 
     collections.forEach((collName) => {
@@ -311,6 +314,9 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
       'customers',
       'purchases',
       'purchaseProducts',
+      'expenses',
+      'expenseCategories',
+      'expenseSeries',
     ];
 
     collections.forEach((collName) => {
@@ -675,6 +681,372 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
 
         const updateRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-001');
         await assertSucceeds(updateDoc(updateRef, { name: 'Vendedor A Atualizado' }));
+      });
+    });
+  });
+
+  describe('Colecoes de Despesas (expenses, expenseCategories, expenseSeries) - operacionais multi-tenant', () => {
+    const colecoesDespesas = ['expenses', 'expenseCategories', 'expenseSeries'];
+
+    const payloadPorColecao: Record<string, (companyId: string) => Record<string, any>> = {
+      expenses: (companyId) => ({
+        description: 'Aluguel',
+        value: 1500,
+        categoryId: `${companyId}_aluguel`,
+        dueDate: '2026-10-10',
+        status: 'a_pagar',
+        origin: 'manual',
+        companyId,
+      }),
+      expenseCategories: (companyId) => ({
+        name: 'Aluguel',
+        type: 'despesa_operacional',
+        archived: false,
+        companyId,
+      }),
+      expenseSeries: (companyId) => ({
+        active: true,
+        period: 'mensal',
+        anchorDate: '2026-10-10',
+        template: {
+          description: 'Internet',
+          value: 120,
+          categoryId: `${companyId}_internet_telefone`,
+        },
+        companyId,
+      }),
+    };
+
+    const campoAtualizavelPorColecao: Record<string, Record<string, any>> = {
+      expenses: { status: 'pago', paidDate: '2026-10-12' },
+      expenseCategories: { archived: true },
+      expenseSeries: { active: false },
+    };
+
+    const semeiaDocSemRegras = async (collName: string, docId: string, data: Record<string, any>) => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), collName, docId), data);
+      });
+    };
+
+    colecoesDespesas.forEach((collName) => {
+      describe(`Colecao ${collName}`, () => {
+        it(`owner de company A pode criar, ler, atualizar e excluir doc da propria empresa em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const docRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertSucceeds(setDoc(docRef, payloadPorColecao[collName]('company-a')));
+          await assertSucceeds(getDoc(docRef));
+          await assertSucceeds(updateDoc(docRef, campoAtualizavelPorColecao[collName]));
+          await assertSucceeds(deleteDoc(docRef));
+        });
+
+        it(`usuario de company A lista em ${collName} apenas docs da propria empresa`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-a', payloadPorColecao[collName]('company-a'));
+          await semeiaDocSemRegras(collName, 'doc-b', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const q = query(
+            collection(contextCompanyA.firestore(), collName),
+            where('companyId', '==', 'company-a')
+          );
+          const result = await assertSucceeds(getDocs(q));
+          expect(result.size).toBe(1);
+        });
+
+        it(`usuario de company A nao pode criar doc com companyId de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const docRef = doc(contextCompanyA.firestore(), collName, 'doc-cross');
+          await assertFails(setDoc(docRef, payloadPorColecao[collName]('company-b')));
+        });
+
+        it(`usuario de company A nao pode ler doc de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const readRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertFails(getDoc(readRef));
+        });
+
+        it(`usuario de company A nao pode listar docs de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const q = query(
+            collection(contextCompanyA.firestore(), collName),
+            where('companyId', '==', 'company-b')
+          );
+          await assertFails(getDocs(q));
+        });
+
+        it(`usuario de company A nao pode atualizar doc de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const updateRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertFails(updateDoc(updateRef, campoAtualizavelPorColecao[collName]));
+        });
+
+        it(`usuario de company A nao pode excluir doc de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const deleteRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertFails(deleteDoc(deleteRef));
+        });
+
+        it(`owner de company A nao pode trocar companyId de doc existente em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-a'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const updateRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertFails(updateDoc(updateRef, { companyId: 'company-b' }));
+        });
+
+        it(`usuario anonimo (sem auth) nao pode ler doc em ${collName}`, async () => {
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-a'));
+
+          const anonimo = testEnv.unauthenticatedContext();
+          const readRef = doc(anonimo.firestore(), collName, 'doc-001');
+          await assertFails(getDoc(readRef));
+        });
+
+        it(`usuario anonimo (sem auth) nao pode criar doc em ${collName}`, async () => {
+          const anonimo = testEnv.unauthenticatedContext();
+          const docRef = doc(anonimo.firestore(), collName, 'doc-anon');
+          await assertFails(setDoc(docRef, payloadPorColecao[collName]('company-a')));
+        });
+
+        it(`usuario anonimo (sem auth) nao pode atualizar doc em ${collName}`, async () => {
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-a'));
+
+          const anonimo = testEnv.unauthenticatedContext();
+          const updateRef = doc(anonimo.firestore(), collName, 'doc-001');
+          await assertFails(updateDoc(updateRef, campoAtualizavelPorColecao[collName]));
+        });
+
+        it(`usuario anonimo (sem auth) nao pode excluir doc em ${collName}`, async () => {
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-a'));
+
+          const anonimo = testEnv.unauthenticatedContext();
+          const deleteRef = doc(anonimo.firestore(), collName, 'doc-001');
+          await assertFails(deleteDoc(deleteRef));
+        });
+
+        it(`super-admin pode ler, criar, atualizar e excluir doc de outra empresa em ${collName}`, async () => {
+          await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+          await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+          const docRef = doc(contextSuperAdmin.firestore(), collName, 'doc-001');
+          const lido = await assertSucceeds(getDoc(docRef));
+          expect(lido.exists()).toBe(true);
+
+          const docNovo = doc(contextSuperAdmin.firestore(), collName, 'doc-cross');
+          await assertSucceeds(setDoc(docNovo, payloadPorColecao[collName]('company-b')));
+          await assertSucceeds(updateDoc(docRef, campoAtualizavelPorColecao[collName]));
+          await assertSucceeds(deleteDoc(docRef));
+        });
+
+        it(`super-admin nao pode trocar companyId de doc existente em ${collName}, mesmo com bypass`, async () => {
+          await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+          const updateRef = doc(contextSuperAdmin.firestore(), collName, 'doc-001');
+          await assertFails(updateDoc(updateRef, { companyId: 'company-admin' }));
+        });
+      });
+    });
+  });
+
+  describe('Cobertura de colecao recurringOrders - operacional multi-tenant', () => {
+    // Seed feito com regras desabilitadas para que o cenario de leitura/escrita
+    // cross-tenant seja avaliado pelas regras, nao pelo proprio seed.
+    const semeiaRecurringOrder = async (docId: string, companyId: string) => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), 'recurringOrders', docId), {
+          companyId,
+          status: 'active',
+          createdAt: Timestamp.now(),
+        });
+      });
+    };
+
+    describe('Escrita same-tenant recurringOrders (deve ser PERMITIDA)', () => {
+      it('usuario de company A pode criar doc em recurringOrders com seu companyId', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const docRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-001');
+        await assertSucceeds(
+          setDoc(docRef, {
+            companyId: 'company-a',
+            status: 'active',
+          })
+        );
+      });
+
+      it('usuario de company A pode atualizar doc de company A em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaRecurringOrder('recurring-001', 'company-a');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const updateRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-001');
+        await assertSucceeds(updateDoc(updateRef, { status: 'paused' }));
+      });
+
+      it('usuario de company A pode deletar doc de company A em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaRecurringOrder('recurring-001', 'company-a');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const deleteRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-001');
+        await assertSucceeds(deleteDoc(deleteRef));
+      });
+    });
+
+    describe('Leitura same-tenant recurringOrders (deve ser PERMITIDA)', () => {
+      it('usuario de company A pode ler doc de company A em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaRecurringOrder('recurring-001', 'company-a');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const readRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-001');
+        const result = await assertSucceeds(getDoc(readRef));
+        expect(result.exists()).toBe(true);
+      });
+
+      it('usuario de company A pode fazer query com docs de sua company em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaRecurringOrder('recurring-001', 'company-a');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const q = query(
+          collection(contextCompanyA.firestore(), 'recurringOrders'),
+          where('companyId', '==', 'company-a')
+        );
+        const result = await assertSucceeds(getDocs(q));
+        expect(result.size).toBe(1);
+      });
+    });
+
+    describe('Cross-tenant recurringOrders (deve ser NEGADO)', () => {
+      it('usuario de company A nao pode ler doc de company B em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaRecurringOrder('recurring-b', 'company-b');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const readRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-b');
+        await assertFails(getDoc(readRef));
+      });
+
+      it('usuario de company A nao pode criar doc com companyId de company B em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const docRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-cross');
+        await assertFails(
+          setDoc(docRef, {
+            companyId: 'company-b',
+            status: 'active',
+          })
+        );
+      });
+
+      it('usuario de company A nao pode atualizar doc de company B em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaRecurringOrder('recurring-b', 'company-b');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const updateRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-b');
+        await assertFails(updateDoc(updateRef, { status: 'paused' }));
+      });
+
+      it('usuario de company A nao pode deletar doc de company B em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaRecurringOrder('recurring-b', 'company-b');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const deleteRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-b');
+        await assertFails(deleteDoc(deleteRef));
+      });
+    });
+
+    describe('Imutabilidade do companyId em recurringOrders (deve ser NEGADA)', () => {
+      it('usuario de company A nao pode trocar o companyId do proprio doc em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+        await semeiaRecurringOrder('recurring-001', 'company-a');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const updateRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-001');
+        await assertFails(updateDoc(updateRef, { companyId: 'company-b' }));
+      });
+    });
+
+    describe('Super-admin em recurringOrders (mesmo padrao das colecoes operacionais)', () => {
+      it('super-admin pode ler doc de outra empresa em recurringOrders', async () => {
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+        await semeiaRecurringOrder('recurring-b', 'company-b');
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const readRef = doc(contextSuperAdmin.firestore(), 'recurringOrders', 'recurring-b');
+        const result = await assertSucceeds(getDoc(readRef));
+        expect(result.exists()).toBe(true);
+      });
+
+      it('super-admin pode criar doc em recurringOrders de outra empresa', async () => {
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const docRef = doc(contextSuperAdmin.firestore(), 'recurringOrders', 'recurring-cross');
+        await assertSucceeds(setDoc(docRef, { companyId: 'company-b', status: 'active' }));
+      });
+
+      it('super-admin pode atualizar doc de outra empresa em recurringOrders', async () => {
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+        await semeiaRecurringOrder('recurring-b', 'company-b');
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const updateRef = doc(contextSuperAdmin.firestore(), 'recurringOrders', 'recurring-b');
+        await assertSucceeds(updateDoc(updateRef, { status: 'paused' }));
+      });
+
+      it('super-admin pode deletar doc de outra empresa em recurringOrders', async () => {
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+        await semeiaRecurringOrder('recurring-b', 'company-b');
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const deleteRef = doc(contextSuperAdmin.firestore(), 'recurringOrders', 'recurring-b');
+        await assertSucceeds(deleteDoc(deleteRef));
+      });
+
+      it('super-admin NAO pode trocar o companyId de um doc em recurringOrders no update', async () => {
+        await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+        await semeiaRecurringOrder('recurring-b', 'company-b');
+
+        const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+        const updateRef = doc(contextSuperAdmin.firestore(), 'recurringOrders', 'recurring-b');
+        await assertFails(updateDoc(updateRef, { companyId: 'company-admin' }));
+      });
+
+      it('usuario comum (isSuperAdmin false) continua negado ao ler doc de outra empresa em recurringOrders', async () => {
+        await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner', false);
+        await semeiaRecurringOrder('recurring-b', 'company-b');
+
+        const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+        const readRef = doc(contextCompanyA.firestore(), 'recurringOrders', 'recurring-b');
+        await assertFails(getDoc(readRef));
       });
     });
   });

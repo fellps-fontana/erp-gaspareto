@@ -223,3 +223,52 @@ textarea:focus {
 .erp-toast--success { background-color: #27ae60; }
 .erp-toast--error   { background-color: #e74c3c; }
 .erp-toast--warning { background-color: #f39c12; }
+
+/* ── Botão padrão de fechar modal (canto superior direito) ── */
+.modal-content,
+.checkout-modal,
+.panel-content {
+  position: relative;
+}
+
+.modal-fechar {
+  position: absolute;
+  top: var(--sp-sm);
+  right: var(--sp-sm);
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.modal-fechar:hover:not(:disabled) {
+  color: var(--color-primary);
+  background: var(--bg-muted);
+}
+
+.modal-fechar:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.modal-fechar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Título do modal não pode ficar sob o X */
+.modal-fechar ~ h2,
+.modal-fechar ~ h3 {
+  padding-inline: 40px;
+}

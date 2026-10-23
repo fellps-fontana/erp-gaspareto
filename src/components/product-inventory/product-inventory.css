@@ -424,6 +424,27 @@ h1 {
   border-left: 6px solid var(--color-danger);
 }
 
+.kpi-clicavel {
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.kpi-clicavel:hover {
+  transform: translateY(-2px);
+}
+
+.kpi-clicavel:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.formula-nota {
+  display: block;
+  margin-top: 0.8rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .kpi-prejuizo {
   background: var(--bg-card);
   border-left: 6px solid var(--color-danger);
@@ -1951,4 +1972,308 @@ input[type="color"] {
     padding-top: 0.5rem;
     border-top: 1px solid var(--border-color);
   }
+}
+
+/* ==========================================================
+   SUB-ABA A RECEBER (panorama anual)
+   ========================================================== */
+.receber-chart { margin-top: 1.25rem; }
+
+.receber-mes-modal {
+  max-width: 560px;
+  max-height: 85vh;
+}
+
+.receber-mes-lista {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.receber-mes-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.receber-mes-info {
+  flex: 1;
+  min-width: 8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.receber-mes-cliente { font-weight: 600; color: var(--text-primary); }
+.receber-mes-meta { font-size: 0.78rem; color: var(--text-muted); }
+.receber-mes-valor { color: var(--text-primary); white-space: nowrap; }
+.receber-mes-vazio { text-align: center; color: var(--text-muted); margin: 0 0 16px; }
+
+.mov-tipo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentColor;
+}
+.mov-tipo.recebido { color: var(--color-success); }
+.mov-tipo.previsto { color: var(--color-info); }
+.mov-tipo.vencido { color: var(--color-danger); }
+
+.kpi-value-success { color: var(--color-success); }
+.kpi-value-info { color: var(--color-info); }
+
+/* ==========================================================
+   RELATÓRIO: CARDS CLICÁVEIS + MODAIS DE DETALHE
+   ========================================================== */
+.kpi-clicavel {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kpi-clicavel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+
+.kpi-clicavel:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Top 5: cabeçalho com título + alternância Unidades | Kg */
+.top-cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
+}
+
+.top-toggle {
+  display: inline-flex;
+  gap: var(--sp-xs);
+  margin-bottom: 15px;
+}
+
+.top-toggle button {
+  background: var(--bg-input);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  padding: 4px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.top-toggle button:hover { color: var(--text-primary); }
+
+.top-toggle button.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-on-primary);
+  font-weight: 700;
+}
+
+/* Subtotal "= Lucro Bruto" na Composição do Resultado */
+.formula-subtotal {
+  border-top: 1px dashed var(--border-color);
+  margin-top: var(--sp-xs);
+  padding-top: var(--sp-sm);
+  font-weight: 700;
+}
+
+.formula-subtotal .formula-valor.positivo,
+.formula-subtotal .formula-valor.negativo { font-weight: 800; }
+
+/* Modal de detalhe do Relatório */
+.detalhe-relatorio-modal {
+  max-width: 860px;
+  max-height: 90vh;
+}
+
+.detalhe-contexto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  margin: -8px 0 var(--sp-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.detalhe-filtro-tag {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.detalhe-corpo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.detalhe-vazio {
+  text-align: center;
+  color: var(--text-muted);
+  margin: var(--sp-md) 0;
+}
+
+.detalhe-aviso {
+  margin: 0;
+  padding: var(--sp-sm) var(--sp-md);
+  border: 1px solid var(--color-warning);
+  border-left-width: 6px;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+.detalhe-pizza {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-lg);
+  flex-wrap: wrap;
+}
+
+.detalhe-pizza-canvas {
+  position: relative;
+  width: 14rem;
+  height: 14rem;
+  flex: 0 0 auto;
+}
+
+.detalhe-legenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.detalhe-legenda li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  font-size: 0.9rem;
+}
+
+.legenda-cor {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-sm);
+  flex: 0 0 auto;
+}
+
+.legenda-nome { flex: 1; color: var(--text-primary); }
+.legenda-pct { color: var(--text-secondary); white-space: nowrap; }
+
+.detalhe-barras {
+  position: relative;
+  height: 14rem;
+}
+
+.detalhe-tabela-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.detalhe-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.detalhe-tabela th,
+.detalhe-tabela td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.detalhe-tabela th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detalhe-tabela tbody tr:last-child td { border-bottom: none; }
+.detalhe-tabela .num { text-align: right; }
+.detalhe-tabela td.negativo { color: var(--color-danger); font-weight: 700; }
+
+/* CMV: linha sem custo cadastrado (CMV subestimado) */
+.detalhe-tabela tr.custo-zero td {
+  background: var(--bg-input);
+}
+
+.detalhe-tabela tr.custo-zero td:first-child { border-left: 4px solid var(--color-warning); }
+
+.selo-sem-custo {
+  margin-left: var(--sp-sm);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-warning);
+  color: var(--color-warning);
+}
+
+/* Origem da venda: PDV x Pedido */
+.origem-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentColor;
+}
+.origem-tag.pdv { color: var(--color-info); }
+.origem-tag.order { color: var(--color-primary-dark); }
+
+.detalhe-rodape {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: var(--sp-md) 0;
+  padding-top: var(--sp-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.detalhe-rodape-label {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.85rem;
+}
+
+.detalhe-rodape-valor {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
 }

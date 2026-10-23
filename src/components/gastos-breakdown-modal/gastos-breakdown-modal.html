@@ -1,0 +1,51 @@
+@if (open) {
+  <div class="gastos-backdrop" (click)="fechar()">
+    <div class="gastos-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <button
+        type="button"
+        class="modal-fechar"
+        aria-label="Fechar"
+        title="Fechar"
+        (click)="fechar()"
+      >
+        ✕
+      </button>
+      <header class="gastos-header">
+        <h3>Gastos do período</h3>
+      </header>
+
+      <div class="gastos-total">
+        <span>Despesas operacionais</span>
+        <strong>R$ {{ totalOperacional | number: '1.2-2' }}</strong>
+      </div>
+
+      @if (operacionais.length === 0) {
+        <p class="gastos-vazio">Nenhuma despesa operacional com vencimento neste período.</p>
+      } @else {
+        <ul class="gastos-lista">
+          @for (l of operacionais; track l.categoryId) {
+            <li class="gastos-linha">
+              <span class="gastos-nome">{{ l.name }}</span>
+              <span class="gastos-pct">{{ l.percentual | number: '1.1-1' }}%</span>
+              <strong class="gastos-valor">R$ {{ l.total | number: '1.2-2' }}</strong>
+              <span class="gastos-barra">
+                <span class="gastos-barra-fill" [style.width.%]="l.percentual"></span>
+              </span>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="gastos-cmv">
+        <div class="gastos-cmv-topo">
+          <span class="gastos-cmv-tag">Já incluso no CMV</span>
+          <strong>R$ {{ totalCustoProducao | number: '1.2-2' }}</strong>
+        </div>
+        <p class="gastos-cmv-nota">
+          Custo de produção (compra de mercadoria, insumos). Apenas informativo: não entra nas
+          despesas operacionais nem no Resultado.
+        </p>
+      </div>
+    </div>
+  </div>
+}

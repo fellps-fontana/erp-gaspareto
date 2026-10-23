@@ -1,0 +1,34 @@
+@media (max-width: 600px) {
+  .form-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .form-modal {
+    width: 100%;
+    border-radius: 0;
+  }
+
+  .form-header,
+  .form-body,
+  .form-actions {
+    padding-inline: var(--sp-md);
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modo-tabs button {
+    min-height: 44px;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .btn-cancelar,
+  .btn-salvar {
+    width: 100%;
+  }
+}

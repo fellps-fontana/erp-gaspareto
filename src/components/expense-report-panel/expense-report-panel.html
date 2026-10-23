@@ -1,0 +1,35 @@
+<section class="despesas-panel">
+  <div class="despesas-card">
+    <h3 class="despesas-titulo">Despesas por categoria no período</h3>
+    <p class="despesas-sub">Competência (vencimento). Operacional e custo de produção.</p>
+
+    @if (semDados) {
+      <p class="despesas-vazio">Nenhuma despesa com vencimento neste período.</p>
+    }
+    <div class="pizza-layout" [hidden]="semDados">
+      <div class="chart-box pizza-box">
+        <canvas #pizzaCanvas></canvas>
+      </div>
+      <ul class="legenda">
+        @for (l of legenda; track l.categoryId) {
+          <li class="legenda-item">
+            <span class="legenda-cor" [style.background]="l.cor"></span>
+            <span class="legenda-nome">{{ l.name }}</span>
+            <span class="tag-tipo" [class.tag-producao]="l.type === 'custo_producao'">
+              {{ l.rotuloTipo }}
+            </span>
+            <strong class="legenda-valor">R$ {{ l.total | number: '1.2-2' }}</strong>
+          </li>
+        }
+      </ul>
+    </div>
+  </div>
+
+  <div class="despesas-card">
+    <h3 class="despesas-titulo">Últimos 12 meses</h3>
+    <p class="despesas-sub">Total por mês de vencimento, empilhado por tipo.</p>
+    <div class="chart-box barras-box">
+      <canvas #barrasCanvas></canvas>
+    </div>
+  </div>
+</section>

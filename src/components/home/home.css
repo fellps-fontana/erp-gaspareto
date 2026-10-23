@@ -356,6 +356,47 @@
   font-size: 0.9rem;
 }
 
+.notif-panel__section + .notif-panel__section {
+  margin-top: var(--sp-md);
+}
+
+.notif-panel__link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.notif-panel__link:hover {
+  border-color: var(--color-primary);
+}
+
+.notif-panel__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.notif-panel__due {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.notif-panel__value {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.notif-panel__value--danger {
+  color: var(--color-danger);
+}
+
+.notif-panel__hint {
+  margin: var(--sp-md) 0 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
 .notif-panel__empty {
   margin: 0;
   padding: var(--sp-sm) var(--sp-md);

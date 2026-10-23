@@ -1,5 +1,7 @@
 export interface NotificationConfig {
   aniversario: boolean;
+  despesasVencendo: boolean;
+  parcelasVencendo: boolean;
 }
 
 export interface ModuleConfig {
@@ -9,7 +11,6 @@ export interface ModuleConfig {
   rotas: boolean;
   contas: boolean;
   clientes: boolean;    // controla a aba Clientes dentro de /estoque
-  compras: boolean;     // controla a aba Compras dentro de /estoque
   vendedores: boolean;  // controla a aba Vendedores dentro de /estoque, a sub-aba do Dashboard e o campo de vendedor no Pedido
   notificacoes: NotificationConfig;
 }
@@ -22,6 +23,8 @@ export interface CompanyConfig {
 
 export const DEFAULT_NOTIFICATIONS: NotificationConfig = {
   aniversario: true,
+  despesasVencendo: true,
+  parcelasVencendo: true,
 };
 
 export const DEFAULT_MODULES: ModuleConfig = {
@@ -31,7 +34,6 @@ export const DEFAULT_MODULES: ModuleConfig = {
   rotas: true,
   contas: true,
   clientes: true,
-  compras: true,
   vendedores: true,
   notificacoes: { ...DEFAULT_NOTIFICATIONS },
 };

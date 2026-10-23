@@ -81,7 +81,7 @@
     <p>Selecione o módulo de acesso</p>
   </div>
 
-  <div class="notif-fab-wrapper" *ngIf="config.modules().notificacoes.aniversario">
+  <div class="notif-fab-wrapper" *ngIf="sinoVisivel()">
     <button
       type="button"
       class="notif-fab"
@@ -89,33 +89,68 @@
       aria-haspopup="true"
       [attr.aria-expanded]="notificacoesAbertas()"
       [attr.aria-label]="
-        aniversariantes().length > 0
-          ? 'Notificações: ' + aniversariantes().length + ' aniversariante(s) hoje'
-          : 'Notificações de aniversariantes'
+        totalAvisos() > 0 ? 'Notificações: ' + totalAvisos() + ' aviso(s)' : 'Notificações'
       "
-      title="Aniversariantes de hoje"
+      title="Notificações"
     >
       <svg class="notif-fab__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path
           d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"
         />
       </svg>
-      <span class="notif-fab__badge" *ngIf="aniversariantes().length > 0">{{
-        aniversariantes().length
-      }}</span>
+      <span class="notif-fab__badge" *ngIf="totalAvisos() > 0">{{ totalAvisos() }}</span>
     </button>
 
     <div class="notif-panel" *ngIf="notificacoesAbertas()" (click)="$event.stopPropagation()">
-      <h2 class="notif-panel__title">🎂 Aniversariantes de hoje</h2>
-      <ul class="notif-panel__list" *ngIf="aniversariantes().length > 0; else notifVazio">
-        <li class="notif-panel__item" *ngFor="let cliente of aniversariantes()">
-          <span class="notif-panel__name">{{ cliente.name }}</span>
-          <span class="notif-panel__phone" *ngIf="cliente.phone">{{ cliente.phone }}</span>
-        </li>
-      </ul>
-      <ng-template #notifVazio>
-        <p class="notif-panel__empty">Nenhum aniversariante hoje</p>
-      </ng-template>
+      <p class="notif-panel__empty" *ngIf="totalAvisos() === 0">Nenhuma notificação</p>
+
+      <section class="notif-panel__section" *ngIf="avisaAniversario() && aniversariantes().length > 0">
+        <h2 class="notif-panel__title">🎂 Aniversários</h2>
+        <ul class="notif-panel__list">
+          <li class="notif-panel__item" *ngFor="let cliente of aniversariantes()">
+            <span class="notif-panel__name">{{ cliente.name }}</span>
+            <span class="notif-panel__phone" *ngIf="cliente.phone">{{ cliente.phone }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="notif-panel__section" *ngIf="avisosDespesas().length > 0">
+        <h2 class="notif-panel__title">Despesas a vencer</h2>
+        <ul class="notif-panel__list">
+          <li *ngFor="let aviso of avisosDespesas()">
+            <a class="notif-panel__item notif-panel__link" [routerLink]="['/contas']">
+              <span class="notif-panel__info">
+                <span class="notif-panel__name">{{ aviso.descricao }}</span>
+                <span class="notif-panel__due">{{ rotuloVencimento(aviso) }}</span>
+              </span>
+              <span class="notif-panel__value" [class.notif-panel__value--danger]="aviso.vencida">{{
+                aviso.valor | currency: 'BRL'
+              }}</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <section class="notif-panel__section" *ngIf="avisosParcelas().length > 0">
+        <h2 class="notif-panel__title">Parcelas de clientes a vencer</h2>
+        <ul class="notif-panel__list">
+          <li *ngFor="let aviso of avisosParcelas()">
+            <a class="notif-panel__item notif-panel__link" [routerLink]="['/orders']">
+              <span class="notif-panel__info">
+                <span class="notif-panel__name">{{ aviso.clienteNome }}</span>
+                <span class="notif-panel__due">{{ rotuloVencimento(aviso) }}</span>
+              </span>
+              <span class="notif-panel__value" [class.notif-panel__value--danger]="aviso.vencida">{{
+                aviso.valor | currency: 'BRL'
+              }}</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <p class="notif-panel__hint" *ngIf="avisaDespesas() || avisaParcelas()">
+        Próximos {{ janelaAvisoDias }} dias e vencidos
+      </p>
     </div>
   </div>
 
@@ -170,7 +205,7 @@
           <path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
         </svg>
       </div>
-      <span class="label">CONTAS <br /><small>Contas a Pagar</small></span>
+      <span class="label">DESPESAS <br /><small>Contas e Despesas</small></span>
     </div>
 
     <div [routerLink]="['/config']" class="menu-card card-config">

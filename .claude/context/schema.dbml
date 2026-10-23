@@ -15,7 +15,7 @@ Table companies {
   document      string    [null]
   plan          string    [note: 'trial | basic | pro']
   status        string    [note: 'active | suspended | canceled']
-  modules       json      [note: 'ModuleConfig: pdv, pedidos, gestao, rotas, contas, clientes, compras, vendedores (booleans) — substitui o doc único config/company']
+  modules       json      [note: 'ModuleConfig: pdv, pedidos, gestao, rotas, contas (rótulo Despesas), clientes, vendedores (booleans) — substitui o doc único config/company. Chave legada compras é ignorada']
   createdAt     timestamp
 }
 
@@ -68,7 +68,8 @@ Table sales {
   total          number
   date           timestamp
   items          json      [note: 'array de SaleItem embutido: idProduct, productName, quantity, priceAtSale, priceAtCost']
-  paymentMethod  string    [note: 'enum: dinheiro | pix']
+  paymentMethod  string    [null, note: 'enum: dinheiro | pix | cartao | cheque | boleto | misto. Venda de pedido nasce sem forma (null) e recebe na conclusão; misto = mais de uma forma']
+  installments   number    [null, note: 'informativo; Pix = 1']
   sale_type      string    [note: 'pdv | order']
   customerId     string    [null, ref: > customers.id, note: 'só preenchido quando sale_type = order']
   status         string    [note: 'completed | canceled — não está na interface TS, escrito direto pelo service']
@@ -97,7 +98,41 @@ Table orders {
   actualDeliveryDate    timestamp [null]
   paymentDate           timestamp [null]
   closingDate           timestamp [null]
+  saleId                string    [null, ref: > sales.id, note: 'Sale criada na entrega (regra 5.3). Ausente em pedido delivered antes do deploy']
+  payments              json      [null, note: 'array embutido de OrderPayment: id, amount, method, installments, dueDate?, paidDate?, status (previsto|pago|cancelado|estornado). Ausente = pedido antigo; finished antigo = 1 pagamento derivado']
+  paymentMethod         string    [null, note: 'preenchido na conclusão; pode ser misto']
+  installments          number    [null]
   observations          string    [null]
+  recurringOrderId      string    [null, ref: > recurringOrders.id, note: 'pedido gerado por recorrência (regra 5.4); id do doc = rec_{recurringOrderId}_{yyyyMMdd}']
+  occurrenceDate        string    [null, note: 'yyyy-MM-dd da ocorrência']
+}
+
+Table recurringOrders {
+  id                string    [pk]
+  companyId         string    [ref: > companies.id, note: 'isolamento multi-tenant, regra 10']
+  sourceOrderId     string    [null, ref: > orders.id]
+  status            string    [note: 'active | paused | ended']
+  frequency         string    [note: 'weekly | biweekly | monthly | weekdays']
+  weekdays          json      [null, note: 'number[] 0..6, só em frequency=weekdays']
+  startDate         string    [note: 'yyyy-MM-dd civil']
+  endDate           string    [null, note: 'yyyy-MM-dd inclusivo']
+  generateFrom      string    [note: 'limite inferior de geração; retomar = hoje']
+  lastGeneratedDate string    [null, note: 'cursor, gravado na mesma transação do pedido gerado']
+  generatedCount    number    [null]
+  lastIssue         json      [null, note: '{date, code, detail} ocorrência pulada']
+  customerId        string    [ref: > customers.id]
+  customerName      string
+  customerPhone     string    [null]
+  items             json      [note: 'idProduct, productName, quantity, soldByWeight? — SEM preço']
+  shippingCost      number
+  deliveryType      string    [note: 'pickup | delivery']
+  address           string    [null]
+  addressLat        number    [null]
+  addressLng        number    [null]
+  observations      string    [null]
+  vendedorId        string    [null, ref: > vendedores.id]
+  vendedorName      string    [null]
+  createdAt         timestamp
 }
 
 Table comandas {
@@ -119,7 +154,7 @@ Table purchases {
   amount        number
 }
 
-Table purchaseProducts {
+Table purchaseProducts {  // LEGADO — substituído por expenseSeries (regra-de-negocio.md §7.3/§14); mantido até purga
   id                string    [pk]
   companyId         string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   name              string
@@ -129,7 +164,7 @@ Table purchaseProducts {
   createdAt         timestamp
 }
 
-Table bills {
+Table bills {  // LEGADO — substituído por expenses (regra-de-negocio.md §7/§14); mantido até purga
   id                  string    [pk]
   companyId           string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
   name                string
@@ -162,6 +197,52 @@ Table counters {
 //   reforçada só por firestore.rules e pelo código-cliente (TenantService),
 //   nunca pelo banco em si. Ver regra-de-negocio.md seção 10 para o motivo de
 //   ser campo e não subcoleção companies/{id}/products/...
-// - purchaseProducts na coleção real do Firestore é "purchase-products"
-//   (kebab-case) — nome da tabela aqui mantido em camelCase por já estar
-//   assim no arquivo original; não é inconsistência nova desta rodada.
+// - purchaseProducts: nome real da coleção no código (PurchaseProductService.COL).
+
+Table expenseCategories {
+  id            string    [pk, note: 'padrão: ${companyId}_${systemKey} (determinístico); custom: id do Firestore']
+  companyId     string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
+  name          string
+  type          string    [note: 'custo_producao | despesa_operacional — imutável após criar; custo_producao não entra no Resultado (§8)']
+  archived      boolean   [note: 'categoria com despesa vinculada só arquiva, nunca exclui']
+  systemKey     string    [null, note: 'só nas 12 padrão: compra_mercadoria, insumos_embalagem, aluguel, energia_agua_gas, internet_telefone, transporte_combustivel, pessoal, impostos_taxas, taxas_cartao, marketing, manutencao_equipamentos, outros']
+  createdAt     timestamp
+}
+
+Table expenseSeries {
+  id                    string    [pk, note: 'migradas: mig_pp_<purchaseProductId>']
+  companyId             string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
+  active                boolean   [note: 'false = série encerrada; ocorrências já geradas ficam']
+  period                string    [note: 'semanal | mensal']
+  anchorDate            string    [note: 'YYYY-MM-DD; ocorrência k = âncora + k períodos (mensal calculado da âncora, clamp de dia)']
+  generatedThrough      string    [null, note: 'YYYY-MM-DD da última ocorrência materializada (marca-d''água; evita ressuscitar ocorrência apagada)']
+  template              json      [note: 'description, value, categoryId, supplier?, paymentMethod?, notes?']
+  legacyPurchaseProductId string  [null]
+  migracaoRevisar       boolean   [null]
+  createdAt             timestamp
+  endedAt               timestamp [null]
+}
+
+Table expenses {
+  id                  string    [pk, note: 'ocorrência de série: ${seriesId}_${dueDate}; migrada: mig_bill_<billId>; demais: id do Firestore']
+  companyId           string    [ref: > companies.id, note: 'isolamento multi-tenant, ver regra-de-negocio.md seção 10']
+  description         string
+  value               number    [note: 'reais, 2 casas; parcelas calculadas em centavos, resto na última']
+  categoryId          string    [ref: > expenseCategories.id]
+  dueDate             string    [note: 'YYYY-MM-DD, OBRIGATÓRIO; critério de competência (Resultado) e de vencida']
+  status              string    [note: 'a_pagar | pago. Vencida é DERIVADA (a_pagar e dueDate < hoje), não gravada']
+  paidDate            string    [null, note: 'YYYY-MM-DD; visão de caixa (Pago no mês)']
+  paymentMethod       string    [null, note: 'enum PaymentMethod: dinheiro | pix | cartao | cheque']
+  supplier            string    [null, note: 'texto livre']
+  notes               string    [null]
+  goodsReceivedDate   string    [null, note: 'YYYY-MM-DD; substitui o antigo status recebido']
+  origin              string    [note: 'manual | parcelamento | recorrencia | migracao']
+  seriesId            string    [null, ref: > expenseSeries.id]
+  installmentGroupId  string    [null]
+  installmentNumber   number    [null]
+  installmentTotal    number    [null]
+  legacyBillId        string    [null]
+  migracaoRevisar     boolean   [null, note: 'filtrável na tela; vencimento por fallback ou categoria sem casamento']
+  migracaoMotivo      string    [null]
+  createdAt           timestamp
+}
