@@ -118,6 +118,26 @@
           />
         </div>
 
+        <div class="preview span-2" *ngIf="modo === 'parcelada' && previewParcelas.length > 0">
+          <p class="preview-titulo">
+            {{ previewParcelas.length }} × R$ {{ previewParcelas[0].value | number: '1.2-2' }}
+            <span
+              *ngIf="previewParcelas[previewParcelas.length - 1].value !== previewParcelas[0].value"
+            >
+              (última R$ {{ previewParcelas[previewParcelas.length - 1].value | number: '1.2-2' }})
+            </span>
+          </p>
+          <ul class="preview-lista">
+            <li *ngFor="let p of previewParcelas">
+              <span>
+                {{ p.installmentNumber }}/{{ p.installmentTotal }} ·
+                {{ p.dueDate | date: 'dd/MM/yyyy' }}
+              </span>
+              <span>R$ {{ p.value | number: '1.2-2' }}</span>
+            </li>
+          </ul>
+        </div>
+
         <div class="form-group span-2">
           <label for="ef-supplier">Fornecedor <span class="opcional">(opcional)</span></label>
           <input id="ef-supplier" type="text" name="supplier" [(ngModel)]="novaDespesa.supplier" />

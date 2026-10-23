@@ -17,7 +17,10 @@ import {
   NewExpenseInput,
 } from '../../models/expense-model';
 import { PAYMENT_METHOD_LABELS, PaymentMethod } from '../../models/sell-model';
-import { ExpenseScheduleService } from '../../services/expense-schedule-service/expense-schedule-service';
+import {
+  ExpenseScheduleService,
+  InstallmentDraft,
+} from '../../services/expense-schedule-service/expense-schedule-service';
 import { NotificationService } from '../../services/notification-service/notification.service';
 
 export type ExpenseFormMode = 'unica' | 'parcelada' | 'recorrente';
@@ -73,6 +76,9 @@ export class ExpenseFormComponent implements OnChanges {
   parcelas = DEFAULT_INSTALLMENTS;
   novaDespesa: ExpenseFormModel = this.formularioVazio();
 
+  private previewKey = '';
+  private previewCache: InstallmentDraft[] = [];
+
   ngOnChanges(changes: SimpleChanges): void {
     if (!changes['expense']) {
       return;
@@ -90,6 +96,17 @@ export class ExpenseFormComponent implements OnChanges {
   get categoriasSelecionaveis(): ExpenseCategory[] {
     const atual = this.expense?.categoryId;
     return this.categories.filter((c) => !c.archived || c.id === atual);
+  }
+
+  get previewParcelas(): InstallmentDraft[] {
+    const valor = Number(this.novaDespesa.value);
+    const { dueDate } = this.novaDespesa;
+    const chave = `${this.modo}|${valor}|${this.parcelas}|${dueDate}`;
+    if (chave !== this.previewKey) {
+      this.previewKey = chave;
+      this.previewCache = this.calcularPreview(valor, dueDate);
+    }
+    return this.previewCache;
   }
 
   get ancoraMuitoAntiga(): boolean {
@@ -121,6 +138,17 @@ export class ExpenseFormComponent implements OnChanges {
 
   cancelar(): void {
     this.cancelled.emit();
+  }
+
+  private calcularPreview(valor: number, dueDate: DateKey): InstallmentDraft[] {
+    if (this.modo !== 'parcelada' || !dueDate || !(valor > 0)) {
+      return [];
+    }
+    try {
+      return ExpenseScheduleService.buildInstallments(valor, Number(this.parcelas), dueDate);
+    } catch {
+      return [];
+    }
   }
 
   private formularioValido(): boolean {
