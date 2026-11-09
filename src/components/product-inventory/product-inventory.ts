@@ -1494,6 +1494,10 @@ export class ProductInventoryComponent implements OnInit, OnDestroy {
     return tipo === 'delivery' ? 'Entrega' : 'Retirada';
   }
 
+  tipoEntregaIcone(tipo: 'pickup' | 'delivery' | undefined): string {
+    return tipo === 'delivery' ? '🚚' : '🏪';
+  }
+
   dataDoPedido(date: any): Date | null {
     if (!date) return null;
     if (typeof date.toDate === 'function') return date.toDate();
