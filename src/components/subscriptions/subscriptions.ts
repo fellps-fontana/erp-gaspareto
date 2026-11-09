@@ -55,7 +55,7 @@ type AcaoPendente =
   | { tipo: 'recebi'; cobranca: SubscriptionCharge; data: CivilDate }
   | { tipo: 'desfazer'; cobranca: SubscriptionCharge };
 
-/** Tela de Assinaturas do super-admin — regra-de-negocio.md secao 14. Regras vivem em subscription-rules. */
+/** Tela de Assinaturas do super-admin — regra-de-negocio.md secao 15. Regras vivem em subscription-rules. */
 @Component({
   selector: 'app-subscriptions',
   standalone: true,

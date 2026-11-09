@@ -3,7 +3,7 @@
 Painel de notificações da Home (ícone de sino). Hoje tem dois tipos:
 aniversariantes do dia (opcional por empresa) e mensalidade da plataforma
 (obrigatório, não desligável). Regras: `context/regra-de-negocio.md` seções 9
-(Clientes), 10 (Multi-tenant), 11 (Configuração por empresa) e 14
+(Clientes), 10 (Multi-tenant), 11 (Configuração por empresa) e 15
 (Mensalidade).
 
 ## Fontes de dados

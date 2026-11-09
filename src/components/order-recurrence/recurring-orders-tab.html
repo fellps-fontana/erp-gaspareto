@@ -30,6 +30,7 @@
 
   <div class="modal-backdrop" *ngIf="endTarget" (click)="closeEndConfirm()">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="endRecurringTitle" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeEndConfirm()" [disabled]="processing">✕</button>
       <h3 id="endRecurringTitle">Encerrar pedido recorrente</h3>
       <p>
         Encerrar a recorrência de <strong>{{ endTarget.customerName }}</strong>? É definitivo:

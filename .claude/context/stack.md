@@ -51,8 +51,9 @@ transações (`runTransaction`) para operações que envolvem estoque.
     regra.
 - **Regras do Firestore (`firestore.rules`):** isolamento multi-tenant —
   toda leitura/escrita nas coleções operacionais (`products`, `sales`,
-  `orders`, `comandas`, `bills`, `customers`, `purchases`,
-  `purchaseProducts`) exige `resource.data.companyId` (leitura) ou
+  `orders`, `comandas`, `customers`, `purchases`, `vendedores`,
+  `expenses`, `expenseCategories`, `expenseSeries`; legado `bills` e
+  `purchaseProducts` mantido até a purga, §14 da regra) exige `resource.data.companyId` (leitura) ou
   `request.resource.data.companyId` (escrita) igual ao `companyId` do
   usuário autenticado (token ou lookup em `users/{uid}`). `companies/{id}`
   só é legível/gravável pelo próprio tenant (escrita restrita a
@@ -62,8 +63,9 @@ transações (`runTransaction`) para operações que envolvem estoque.
 - **Hosting:** Firebase Hosting, `dist/erp-gaspareto/browser` como pasta pública,
   rewrite total para `index.html` (SPA).
 - **Coleções Firestore identificadas no código:**
-  `products`, `sales`, `orders`, `purchases`, `purchaseProducts`, `bills`,
-  `customers`, `comandas`, `companies` (substitui o antigo doc único
+  `products`, `sales`, `orders`, `purchases`, `expenses`,
+  `expenseCategories`, `expenseSeries`, `customers`, `vendedores`,
+  `purchaseProducts` (LEGADO), `bills` (LEGADO), `comandas`, `companies` (substitui o antigo doc único
   `config/company`), `users`.
 
 ## Ferramentas / qualidade
@@ -79,6 +81,11 @@ transações (`runTransaction`) para operações que envolvem estoque.
     emulador. Runner separado porque `@firebase/rules-unit-testing` roda em
     Node (não em browser/Karma) e é o padrão oficial da Firebase para esse
     tipo de teste.
+  - **node:test** (`npm run test:migration` = `node --test test/expense-migration-core.test.mjs`):
+    testa o núcleo puro da migração (`scripts/lib/expense-migration-core.mjs`),
+    sem emulador e sem Angular. O script completo é verificado por execução
+    contra o Firestore Emulator (FIRESTORE_EMULATOR_HOST) via `firebase-admin`
+    (já devDependency).
   - **Firestore Emulator:** `firebase.json` tem `emulators.firestore` (porta
     8080, `firebase emulators:start --only firestore`) — pré-requisito: Java
     (JRE/JDK 11+) instalado. Sem o emulador rodando, nenhum dos dois runners

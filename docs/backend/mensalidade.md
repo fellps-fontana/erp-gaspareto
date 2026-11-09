@@ -3,7 +3,7 @@
 Controle da mensalidade que as empresas clientes pagam ao dono da plataforma.
 Gerenciado só pelo super-admin (`isSuperAdmin`). v1 = controle + aviso: sem
 gateway, pagamento fora do app (Pix), o super-admin marca como pago; atraso só
-gera aviso, nada é bloqueado. Regra: `context/regra-de-negocio.md` seção 14
+gera aviso, nada é bloqueado. Regra: `context/regra-de-negocio.md` seção 15
 (e seções 10 e 13 para isolamento e super-admin).
 
 ## Coleções
@@ -28,7 +28,7 @@ gera aviso, nada é bloqueado. Regra: `context/regra-de-negocio.md` seção 14
 
 Erros de regra são `MensalidadeInvalidaError` com `codigo` estável.
 
-## Regras aplicadas (seção 14)
+## Regras aplicadas (seção 15)
 
 - Geração idempotente por id determinístico + transação (lê, só grava se não
   existe); primeira cobrança no mês do início do contrato; antecipa a

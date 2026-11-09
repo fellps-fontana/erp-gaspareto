@@ -35,7 +35,7 @@ interface ConfigComDocId {
   config: SubscriptionConfig;
 }
 
-/** Mensalidade da plataforma — regra-de-negocio.md secao 14. Regras puras em subscription-rules. */
+/** Mensalidade da plataforma — regra-de-negocio.md secao 15. Regras puras em subscription-rules. */
 @Injectable({ providedIn: 'root' })
 export class SubscriptionService extends FirestoreBaseService {
   private firestore = inject(Firestore);

@@ -6,7 +6,7 @@ import {
   diasNoMes, diferencaEmDias, ehDataCivilValida, formatarCivil
 } from '../recurring-order-service/recurrence-rules';
 
-/** Dias de antecedencia do aviso de vencimento (regra-de-negocio.md secao 14). */
+/** Dias de antecedencia do aviso de vencimento (regra-de-negocio.md secao 15). */
 export const DIAS_DE_AVISO = 5;
 export const STATUS_A_PAGAR: ChargeStatus = 'a_pagar';
 export const STATUS_PAGO: ChargeStatus = 'pago';

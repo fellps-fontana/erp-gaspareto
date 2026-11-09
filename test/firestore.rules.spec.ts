@@ -285,6 +285,9 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
       'customers',
       'purchases',
       'purchaseProducts',
+      'expenses',
+      'expenseCategories',
+      'expenseSeries',
     ];
 
     collections.forEach((collName) => {
@@ -311,6 +314,9 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
       'customers',
       'purchases',
       'purchaseProducts',
+      'expenses',
+      'expenseCategories',
+      'expenseSeries',
     ];
 
     collections.forEach((collName) => {
@@ -675,6 +681,191 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
 
         const updateRef = doc(contextCompanyA.firestore(), 'vendedores', 'vendedor-001');
         await assertSucceeds(updateDoc(updateRef, { name: 'Vendedor A Atualizado' }));
+      });
+    });
+  });
+
+  describe('Colecoes de Despesas (expenses, expenseCategories, expenseSeries) - operacionais multi-tenant', () => {
+    const colecoesDespesas = ['expenses', 'expenseCategories', 'expenseSeries'];
+
+    const payloadPorColecao: Record<string, (companyId: string) => Record<string, any>> = {
+      expenses: (companyId) => ({
+        description: 'Aluguel',
+        value: 1500,
+        categoryId: `${companyId}_aluguel`,
+        dueDate: '2026-10-10',
+        status: 'a_pagar',
+        origin: 'manual',
+        companyId,
+      }),
+      expenseCategories: (companyId) => ({
+        name: 'Aluguel',
+        type: 'despesa_operacional',
+        archived: false,
+        companyId,
+      }),
+      expenseSeries: (companyId) => ({
+        active: true,
+        period: 'mensal',
+        anchorDate: '2026-10-10',
+        template: {
+          description: 'Internet',
+          value: 120,
+          categoryId: `${companyId}_internet_telefone`,
+        },
+        companyId,
+      }),
+    };
+
+    const campoAtualizavelPorColecao: Record<string, Record<string, any>> = {
+      expenses: { status: 'pago', paidDate: '2026-10-12' },
+      expenseCategories: { archived: true },
+      expenseSeries: { active: false },
+    };
+
+    const semeiaDocSemRegras = async (collName: string, docId: string, data: Record<string, any>) => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), collName, docId), data);
+      });
+    };
+
+    colecoesDespesas.forEach((collName) => {
+      describe(`Colecao ${collName}`, () => {
+        it(`owner de company A pode criar, ler, atualizar e excluir doc da propria empresa em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const docRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertSucceeds(setDoc(docRef, payloadPorColecao[collName]('company-a')));
+          await assertSucceeds(getDoc(docRef));
+          await assertSucceeds(updateDoc(docRef, campoAtualizavelPorColecao[collName]));
+          await assertSucceeds(deleteDoc(docRef));
+        });
+
+        it(`usuario de company A lista em ${collName} apenas docs da propria empresa`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-a', payloadPorColecao[collName]('company-a'));
+          await semeiaDocSemRegras(collName, 'doc-b', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const q = query(
+            collection(contextCompanyA.firestore(), collName),
+            where('companyId', '==', 'company-a')
+          );
+          const result = await assertSucceeds(getDocs(q));
+          expect(result.size).toBe(1);
+        });
+
+        it(`usuario de company A nao pode criar doc com companyId de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const docRef = doc(contextCompanyA.firestore(), collName, 'doc-cross');
+          await assertFails(setDoc(docRef, payloadPorColecao[collName]('company-b')));
+        });
+
+        it(`usuario de company A nao pode ler doc de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const readRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertFails(getDoc(readRef));
+        });
+
+        it(`usuario de company A nao pode listar docs de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const q = query(
+            collection(contextCompanyA.firestore(), collName),
+            where('companyId', '==', 'company-b')
+          );
+          await assertFails(getDocs(q));
+        });
+
+        it(`usuario de company A nao pode atualizar doc de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const updateRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertFails(updateDoc(updateRef, campoAtualizavelPorColecao[collName]));
+        });
+
+        it(`usuario de company A nao pode excluir doc de company B em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const deleteRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertFails(deleteDoc(deleteRef));
+        });
+
+        it(`owner de company A nao pode trocar companyId de doc existente em ${collName}`, async () => {
+          await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-a'));
+
+          const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+          const updateRef = doc(contextCompanyA.firestore(), collName, 'doc-001');
+          await assertFails(updateDoc(updateRef, { companyId: 'company-b' }));
+        });
+
+        it(`usuario anonimo (sem auth) nao pode ler doc em ${collName}`, async () => {
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-a'));
+
+          const anonimo = testEnv.unauthenticatedContext();
+          const readRef = doc(anonimo.firestore(), collName, 'doc-001');
+          await assertFails(getDoc(readRef));
+        });
+
+        it(`usuario anonimo (sem auth) nao pode criar doc em ${collName}`, async () => {
+          const anonimo = testEnv.unauthenticatedContext();
+          const docRef = doc(anonimo.firestore(), collName, 'doc-anon');
+          await assertFails(setDoc(docRef, payloadPorColecao[collName]('company-a')));
+        });
+
+        it(`usuario anonimo (sem auth) nao pode atualizar doc em ${collName}`, async () => {
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-a'));
+
+          const anonimo = testEnv.unauthenticatedContext();
+          const updateRef = doc(anonimo.firestore(), collName, 'doc-001');
+          await assertFails(updateDoc(updateRef, campoAtualizavelPorColecao[collName]));
+        });
+
+        it(`usuario anonimo (sem auth) nao pode excluir doc em ${collName}`, async () => {
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-a'));
+
+          const anonimo = testEnv.unauthenticatedContext();
+          const deleteRef = doc(anonimo.firestore(), collName, 'doc-001');
+          await assertFails(deleteDoc(deleteRef));
+        });
+
+        it(`super-admin pode ler, criar, atualizar e excluir doc de outra empresa em ${collName}`, async () => {
+          await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+          await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+          const docRef = doc(contextSuperAdmin.firestore(), collName, 'doc-001');
+          const lido = await assertSucceeds(getDoc(docRef));
+          expect(lido.exists()).toBe(true);
+
+          const docNovo = doc(contextSuperAdmin.firestore(), collName, 'doc-cross');
+          await assertSucceeds(setDoc(docNovo, payloadPorColecao[collName]('company-b')));
+          await assertSucceeds(updateDoc(docRef, campoAtualizavelPorColecao[collName]));
+          await assertSucceeds(deleteDoc(docRef));
+        });
+
+        it(`super-admin nao pode trocar companyId de doc existente em ${collName}, mesmo com bypass`, async () => {
+          await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+          await semeiaDocSemRegras(collName, 'doc-001', payloadPorColecao[collName]('company-b'));
+
+          const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+          const updateRef = doc(contextSuperAdmin.firestore(), collName, 'doc-001');
+          await assertFails(updateDoc(updateRef, { companyId: 'company-admin' }));
+        });
       });
     });
   });

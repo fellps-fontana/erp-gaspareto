@@ -4,7 +4,7 @@ import { CivilDate } from '../services/recurring-order-service/recurrence-rules'
 export type { CivilDate };
 /** Competencia mensal da cobranca: 'yyyy-MM'. */
 export type Competence = string;
-/** "Vencida" e derivada (a_pagar e hoje > dueDate), nunca persistida — regra-de-negocio.md secao 14. */
+/** "Vencida" e derivada (a_pagar e hoje > dueDate), nunca persistida — regra-de-negocio.md secao 15. */
 export type ChargeStatus = 'a_pagar' | 'pago';
 
 /** subscriptions/{companyId} — so super-admin le/escreve. */
