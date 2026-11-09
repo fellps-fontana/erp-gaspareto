@@ -112,3 +112,12 @@ ff730dd docs: documentacao e historico da branch (+ commit de renomeação do hi
  test/firestore.rules.spec.ts                       | 493 +++++++++++++++++++
  19 files changed, 2769 insertions(+), 23 deletions(-)
 ```
+
+## Ajustes pos-revisao
+- PR #43 abriu com conflito: a branch partiu de `homologacao` em `3e662a5` e a base avançou (Despesas, notificações de despesas/parcelas).
+- TASK-056 (Kira): merge de `origin/homologacao` (`15238b7`). `homologacao` já tinha a seção 14 (Migração Contas a Pagar → Despesas); a mensalidade virou **seção 15** (referências em código, schema e docs atualizadas). home.ts/html resolvidos para a versão de `homologacao`.
+- TASK-057 (hanzo): aviso de mensalidade reintegrado ao sino novo (independente de flags; badge soma os 4 tipos); regra CSS duplicada pelo merge removida.
+- TASK-058 (style): aprovado na 1ª rodada; débito menor: duas fontes de "hoje" no componente da Home.
+- TASK-059: test:rules 172/172, suíte completa 1023/1023.
+- docs/backend/notificacoes.md passou a descrever também despesas e parcelas a vencer.
+- Nas seções acima deste bloco, "seção 14" da mensalidade refere-se à numeração anterior ao merge (hoje seção 15).

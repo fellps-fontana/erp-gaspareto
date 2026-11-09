@@ -104,6 +104,23 @@
     <div class="notif-panel" *ngIf="notificacoesAbertas()" (click)="$event.stopPropagation()">
       <p class="notif-panel__empty" *ngIf="totalAvisos() === 0">Nenhuma notificação</p>
 
+      <section class="notif-panel__section" *ngIf="avisosMensalidade().length > 0">
+        <h2 class="notif-panel__title">💳 Mensalidade</h2>
+        <ul class="notif-panel__list">
+          <li
+            class="notif-panel__item notif-panel__item--stacked"
+            [class.notif-panel__item--atraso]="aviso.emAtraso"
+            *ngFor="let aviso of avisosMensalidade(); trackBy: trackAviso"
+          >
+            <span class="notif-panel__name">{{ aviso.texto }}</span>
+            <span class="notif-panel__phone">
+              {{ aviso.valor | currency: 'BRL' }} · vencimento
+              {{ aviso.vencimento | date: 'dd/MM/yyyy' }}
+            </span>
+          </li>
+        </ul>
+      </section>
+
       <section class="notif-panel__section" *ngIf="avisaAniversario() && aniversariantes().length > 0">
         <h2 class="notif-panel__title">🎂 Aniversários</h2>
         <ul class="notif-panel__list">

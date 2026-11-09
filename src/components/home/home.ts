@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { toSignal, toObservable } from '@angular/core/rxjs-interop';
-import { from, map, of, switchMap } from 'rxjs';
+import { catchError, from, map, of, switchMap } from 'rxjs';
 import { ThemeService } from '../../services/theme/theme-service';
 import { ConfigService } from '../../services/config/config.service';
 import { CustomerService } from '../../services/customer-service/customer-service';
@@ -20,9 +20,25 @@ import {
   despesasAVencer,
   parcelasAVencer,
 } from '../../services/notification-rules/notification-rules';
+import { SubscriptionService } from '../../services/subscription-service/subscription-service';
+import {
+  cobrancasComAviso,
+  textoDoAviso,
+} from '../../services/subscription-service/subscription-rules';
+import { hojeCivil } from '../../services/recurring-order-service/recurrence-rules';
 import { DateKey } from '../../models/expense-model';
 import { Company } from '../../models/company-model';
 import { BuildInfo } from '../../models/build-info-model';
+import { CivilDate, SubscriptionCharge } from '../../models/subscription-model';
+
+/** Item do painel de Notificações referente à mensalidade da plataforma. */
+interface AvisoMensalidade {
+  id: string;
+  texto: string;
+  emAtraso: boolean;
+  valor: number;
+  vencimento: CivilDate;
+}
 
 @Component({
   selector: 'app-home',
@@ -40,6 +56,7 @@ export class HomeComponent {
   private readonly buildInfoService = inject(BuildInfoService);
   private readonly expenseService = inject(ExpenseService);
   private readonly orderService = inject(OrderService);
+  private readonly subscriptionService = inject(SubscriptionService);
 
   readonly janelaAvisoDias = JANELA_AVISO_DIAS;
 
@@ -53,8 +70,47 @@ export class HomeComponent {
     const modules = this.config.modules();
     return modules.notificacoes.parcelasVencendo && modules.pedidos;
   });
+
+  // Cobranças de mensalidade em aberto da empresa efetiva (regra-de-negocio.md seção 15).
+  // Sem companyId (deslogado/carregando) não consulta. Falha de leitura não derruba a home.
+  private readonly cobrancasEmAberto = toSignal(
+    toObservable(this.tenant.companyId).pipe(
+      switchMap(companyId =>
+        companyId
+          ? this.subscriptionService.getOpenChargesOfCompany(companyId).pipe(
+              catchError(error => {
+                console.error('Home: erro ao carregar cobranças da mensalidade:', error);
+                return of([] as SubscriptionCharge[]);
+              })
+            )
+          : of([] as SubscriptionCharge[])
+      )
+    ),
+    { initialValue: [] as SubscriptionCharge[] }
+  );
+
+  // Janela de aviso e atraso vêm da função pura de domínio; aqui só se monta o texto exibido.
+  // O aviso não depende de modules.notificacoes nem de módulo: a empresa não pode desligá-lo.
+  // "Hoje" é avaliado quando as cobranças mudam; a virada do dia com a aba aberta
+  // não recalcula (aceito na v1).
+  readonly avisosMensalidade = computed<AvisoMensalidade[]>(() =>
+    cobrancasComAviso(this.cobrancasEmAberto(), hojeCivil(new Date())).map(
+      ({ cobranca, aviso }) => ({
+        id: cobranca.id ?? cobranca.competence,
+        texto: `Mensalidade ${textoDoAviso(aviso)}`,
+        emAtraso: aviso.kind === 'em_atraso',
+        valor: cobranca.amount,
+        vencimento: cobranca.dueDate,
+      })
+    )
+  );
+
   readonly sinoVisivel = computed(
-    () => this.avisaAniversario() || this.avisaDespesas() || this.avisaParcelas()
+    () =>
+      this.avisaAniversario() ||
+      this.avisaDespesas() ||
+      this.avisaParcelas() ||
+      this.avisosMensalidade().length > 0
   );
 
   // Lista de clientes que fazem aniversário hoje — usada pelo ícone/painel de notificação
@@ -92,8 +148,13 @@ export class HomeComponent {
     () =>
       (this.avisaAniversario() ? this.aniversariantes().length : 0) +
       this.avisosDespesas().length +
-      this.avisosParcelas().length
+      this.avisosParcelas().length +
+      this.avisosMensalidade().length
   );
+
+  trackAviso(_indice: number, aviso: AvisoMensalidade): string {
+    return aviso.id;
+  }
 
   // Rotulo de vencimento: apenas formatacao; "vencida" vem pronto das regras.
   rotuloVencimento(aviso: { dueDate: DateKey; vencida: boolean }): string {

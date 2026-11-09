@@ -376,10 +376,6 @@
   font-size: 0.9rem;
 }
 
-.notif-panel__section + .notif-panel__section {
-  margin-top: var(--sp-md);
-}
-
 .notif-panel__link {
   color: inherit;
   text-decoration: none;
