@@ -1,4 +1,4 @@
-# fellps-fontana/copepod
+# fellps-fontana/assinaturas-mensalidade
 - Periodo: 2026-11-09 -> 2026-11-09
 - Sessoes: SESSAO: 2026-11-09 15:14
 - Fluxo: Implementacao (com ciclos de Correcao pós-revisão)
@@ -87,7 +87,7 @@ Notificações da empresa. v1 sem gateway e sem bloqueio.
 ```
 c0b3650 feat(assinaturas): mensalidade da plataforma com aviso em Notificações
 ```
-(+ commit de documentação e histórico desta branch)
+ff730dd docs: documentacao e historico da branch (+ commit de renomeação do histórico)
 
 ## Arquivos alterados
 ```
