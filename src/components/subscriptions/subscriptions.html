@@ -1,0 +1,117 @@
+<div class="subs-page">
+
+  <div class="subs-header">
+    <button class="btn-voltar" type="button" [routerLink]="['/admin']">Voltar</button>
+    <div>
+      <h1>Assinaturas</h1>
+      <p>Mensalidade por empresa e controle de recebimentos</p>
+    </div>
+  </div>
+
+  <div class="state-message" *ngIf="isLoading">
+    <span class="spinner" aria-hidden="true"></span> Carregando assinaturas...
+  </div>
+  <div class="state-message state-message--error" *ngIf="!isLoading && loadError">{{ loadError }}</div>
+  <div class="state-message" *ngIf="!isLoading && !loadError && assinaturas.length === 0">
+    Nenhuma empresa encontrada.
+  </div>
+
+  <ng-container *ngIf="!isLoading && !loadError">
+    <section class="subs-card" *ngFor="let item of assinaturas">
+      <div class="subs-card-top">
+        <div>
+          <h2>{{ item.company.name }}</h2>
+          <p class="subs-meta" *ngIf="item.config">
+            <strong>{{ item.config.amount | currency:'BRL' }}</strong> / mês ·
+            vence todo dia {{ item.config.dueDay }} ·
+            início {{ item.config.contractStart | date:'dd/MM/yyyy' }}
+          </p>
+          <p class="subs-meta" *ngIf="!item.config">Mensalidade ainda não configurada.</p>
+        </div>
+        <div class="subs-actions">
+          <span class="badge" *ngIf="item.config" [class.badge--on]="item.config.active">
+            {{ item.config.active ? 'Ativa' : 'Inativa' }}
+          </span>
+          <button class="btn btn-outline btn-sm" type="button"
+            (click)="editandoId === item.company.id ? fecharConfiguracao() : abrirConfiguracao(item)">
+            {{ editandoId === item.company.id ? 'Cancelar' : (item.config ? 'Editar' : 'Configurar') }}
+          </button>
+        </div>
+      </div>
+
+      <form class="config-form" *ngIf="editandoId === item.company.id"
+        (ngSubmit)="salvarConfiguracao(item)">
+        <label class="field">
+          <span>Valor mensal (R$)</span>
+          <input type="number" name="amount" step="0.01" min="0" inputmode="decimal"
+            [(ngModel)]="form.amount" [disabled]="isSaving" />
+        </label>
+        <label class="field">
+          <span>Dia de vencimento (1 a 31)</span>
+          <input type="number" name="dueDay" min="1" max="31" inputmode="numeric"
+            [(ngModel)]="form.dueDay" [disabled]="isSaving" />
+        </label>
+        <label class="field">
+          <span>Início do contrato</span>
+          <input type="date" name="contractStart" [(ngModel)]="form.contractStart" [disabled]="isSaving" />
+        </label>
+        <label class="field field--check">
+          <input type="checkbox" name="active" [(ngModel)]="form.active" [disabled]="isSaving" />
+          <span>Cobrança ativa</span>
+        </label>
+        <button class="btn btn-primary btn-sm" type="submit" [disabled]="isSaving">
+          {{ isSaving ? 'Salvando...' : 'Salvar' }}
+        </button>
+      </form>
+
+      <ul class="charges" *ngIf="item.cobrancas.length > 0">
+        <li class="charge" *ngFor="let c of item.cobrancas">
+          <div class="charge-info">
+            <strong>{{ c.cobranca.competence }}</strong>
+            <span>{{ c.cobranca.amount | currency:'BRL' }} · vence {{ c.cobranca.dueDate | date:'dd/MM/yyyy' }}</span>
+            <span *ngIf="c.cobranca.status === 'pago'" class="charge-paid">
+              Pago em {{ c.cobranca.paidDate | date:'dd/MM/yyyy' }}: {{ c.cobranca.paidAmount | currency:'BRL' }}
+            </span>
+          </div>
+          <span class="state-badge state-{{ c.tom }}">{{ c.rotulo }}</span>
+          <button *ngIf="c.cobranca.status === 'a_pagar'" class="btn btn-primary btn-sm" type="button"
+            (click)="pedirRecebi(c.cobranca)">Recebi</button>
+          <button *ngIf="c.cobranca.status === 'pago'" class="btn btn-outline btn-sm" type="button"
+            (click)="pedirDesfazer(c.cobranca)">Desfazer</button>
+        </li>
+      </ul>
+      <p class="subs-meta" *ngIf="item.config && item.cobrancas.length === 0">Nenhuma cobrança gerada.</p>
+    </section>
+  </ng-container>
+
+  <div class="modal-backdrop" *ngIf="acao" (click)="cancelarAcao()">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="acaoTitulo"
+      (click)="$event.stopPropagation()">
+      <ng-container *ngIf="acao.tipo === 'recebi'">
+        <h3 id="acaoTitulo">Confirmar recebimento</h3>
+        <p>
+          Competência {{ acao.cobranca.competence }}, valor
+          <strong>{{ acao.cobranca.amount | currency:'BRL' }}</strong>. Confirme a data do pagamento.
+        </p>
+        <label class="field">
+          <span>Data do pagamento</span>
+          <input type="date" name="paidDate" [(ngModel)]="acao.data" [disabled]="isProcessing" />
+        </label>
+      </ng-container>
+      <ng-container *ngIf="acao.tipo === 'desfazer'">
+        <h3 id="acaoTitulo">Desfazer pagamento</h3>
+        <p>
+          A cobrança de {{ acao.cobranca.competence }} voltará a ficar em aberto e a empresa
+          receberá o aviso novamente.
+        </p>
+      </ng-container>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" type="button" (click)="cancelarAcao()"
+          [disabled]="isProcessing">Voltar</button>
+        <button class="btn btn-primary btn-sm" type="button" (click)="confirmarAcao()"
+          [disabled]="isProcessing">{{ isProcessing ? 'Salvando...' : 'Confirmar' }}</button>
+      </div>
+    </div>
+  </div>
+
+</div>

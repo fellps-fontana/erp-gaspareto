@@ -81,7 +81,7 @@
     <p>Selecione o módulo de acesso</p>
   </div>
 
-  <div class="notif-fab-wrapper" *ngIf="config.modules().notificacoes.aniversario">
+  <div class="notif-fab-wrapper" *ngIf="mostrarSino()">
     <button
       type="button"
       class="notif-fab"
@@ -89,33 +89,52 @@
       aria-haspopup="true"
       [attr.aria-expanded]="notificacoesAbertas()"
       [attr.aria-label]="
-        aniversariantes().length > 0
-          ? 'Notificações: ' + aniversariantes().length + ' aniversariante(s) hoje'
-          : 'Notificações de aniversariantes'
+        totalNotificacoes() > 0
+          ? 'Notificações: ' + totalNotificacoes() + ' item(ns)'
+          : 'Notificações'
       "
-      title="Aniversariantes de hoje"
+      title="Notificações"
     >
       <svg class="notif-fab__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path
           d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"
         />
       </svg>
-      <span class="notif-fab__badge" *ngIf="aniversariantes().length > 0">{{
-        aniversariantes().length
+      <span class="notif-fab__badge" *ngIf="totalNotificacoes() > 0">{{
+        totalNotificacoes()
       }}</span>
     </button>
 
     <div class="notif-panel" *ngIf="notificacoesAbertas()" (click)="$event.stopPropagation()">
-      <h2 class="notif-panel__title">🎂 Aniversariantes de hoje</h2>
-      <ul class="notif-panel__list" *ngIf="aniversariantes().length > 0; else notifVazio">
-        <li class="notif-panel__item" *ngFor="let cliente of aniversariantes()">
-          <span class="notif-panel__name">{{ cliente.name }}</span>
-          <span class="notif-panel__phone" *ngIf="cliente.phone">{{ cliente.phone }}</span>
-        </li>
-      </ul>
-      <ng-template #notifVazio>
-        <p class="notif-panel__empty">Nenhum aniversariante hoje</p>
-      </ng-template>
+      <section class="notif-panel__section" *ngIf="avisosMensalidade().length > 0">
+        <h2 class="notif-panel__title">💳 Mensalidade</h2>
+        <ul class="notif-panel__list">
+          <li
+            class="notif-panel__item notif-panel__item--stacked"
+            [class.notif-panel__item--atraso]="aviso.emAtraso"
+            *ngFor="let aviso of avisosMensalidade(); trackBy: trackAviso"
+          >
+            <span class="notif-panel__name">{{ aviso.texto }}</span>
+            <span class="notif-panel__phone">
+              {{ aviso.valor | currency: 'BRL' }} · vencimento
+              {{ aviso.vencimento | date: 'dd/MM/yyyy' }}
+            </span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="notif-panel__section" *ngIf="mostrarAniversariantes()">
+        <h2 class="notif-panel__title">🎂 Aniversariantes de hoje</h2>
+        <ul class="notif-panel__list" *ngIf="aniversariantes().length > 0; else notifVazio">
+          <li class="notif-panel__item" *ngFor="let cliente of aniversariantes()">
+            <span class="notif-panel__name">{{ cliente.name }}</span>
+            <span class="notif-panel__phone" *ngIf="cliente.phone">{{ cliente.phone }}</span>
+          </li>
+        </ul>
+        <ng-template #notifVazio>
+          <p class="notif-panel__empty">Nenhum aniversariante hoje</p>
+        </ng-template>
+      </section>
     </div>
   </div>
 

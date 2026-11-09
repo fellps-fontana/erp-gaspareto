@@ -171,7 +171,7 @@ function validarDataCivil(data: CivilDate): void {
   }
 }
 
-function ehDataCivilValida(data: CivilDate): boolean {
+export function ehDataCivilValida(data: CivilDate): boolean {
   return PADRAO_DATA_CIVIL.test(data) && utcParaCivil(civilParaUtc(data)) === data;
 }
 
@@ -250,7 +250,7 @@ function primeiroDiaMarcadoAPartirDe(agenda: AgendaDeRecorrencia, dataMinima: Ci
   falhar('DIAS_DA_SEMANA_INVALIDOS', 'weekdays sem nenhum dia valido');
 }
 
-function formatarCivil(ano: number, mesIndice: number, dia: number): CivilDate {
+export function formatarCivil(ano: number, mesIndice: number, dia: number): CivilDate {
   const anoTexto = String(ano).padStart(4, '0');
   const mesTexto = String(mesIndice + 1).padStart(2, '0');
   const diaTexto = String(dia).padStart(2, '0');
@@ -271,7 +271,7 @@ function somarDias(data: CivilDate, dias: number): CivilDate {
   return utcParaCivil(new Date(civilParaUtc(data).getTime() + dias * MILISSEGUNDOS_POR_DIA));
 }
 
-function diferencaEmDias(de: CivilDate, ate: CivilDate): number {
+export function diferencaEmDias(de: CivilDate, ate: CivilDate): number {
   return (civilParaUtc(ate).getTime() - civilParaUtc(de).getTime()) / MILISSEGUNDOS_POR_DIA;
 }
 
@@ -279,7 +279,7 @@ function diaDaSemana(data: CivilDate): number {
   return civilParaUtc(data).getUTCDay();
 }
 
-function diasNoMes(ano: number, mesIndice: number): number {
+export function diasNoMes(ano: number, mesIndice: number): number {
   return new Date(Date.UTC(ano, mesIndice + 1, 0)).getUTCDate();
 }
 

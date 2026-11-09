@@ -9,6 +9,7 @@ import { ConfigComponent } from '../components/config/config';
 import { LoginComponent } from '../components/login/login';
 import { SignupComponent } from '../components/signup/signup';
 import { SuperAdminComponent } from '../components/super-admin/super-admin';
+import { SubscriptionsComponent } from '../components/subscriptions/subscriptions';
 import { authGuard } from '../guards/auth.guard';
 import { moduleGuard } from '../guards/module.guard';
 import { superAdminGuard } from '../guards/super-admin.guard';
@@ -24,5 +25,6 @@ export const routes: Routes = [
   { path: 'contas', component: BillsComponent, canActivate: [authGuard, moduleGuard], data: { module: 'contas' } },
   { path: 'config', component: ConfigComponent },
   { path: 'admin', component: SuperAdminComponent, canActivate: [authGuard, superAdminGuard] },
+  { path: 'admin/assinaturas', component: SubscriptionsComponent, canActivate: [authGuard, superAdminGuard] },
   { path: '**', redirectTo: '' }
 ];
