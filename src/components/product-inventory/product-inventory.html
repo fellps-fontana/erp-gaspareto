@@ -1068,24 +1068,22 @@
   <div class="checkout-overlay" *ngIf="detalheLancamentoAberto as item" (click)="fecharDetalheLancamento()">
     <div class="checkout-modal detalhe-lancamento-modal" (click)="$event.stopPropagation()">
       <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="fecharDetalheLancamento()">✕</button>
-      <div class="pedido-historico-header">
-        <div class="header-left-group">
+      <div class="detalhe-lancamento-cabecalho">
+        <div class="detalhe-lancamento-selos">
           <span class="order-number" *ngIf="item.numero">#{{ item.numero }}</span>
           <span class="status-badge" [ngClass]="item.origem">{{ origemLabel(item.origem) }}</span>
-        </div>
-        <div class="header-right-group">
           <span class="status-badge" [ngClass]="statusClassHistorico(item)">{{ statusLabelHistorico(item) }}</span>
-          <span class="pedido-historico-data">{{ item.data | date:'dd/MM/yyyy HH:mm' }}</span>
         </div>
+        <span class="pedido-historico-data">{{ item.data | date:'dd/MM/yyyy HH:mm' }}</span>
       </div>
 
-      <h2>{{ item.clienteNome }}</h2>
+      <h2 class="detalhe-lancamento-cliente">{{ item.clienteNome }}</h2>
 
       <div class="detalhe-lancamento-meta">
         <span class="meta-badge" *ngIf="item.paymentMethod">
           💳 {{ paymentMethodLabel(item.paymentMethod) }}<ng-container *ngIf="item.installments && item.installments > 1"> · {{ item.installments }}x</ng-container>
         </span>
-        <span class="meta-badge" *ngIf="item.origem === 'pedido'">🚚 {{ tipoEntregaLabel(item.deliveryType) }}</span>
+        <span class="meta-badge" *ngIf="item.origem === 'pedido'">{{ tipoEntregaIcone(item.deliveryType) }} {{ tipoEntregaLabel(item.deliveryType) }}</span>
       </div>
 
       <p class="detalhe-lancamento-endereco" *ngIf="item.origem === 'pedido' && item.deliveryType === 'delivery' && item.address">
