@@ -296,6 +296,12 @@
     flex-direction: column;
   }
 
+  /* Em coluna, o flex-basis de 320px do desktop vira altura minima e abre um vao
+     abaixo do Resumo de Producao. Aqui o card ocupa so a altura do conteudo. */
+  .summary-row .order-summary-header {
+    flex: 0 0 auto;
+  }
+
   .estimate-container {
     flex-direction: column;
     align-items: flex-start;
