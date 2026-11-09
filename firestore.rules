@@ -26,6 +26,11 @@ service cloud.firestore {
       return collection in ['products', 'sales', 'comandas', 'orders', 'bills', 'customers', 'purchases', 'purchaseProducts', 'vendedores', 'expenses', 'expenseCategories', 'expenseSeries', 'recurringOrders'];
     }
 
+    // Id da cobranca = companyId + '_' + competence sem hifen (ex.: abc123_202611).
+    function competenciaSemHifen(competence) {
+      return competence.split('-')[0] + competence.split('-')[1];
+    }
+
     match /users/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdminUser());
       allow create: if isSignedIn()
@@ -58,6 +63,50 @@ service cloud.firestore {
       allow delete: if isSignedIn()
         && userCompanyId() == companyId
         && userRole() in ['owner', 'admin'];
+    }
+
+    // Mensalidade da plataforma (regra 14). Fora de isOperationalCollection e do
+    // bypass generico: so o super-admin escreve; empresa le apenas a propria cobranca.
+    match /subscriptions/{companyId} {
+      allow read: if isSignedIn() && isSuperAdminUser();
+      allow create, update: if isSignedIn()
+        && isSuperAdminUser()
+        && request.resource.data.companyId == companyId;
+      allow delete: if false;
+    }
+
+    match /subscriptionCharges/{chargeId} {
+      allow read: if isSignedIn()
+        && (isSuperAdminUser() || resource.data.companyId == userCompanyId());
+
+      allow create: if isSignedIn()
+        && isSuperAdminUser()
+        && request.resource.data.status == 'a_pagar'
+        && request.resource.data.paidDate == null
+        && request.resource.data.paidAmount == null
+        && request.resource.data.competence.matches('[0-9]{4}-[0-9]{2}')
+        && chargeId == request.resource.data.companyId + '_' + competenciaSemHifen(request.resource.data.competence);
+
+      allow update: if isSignedIn()
+        && isSuperAdminUser()
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.competence == resource.data.competence
+        && request.resource.data.dueDate == resource.data.dueDate
+        && request.resource.data.amount == resource.data.amount
+        && (
+          (resource.data.status == 'a_pagar'
+            && request.resource.data.status == 'pago'
+            && request.resource.data.paidDate is string
+            && request.resource.data.paidDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && request.resource.data.paidAmount == resource.data.amount)
+          ||
+          (resource.data.status == 'pago'
+            && request.resource.data.status == 'a_pagar'
+            && request.resource.data.paidDate == null
+            && request.resource.data.paidAmount == null)
+        );
+
+      allow delete: if false;
     }
 
     match /{collection}/{docId} {

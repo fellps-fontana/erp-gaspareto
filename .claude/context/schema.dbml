@@ -179,6 +179,30 @@ Table bills {  // LEGADO — substituído por expenses (regra-de-negocio.md §7/
   purchaseProductId   string    [null, ref: > purchaseProducts.id]
 }
 
+Table subscriptions {
+  id             string    [pk, note: 'doc id = companyId (uma config por empresa). Só super-admin lê/escreve — regra-de-negocio.md seção 15']
+  companyId      string    [ref: - companies.id, note: 'igual ao id do doc']
+  amount         number    [note: 'valor da mensalidade (> 0), configurável por empresa; editar só afeta cobranças ainda não geradas']
+  dueDay         number    [note: '1..31; mês sem o dia usa o último dia do mês']
+  active         boolean   [note: 'cobrança ativa/inativa; inativa = não gera novas, não bloqueia nada']
+  contractStart  string    [note: 'yyyy-MM-dd; primeira cobrança = mês deste campo']
+  generateFrom   string    [note: 'yyyy-MM; limite inferior de geração; reativar = mês atual']
+  createdAt      timestamp
+  updatedAt      timestamp
+}
+
+Table subscriptionCharges {
+  id            string    [pk, note: 'id determinístico {companyId}_{yyyyMM} — garante idempotência da geração']
+  companyId     string    [ref: > companies.id, note: 'empresa lê só as próprias; escrita só super-admin (seção 15, NÃO é coleção operacional)']
+  competence    string    [note: 'yyyy-MM']
+  dueDate       string    [note: 'yyyy-MM-dd; calculada na geração e congelada']
+  amount        number    [note: 'snapshot do valor na geração']
+  status        string    [note: 'a_pagar | pago. "Vencida" é DERIVADA (a_pagar e hoje > dueDate), nunca persistida']
+  paidDate      string    [null, note: 'yyyy-MM-dd; só em pago']
+  paidAmount    number    [null, note: '= amount (sem pagamento parcial); só em pago']
+  createdAt     timestamp
+}
+
 Table config {
   id       string  [pk, note: "único doc usado: id = 'company' — LEGADO"]
   modules  json    [note: 'ModuleConfig — substituído por companies.modules (ver regra-de-negocio.md seção 11); manter documentado até confirmar remoção do doc config/company em produção']

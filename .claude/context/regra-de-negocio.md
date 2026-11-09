@@ -761,6 +761,8 @@ depois do cutover (ver §14).
 - ~~Fechar Sale de pedido cancelado após entrega~~ — resolvido pela seção 5.3
   (decisão do usuário de 2026-10-20: a `Sale` é cancelada junto).
 
+- ~~Mensalidade da plataforma (seção 15) — pontos assumidos~~ — confirmados pelo usuário em 2026-11-09 (antecipação, catch-up, data editável, desativar mantém abertas, desfazer pagamento pelo super-admin, aviso depende do super-admin abrir Assinaturas na v1).
+
 ## 13. Super-admin da plataforma — [CRÍTICA]
 
 - **Campo `isSuperAdmin: boolean`** em `users/{uid}` (default `false`, ausente =
@@ -887,3 +889,115 @@ recusa qualquer outro projeto. Habilitar produção exige task nova e explícita
 - Depois do cutover validado em produção (task futura), `bills`,
   `purchaseProducts`, seus índices e entradas em `firestore.rules` são
   purgados em task própria.
+
+## 15. Mensalidade da plataforma (`subscriptions` / `subscriptionCharges`) — [CRÍTICA]
+
+> Decisões do usuário de 2026-11-09. As empresas clientes pagam mensalidade ao
+> dono da plataforma. Quem gerencia é o **super-admin** (`isSuperAdmin`, seção
+> 13), nunca o owner/admin da empresa. Dinheiro + autorização entre tenants:
+> ciclo TDD obrigatório.
+
+### Escopo da v1
+- **Controle + aviso.** Sem gateway. O pagamento acontece fora do app (Pix); o
+  super-admin marca como pago. Atraso é **só aviso** — nada é bloqueado.
+- Fora da v1: gateway, bloqueio por inadimplência, juros/multa, recibo/NF.
+
+### Modelo
+- `subscriptions/{companyId}` (doc id = `companyId`) — config por empresa,
+  editada só pelo super-admin: `companyId`, `amount` (number finito > 0, 2
+  casas; não existe valor fixo global — configurável por empresa), `dueDay`
+  (inteiro 1..31), `active` (cobrança ativa/inativa), `contractStart`
+  (`yyyy-MM-dd`), `generateFrom` (`yyyy-MM`; limite inferior de geração: no
+  primeiro save = mês de `contractStart`; ao reativar (`active` false -> true) =
+  mês atual), `createdAt`, `updatedAt`.
+- `subscriptionCharges/{companyId}_{yyyyMM}` (id determinístico, ex.:
+  `abc123_202611`): `companyId`, `competence` (`yyyy-MM`), `dueDate`
+  (`yyyy-MM-dd`, calculada na geração), `amount` (**snapshot** do valor na
+  geração), `status` (`'a_pagar' | 'pago'`), `paidDate` (`yyyy-MM-dd` | null),
+  `paidAmount` (number | null), `createdAt`.
+- Datas são strings civis no calendário local (BR), sem fuso — como em 5.4.
+- **Por que coleção própria e não campo em `companies/{id}`:** hoje owner/admin
+  podem dar `update` em `companies/{id}` e o `create` é aberto no auto-cadastro;
+  proteger campos ali exigiria `affectedKeys()` no update e validação no create,
+  e um campo esquecido deixaria a empresa editar a própria mensalidade. Coleção
+  nova é negada por padrão e só o super-admin escreve.
+- Editar valor/`dueDay` afeta **só cobranças ainda não geradas** (cobrança gerada
+  guarda `amount` e `dueDate` congelados).
+
+### Vencimento
+- `dueDate(M)` = dia `dueDay` do mês M; mês sem o dia usa o último dia do mês
+  (mesmo critério de 5.4).
+
+### Geração (automática, idempotente)
+- Roda **no cliente, quando o super-admin abre a tela de Assinaturas**
+  (confirmado pelo usuário em 2026-11-09). A empresa nunca cria a própria
+  cobrança. Cloud Function agendada entra só em produção, no futuro, com o mesmo
+  núcleo (homolog é Spark e não roda Functions) — mesmo padrão de 5.4.
+- Consequência aceita pelo usuário (2026-11-09): na v1, se o super-admin não
+  abrir Assinaturas, a cobrança do mês não nasce e a empresa não recebe aviso.
+- Para cada empresa com `active = true`, a competência M é gerada se:
+  1. `M >= max(mês(contractStart), generateFrom)` — **nunca antes do início do
+     contrato**; a primeira cobrança é a do mês de `contractStart`, **mesmo que o
+     `dueDay` já tenha passado nesse mês** (nasce já "em atraso");
+  2. `M <= mês atual` **ou** `hoje >= dueDate(M) − 5 dias` (a janela de aviso da
+     competência seguinte já abriu). Confirmado pelo usuário (2026-11-09): sem
+     esta antecipação, vencimento nos primeiros dias do mês nunca avisaria 5 dias
+     antes (a cobrança do mês seguinte ainda não existiria).
+- Catch-up (confirmado): gera todos os meses faltantes dentro do intervalo
+  acima, não só o último.
+- **Idempotência:** id = `{companyId}_{yyyyMM}`. A criação é uma transação que lê
+  o doc e só grava se não existir; duas execuções (dois dispositivos/abas) nunca
+  duplicam. Cobrança já existente nunca é sobrescrita.
+- Desativar (`active = false`) só para a geração futura; cobranças já geradas
+  continuam avisando até serem pagas (confirmado).
+
+### Status e atraso
+- Persistido: `a_pagar | pago`. **"Vencida" é derivada, nunca gravada:** `a_pagar`
+  e `hoje > dueDate`.
+- Derivação (função pura única, `hoje` = data civil local):
+  - `pago` -> sem aviso;
+  - `a_pagar` com `dueDate - hoje` > 5 dias -> sem aviso;
+  - `a_pagar` com `0 <= dueDate - hoje <= 5` -> "vence em N dias" (N = 0 ->
+    "vence hoje");
+  - `a_pagar` com `hoje > dueDate` -> "em atraso há X dias".
+- **Botão "Recebi"** (super-admin): `a_pagar` -> `pago`, grava `paidDate`
+  (padrão = hoje; o super-admin pode ajustar a data — confirmado) e
+  `paidAmount = amount`. **Sem pagamento parcial.** Marcar uma cobrança já paga é
+  rejeitado (`JA_PAGA`).
+- **Desfazer pagamento** (super-admin, confirmado em 2026-11-09): `pago` ->
+  `a_pagar`, limpando `paidDate` e `paidAmount` (`null`); desfazer cobrança que
+  não está paga é rejeitado (`NAO_PAGA`). Serve para corrigir "Recebi" clicado
+  por engano. Não existe cancelar/apagar cobrança na v1.
+
+### Aviso na área Notificações (painel da home)
+- Novo tipo de item **"mensalidade"** no painel de Notificações já existente
+  (hoje só aniversariantes). Aparece 5 dias antes do vencimento ("vence em N
+  dias"), vira "em atraso" após o vencimento e **some quando a cobrança é
+  marcada como paga**.
+- Todos os usuários da empresa veem o aviso (hoje 1 usuário por empresa).
+- **A empresa não pode desligar este aviso:** fica fora de `modules.notificacoes`
+  e da tela Configurações; o painel/sino precisa aparecer mesmo com
+  `notificacoes.aniversario` desligado.
+- O aviso mostra só a informação (vence/atrasada, valor, vencimento), **sem
+  chave Pix** (confirmado pelo usuário em 2026-11-09).
+- O aviso mostra as cobranças da empresa efetiva da sessão (`TenantService`);
+  super-admin em override de empresa vê as da empresa selecionada.
+
+### Autorização (`firestore.rules`)
+| Ação | Super-admin | Empresa (owner/admin/employee) |
+|---|---|---|
+| ler/escrever `subscriptions` | sim (delete: não) | **nada** |
+| ler `subscriptionCharges` | todas | **só** `companyId` da própria empresa |
+| criar `subscriptionCharges` | sim (só `status = 'a_pagar'`, id = `{companyId}_{yyyyMM}`) | não |
+| atualizar `subscriptionCharges` | só `a_pagar -> pago` com `paidAmount == amount`, ou `pago -> a_pagar` com `paidDate`/`paidAmount` = `null`; `companyId`, `competence`, `dueDate`, `amount` imutáveis | não |
+| apagar `subscriptionCharges` | não | não |
+- As duas coleções **não** entram em `isOperationalCollection` nem no bypass
+  genérico de super-admin das coleções operacionais (seção 13) — regras próprias,
+  senão a empresa conseguiria escrever pelo `companyId`.
+- Empresa A nunca lê cobrança da empresa B (equivalente ao isolamento da seção
+  10: vazamento aqui expõe valor contratado de outro cliente).
+
+### Reaproveitamento
+- Idempotência por id determinístico + transação segue o padrão de 5.4
+  (`rec_{id}_{yyyyMMdd}`); datas civis e `hojeCivil` vêm de
+  `recurrence-rules.ts`.

@@ -52,3 +52,6 @@ Thumbs.db
 service-account*.json
 *-service-account.json
 *firebase-adminsdk*.json
+
+# Kira task queue (local por branch)
+.kira/
