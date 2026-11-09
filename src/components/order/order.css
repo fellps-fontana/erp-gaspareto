@@ -799,6 +799,11 @@ textarea:focus {
   outline: none;
 }
 
+/* Safari iOS centraliza o valor do date nativo por este pseudo-elemento. */
+.schedule-date-input::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 .scheduled-date-badge {
   display: flex;
   align-items: center;
@@ -1225,22 +1230,33 @@ textarea:focus {
     width: 100%;
   }
 
-  /* Frete e agendamento: label + input + botão não cabem lado a lado
-     em telas muito estreitas — empilha em coluna. */
-  .freight-row,
-  .schedule-row {
+  /* Frete: label + input não cabem lado a lado em telas muito estreitas —
+     empilha em coluna. */
+  .freight-row {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
   }
 
-  .freight-row input,
-  .schedule-date-input {
+  .freight-row input {
     width: 100%;
   }
 
-  .schedule-row .btn-calendar {
-    align-self: flex-end;
+  /* Data de Retirada/Entrega fica em uma linha (label | data | Google Calendar).
+     Empilhada, o controle nativo do Safari iOS centralizava a data e o card
+     ocupava ~1/4 da tela. Altura do input = altura do select de Vendedor. */
+  .schedule-row {
+    gap: 8px;
+  }
+
+  .schedule-date-input {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 37px;
+    padding: 0 4px;
+    text-align: left;
   }
 
   /* Grid de produtos do carrinho: colunas menores para manter 2 por
