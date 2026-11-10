@@ -317,7 +317,9 @@ export function mapPurchaseProductToSeries(purchaseProduct, linkedBills, ctx) {
   const category = seriesCategory(purchaseProduct, latestBill);
   const data = compact({
     companyId: ctx.companyId,
-    active: true,
+    // Nasce inativa: o sistema antigo nunca gerou essas contas sozinho. Ativa, a serie
+    // geraria ocorrencias retroativas desde anchorDate (secao 14, decisao de 10/11/2026).
+    active: false,
     period: periodOf(purchaseProduct),
     anchorDate: dueKeys[0] ?? anchorWithoutBills(purchaseProduct),
     generatedThrough: dueKeys.length ? dueKeys[dueKeys.length - 1] : undefined,

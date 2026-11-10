@@ -339,10 +339,10 @@ describe('mapPurchaseProductToSeries', () => {
     assert.equal(data.migracaoRevisar, true);
   });
 
-  it('legacyPurchaseProductId aponta pro id do produto e a serie nasce ativa', () => {
+  it('legacyPurchaseProductId aponta pro id do produto e a serie nasce inativa', () => {
     const { data } = mapPurchaseProductToSeries(purchaseProduct(), [], CTX);
     assert.equal(data.legacyPurchaseProductId, 'pp1');
-    assert.equal(data.active, true);
+    assert.equal(data.active, false);
   });
 });
 

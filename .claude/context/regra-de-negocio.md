@@ -851,8 +851,9 @@ depois do cutover (ver §14).
 ## 14. Migração Contas a Pagar → Despesas — [CRÍTICA]
 
 Script `scripts/migrate-bills-to-expenses.mjs` (Admin SDK) + núcleo puro
-`scripts/lib/expense-migration-core.mjs`. **Só roda em homolog (`hologaerp`)**;
-recusa qualquer outro projeto. Habilitar produção exige task nova e explícita.
+`scripts/lib/expense-migration-core.mjs`. Alvo padrão **homolog (`hologaerp`)**.
+**Produção (`projetosfelipe-9e458`) só com `--target-prod` explícito** (liberado em
+2026-11-10); sem a flag, produção é recusada. Qualquer outro projeto é sempre recusado.
 
 - **Idempotente e não destrutivo**: lê `bills`/`purchaseProducts`, nunca
   altera nem apaga legado. Cada doc novo usa ID determinístico (`mig_bill_<id>`,
@@ -875,7 +876,10 @@ recusa qualquer outro projeto. Habilitar produção exige task nova e explícita
   categoria padrão; "Taxas de cartão" tem precedência sobre "Impostos/Taxas".
   [CONFIRMAR] heurística (4).
 - **`purchaseProducts` (D4)**: os com `recurring=true` viram `expenseSeries`
-  (`mig_pp_<id>`): `anchorDate` = menor `dueDate` dos bills ligados (ou data
+  (`mig_pp_<id>`) **inativas (`active=false`)** — decisão do usuário de 2026-11-10: o
+  sistema antigo nunca gerou essas contas sozinho, e a série ativa geraria ocorrências
+  retroativas desde `anchorDate`. Série inativa não aparece na tela nem gera ocorrência;
+  quem ainda paga cadastra uma despesa recorrente nova em Despesas. `anchorDate` = menor `dueDate` dos bills ligados (ou data
   de criação), `generatedThrough` = maior `dueDate` dos bills ligados (para o
   catch-up continuar dali), `template` do último bill, `period`
   `weekly→semanal`/`monthly→mensal`. Bills ligados recebem `seriesId`.

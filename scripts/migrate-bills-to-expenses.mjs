@@ -1,9 +1,10 @@
 // Migracao bills/purchaseProducts -> expenses / expenseSeries / expenseCategories.
 // Regra: regra-de-negocio.md secao 14. Nucleo puro: scripts/lib/expense-migration-core.mjs.
 //
-// SOMENTE HOMOLOG: projeto fixo hologaerp. Qualquer outro projeto (argumento --project,
-// GCLOUD_PROJECT ou GOOGLE_CLOUD_PROJECT, ou project_id da service account) e recusado
-// com exit code 1 ANTES de iniciar o Admin SDK.
+// ALVO: hologaerp por padrao. Producao (projetosfelipe-9e458) so com --target-prod explicito.
+// Qualquer outro projeto (argumento --project, GCLOUD_PROJECT ou GOOGLE_CLOUD_PROJECT, ou
+// project_id da service account) diferente do alvo e recusado com exit code 1 ANTES de
+// iniciar o Admin SDK.
 //
 // USO
 //   node scripts/migrate-bills-to-expenses.mjs                       dry-run (nada gravado)
@@ -12,6 +13,8 @@
 //   node scripts/migrate-bills-to-expenses.mjs --rollback            dry-run do rollback
 //   node scripts/migrate-bills-to-expenses.mjs --rollback --apply    apaga o que a migracao criou
 //   npm run migrate:expenses:hml                                     atalho (hologaerp)
+//   node scripts/migrate-bills-to-expenses.mjs --target-prod         dry-run em PRODUCAO
+//   node scripts/migrate-bills-to-expenses.mjs --target-prod --apply grava em PRODUCAO
 //
 // PRE-REQUISITOS
 //   - Emulador local: FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 (dispensa credencial).
@@ -35,7 +38,8 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { readFileSync, existsSync } from 'node:fs';
 import { ID_PREFIX_SERIES, ORIGIN_MIGRACAO, planMigration } from './lib/expense-migration-core.mjs';
 
-const TARGET_PROJECT = 'hologaerp';
+const HOMOLOG_PROJECT = 'hologaerp';
+const PROD_PROJECT = 'projetosfelipe-9e458';
 const LEGACY_COLLECTIONS = { bills: 'bills', purchaseProducts: 'purchaseProducts' };
 const NEW_COLLECTIONS = {
   categories: 'expenseCategories',
@@ -48,9 +52,10 @@ const ALREADY_EXISTS_CODE = 6;
 const PREFIX_RANGE_END_SENTINEL = '\uf8ff';
 
 function parseArgs(argv) {
-  const args = { apply: false, rollback: false, companyId: null, project: null };
+  const args = { apply: false, rollback: false, companyId: null, project: null, targetProd: false };
   for (const arg of argv) {
     if (arg === '--apply') args.apply = true;
+    else if (arg === '--target-prod') args.targetProd = true;
     else if (arg === '--rollback') args.rollback = true;
     else if (arg.startsWith('--company=')) args.companyId = argValue(arg);
     else if (arg.startsWith('--project=')) args.project = argValue(arg);
@@ -65,38 +70,44 @@ function argValue(arg) {
   return value;
 }
 
-function assertTargetProject(requestedProject) {
+/** Projeto alvo: producao so com --target-prod; sem a flag, sempre homolog. */
+function resolveTargetProject(args) {
+  return args.targetProd ? PROD_PROJECT : HOMOLOG_PROJECT;
+}
+
+function assertTargetProject(requestedProject, target) {
   const candidates = [
     requestedProject,
     process.env.GCLOUD_PROJECT,
     process.env.GOOGLE_CLOUD_PROJECT,
   ];
-  const foreign = candidates.filter((project) => project && project !== TARGET_PROJECT);
+  const foreign = candidates.filter((project) => project && project !== target);
   if (foreign.length) {
-    throw new Error(`projeto ${foreign[0]} recusado: este script so roda em ${TARGET_PROJECT}`);
+    const hint = foreign[0] === PROD_PROJECT ? ' (producao exige --target-prod)' : '';
+    throw new Error(`projeto ${foreign[0]} recusado: alvo desta execucao e ${target}${hint}`);
   }
 }
 
-function loadServiceAccount(path) {
+function loadServiceAccount(path, target) {
   if (!existsSync(path)) throw new Error(`SERVICE_ACCOUNT_PATH nao existe: ${path}`);
   const serviceAccount = JSON.parse(readFileSync(path, 'utf8'));
-  if (serviceAccount.project_id !== TARGET_PROJECT) {
+  if (serviceAccount.project_id !== target) {
     throw new Error(
-      `service account do projeto ${serviceAccount.project_id} recusada: este script so usa ${TARGET_PROJECT}`,
+      `service account do projeto ${serviceAccount.project_id} recusada: alvo desta execucao e ${target}`,
     );
   }
   return serviceAccount;
 }
 
-function resolveCredential() {
+function resolveCredential(target) {
   const path = process.env.SERVICE_ACCOUNT_PATH;
-  return path ? cert(loadServiceAccount(path)) : applicationDefault();
+  return path ? cert(loadServiceAccount(path, target)) : applicationDefault();
 }
 
-function initFirestore() {
-  const credential = process.env.FIRESTORE_EMULATOR_HOST ? undefined : resolveCredential();
+function initFirestore(target) {
+  const credential = process.env.FIRESTORE_EMULATOR_HOST ? undefined : resolveCredential(target);
   const app = initializeApp({
-    projectId: TARGET_PROJECT,
+    projectId: target,
     ...(credential && { credential }),
   });
   return getFirestore(app);
@@ -291,16 +302,18 @@ async function runRollback(db, args) {
   );
 }
 
-function printMode(args) {
-  const mode = args.apply ? 'APLICANDO (projeto hologaerp)' : 'DRY-RUN (nada gravado; use --apply)';
+function printMode(args, target) {
+  const mode = args.apply ? `APLICANDO (projeto ${target})` : 'DRY-RUN (nada gravado; use --apply)';
+  console.log(`Projeto: ${target}${target === PROD_PROJECT ? '  <<< PRODUCAO >>>' : ''}`);
   console.log(`Modo: ${mode}${args.rollback ? ' [ROLLBACK]' : ''}`);
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  assertTargetProject(args.project);
-  const db = initFirestore();
-  printMode(args);
+  const target = resolveTargetProject(args);
+  assertTargetProject(args.project, target);
+  const db = initFirestore(target);
+  printMode(args, target);
   if (args.rollback) await runRollback(db, args);
   else await runMigration(db, args);
 }
