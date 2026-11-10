@@ -1,0 +1,25 @@
+<ng-container *ngIf="linhas$ | async as linhas">
+  <section class="recorrentes" *ngIf="linhas.length > 0">
+    <h3 class="recorrentes-titulo">🔁 Pedidos recorrentes deste cliente</h3>
+
+    <article class="recorrente-card" *ngFor="let l of linhas; trackBy: trackById">
+      <div class="recorrente-topo">
+        <span class="recorrente-frequencia">{{ l.view.frequencyLabel }}</span>
+        <span class="status-badge" [ngClass]="'status-' + l.view.status">{{ l.view.statusLabel }}</span>
+      </div>
+
+      <p class="recorrente-itens">{{ l.view.itemsSummary }}</p>
+
+      <p class="recorrente-proxima" *ngIf="l.proximaData">Próxima: <strong>{{ l.proximaData }}</strong></p>
+
+      <p class="recorrente-aviso" *ngIf="l.view.issueLabel" role="alert">⚠️ {{ l.view.issueLabel }}</p>
+
+      <div class="recorrente-acoes" *ngIf="l.view.canPause || l.view.canResume">
+        <button type="button" class="btn btn-outline" *ngIf="l.view.canPause"
+                [disabled]="emAcao === l.id" (click)="pausar(l.id)">Pausar</button>
+        <button type="button" class="btn btn-primary" *ngIf="l.view.canResume"
+                [disabled]="emAcao === l.id" (click)="retomar(l.id)">Retomar</button>
+      </div>
+    </article>
+  </section>
+</ng-container>

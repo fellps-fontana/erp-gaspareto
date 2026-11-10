@@ -1,0 +1,18 @@
+<div class="update-region" role="status" aria-live="polite">
+  @if (updateAvailable() && !dispensado()) {
+    <div class="update-banner">
+      <span class="update-text">Nova versão disponível</span>
+      <button type="button" class="btn btn-primary update-action" (click)="atualizar()">
+        Atualizar
+      </button>
+      <button
+        type="button"
+        class="update-dismiss"
+        aria-label="Dispensar aviso de nova versão"
+        (click)="dispensar()"
+      >
+        ✕
+      </button>
+    </div>
+  }
+</div>

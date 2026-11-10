@@ -1,12 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
-  collection, doc, runTransaction, query, where, orderBy, serverTimestamp, increment
+  collection, doc, runTransaction, query, where, orderBy, serverTimestamp, increment,
+  DocumentReference, Transaction
 } from 'firebase/firestore';
 import { Observable } from 'rxjs';
-import { Sale } from '../../models/sell-model';
+import { PaymentMethod, Sale } from '../../models/sell-model';
 import { FirestoreBaseService } from '../firestore-base.service';
 import { TenantService } from '../tenant-service/tenant-service';
+
+const SALE_STATUS = {
+  COMPLETED: 'completed',
+  CANCELED: 'canceled'
+} as const;
 
 @Injectable({
   providedIn: 'root',
@@ -24,7 +30,10 @@ export class SaleService extends FirestoreBaseService {
     return this.collectionDataObservable<Sale>(q);
   }
 
-  async processSale(sale: Omit<Sale, 'id' | 'companyId'>, updateStock: boolean = true): Promise<void> {
+  async processSale(
+    sale: Omit<Sale, 'id' | 'companyId'>,
+    updateStock: boolean = true
+  ): Promise<void> {
     const companyId = this.tenantService.companyId();
     if (!companyId) {
       throw new Error(
@@ -64,17 +73,10 @@ export class SaleService extends FirestoreBaseService {
         const newSaleRef = doc(collection(this.firestore, this.COLLECTION_NAME));
         const saleDoc: any = {
           companyId,
-          items: sale.items.map(i => ({
-            idProduct: i.idProduct,
-            productName: i.productName,
-            quantity: Number(i.quantity),
-            priceAtSale: Number(i.priceAtSale),
-            priceAtCost: Number(i.priceAtCost),
-            soldByWeight: i.soldByWeight ?? false
-          })),
+          items: this.mapSaleItems(sale),
           total: Number(sale.total) || 0,
           date: serverTimestamp(),
-          status: 'completed',
+          status: SALE_STATUS.COMPLETED,
           sale_type: sale.sale_type,
           paymentMethod: sale.paymentMethod
         };
@@ -115,12 +117,66 @@ export class SaleService extends FirestoreBaseService {
           transaction.update(productRef, { stock: increment(item.quantity) });
         }
 
-        transaction.update(saleDocRef, { status: 'canceled' });
+        transaction.update(saleDocRef, { status: SALE_STATUS.CANCELED });
       });
       return true;
     } catch (error) {
       console.error('SaleService: Erro ao cancelar venda:', error);
       throw error;
     }
+  }
+
+  // --- Helpers transacionais de Pedidos (regra-de-negocio.md seção 5.3) ---
+  // Recebem a Transaction do OrderService: venda e pedido gravam juntos ou nada grava.
+
+  /** Cria a Sale de pedido (status 'completed', sem forma, sem tocar estoque). */
+  addSaleInTransaction(
+    transaction: Transaction,
+    sale: Omit<Sale, 'id' | 'companyId'>,
+    companyId: string
+  ): DocumentReference {
+    const newSaleRef = doc(collection(this.firestore, this.COLLECTION_NAME));
+    transaction.set(newSaleRef, {
+      companyId,
+      items: this.mapSaleItems(sale),
+      total: Number(sale.total) || 0,
+      date: sale.date,
+      status: SALE_STATUS.COMPLETED,
+      sale_type: sale.sale_type,
+      ...(sale.customerId ? { customerId: sale.customerId } : {})
+    });
+    return newSaleRef;
+  }
+
+  /** Preenche a forma de pagamento final da Sale na conclusão do pedido. */
+  setSalePaymentInTransaction(
+    transaction: Transaction,
+    saleId: string,
+    forma: { paymentMethod: PaymentMethod; installments: number }
+  ): void {
+    transaction.update(this.saleRef(saleId), {
+      paymentMethod: forma.paymentMethod,
+      installments: forma.installments
+    });
+  }
+
+  /** Marca a Sale como 'canceled' SEM devolver estoque (o pedido já devolve). */
+  cancelSaleRecordInTransaction(transaction: Transaction, saleId: string): void {
+    transaction.update(this.saleRef(saleId), { status: SALE_STATUS.CANCELED });
+  }
+
+  private saleRef(saleId: string): DocumentReference {
+    return doc(this.firestore, `${this.COLLECTION_NAME}/${saleId}`);
+  }
+
+  private mapSaleItems(sale: Pick<Sale, 'items'>): Sale['items'] {
+    return sale.items.map(i => ({
+      idProduct: i.idProduct,
+      productName: i.productName,
+      quantity: Number(i.quantity),
+      priceAtSale: Number(i.priceAtSale),
+      priceAtCost: Number(i.priceAtCost),
+      soldByWeight: i.soldByWeight ?? false
+    }));
   }
 }

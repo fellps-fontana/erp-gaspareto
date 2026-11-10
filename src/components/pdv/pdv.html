@@ -80,6 +80,7 @@
     <!-- Modal de Checkout / Comanda -->
     <div class="checkout-overlay" *ngIf="isCheckoutModalOpen" (click)="closeCheckout()">
       <div class="checkout-modal" (click)="$event.stopPropagation()">
+        <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeCheckout()">✕</button>
 
         <!-- Passo 1: Escolha Inicial -->
         <ng-container *ngIf="checkoutStep === 'choice'">
@@ -239,6 +240,7 @@
   <!-- MODAL DE EXCLUSÃO ESTILIZADO -->
   <div class="checkout-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
     <div class="checkout-modal delete-modal" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeDeleteModal()">✕</button>
       <div class="modal-icon-header warning">⚠️</div>
       <h2>Excluir Comanda?</h2>
 

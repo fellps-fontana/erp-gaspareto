@@ -5,7 +5,8 @@ export enum PaymentMethod {
     PIX = 'pix',
     CARTAO = 'cartao',
     CHEQUE = 'cheque',
-    BOLETO = 'boleto'
+    BOLETO = 'boleto',
+    MISTO = 'misto' // Nunca escolhido pelo usuário: conclusão de pedido com mais de uma forma (regra-de-negocio.md seção 5.3)
 }
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -13,7 +14,8 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
     [PaymentMethod.PIX]: 'Pix',
     [PaymentMethod.CARTAO]: 'Cartão',
     [PaymentMethod.CHEQUE]: 'Cheque',
-    [PaymentMethod.BOLETO]: 'Boleto'
+    [PaymentMethod.BOLETO]: 'Boleto',
+    [PaymentMethod.MISTO]: 'Misto'
 };
 
 export interface SaleItem {
@@ -31,7 +33,7 @@ export interface Sale {
     total: number; // Use total pra bater com o Service
     date: Timestamp | any;
     items: SaleItem[];
-    paymentMethod: PaymentMethod;
+    paymentMethod?: PaymentMethod; // Venda de pedido nasce sem forma na entrega e recebe na conclusão (seção 5.3)
     installments?: number; // Metadado (1/ausente = à vista). Sem controle de parcela individual — nunca gera lançamento em bills.
     sale_type: 'pdv' | 'order'; // Pra gente saber a origem
     customerId?: string; // Só preenchido em pedidos (sale_type === 'order') com cliente vinculado

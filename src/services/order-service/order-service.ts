@@ -1,17 +1,55 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore } from '@angular/fire/firestore';
+import { Firestore, Timestamp } from '@angular/fire/firestore';
 import {
   collection, doc, updateDoc, serverTimestamp, query, where,
-  CollectionReference, DocumentReference, runTransaction, increment
+  CollectionReference, DocumentReference, runTransaction, increment, Transaction
 } from 'firebase/firestore';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { Order } from '../../models/order-model';
+import { Order, OrderItem, OrderPayment } from '../../models/order-model';
+import {
+  aplicarAgendaParcelas, aplicarCancelamento, aplicarPagamento, calcularTotalDoPedido,
+  FormaFinal, listarPagamentos, ParcelaInput, PagamentoInvalidoError, RegistrarPagamentoInput,
+  resolverFormaDeConclusao, validarNovoTotal
+} from './order-payment-rules';
 import { SaleService } from '../sale-service/sale-service';
-import { PaymentMethod, Sale } from '../../models/sell-model';
+import { Sale } from '../../models/sell-model';
 import { FirestoreBaseService } from '../firestore-base.service';
 import { TenantService } from '../tenant-service/tenant-service';
-import { calcularTotalItemPorPeso } from '../product-service/product-weight-rules';
+
+export interface RegistrarPagamentoResultado { concluido: boolean; saldo: number; }
+export interface CancelOrderOptions { estornar: boolean; }
+
+type StatusPedido = Order['status'];
+/** Antes da entrega: aceita entrega e edicao do pedido. */
+const STATUS_ANTES_DA_ENTREGA: readonly StatusPedido[] = [
+  'open', 'pending', 'preparing', 'ready', 'delivering'
+];
+const STATUS_NAO_CANCELAVEIS: readonly StatusPedido[] = ['finished', 'canceled'];
+
+/** Unico conjunto de campos que a edicao aceita vindos de fora; o resto e ignorado. */
+const CAMPOS_EDITAVEIS: readonly (keyof Order)[] = [
+  'items', 'shippingCost', 'address', 'addressLat', 'addressLng', 'deliveryType',
+  'observations', 'customerName', 'customerPhone', 'customerId',
+  'vendedorId', 'vendedorName', 'scheduledDate'
+];
+
+function camposEditaveis(orderData: Partial<Order>): Partial<Order> {
+  const editaveis: Record<string, unknown> = {};
+  for (const campo of CAMPOS_EDITAVEIS) {
+    if (orderData[campo] !== undefined) editaveis[campo] = orderData[campo];
+  }
+  return editaveis as Partial<Order>;
+}
+
+/** Data do pagamento pago mais recente (paidDate); sem pago com data, usa o instante informado. */
+function dataDoUltimoPagamento(payments: OrderPayment[], agora: Date): Timestamp {
+  const datasPagas = payments.flatMap(p => (p.status === 'pago' && p.paidDate ? [p.paidDate] : []));
+  if (datasPagas.length === 0) {
+    return Timestamp.fromDate(agora);
+  }
+  return datasPagas.reduce((a, b) => (b.toMillis() >= a.toMillis() ? b : a));
+}
 
 @Injectable({
   providedIn: 'root',
@@ -30,7 +68,10 @@ export class OrderService extends FirestoreBaseService {
   }
 
   getOrders(): Observable<Order[]> {
-    const q = query(this.ordersCollection, where('companyId', '==', this.tenantService.companyId()));
+    const q = query(
+      this.ordersCollection,
+      where('companyId', '==', this.tenantService.companyId())
+    );
     return this.collectionDataObservable<Order>(q).pipe(
       map(orders => [...orders].sort((a, b) => {
         const dateA = a.createdAt?.toMillis?.() || (a.createdAt as any)?.seconds * 1000 || 0;
@@ -124,132 +165,95 @@ export class OrderService extends FirestoreBaseService {
     return newOrderRef;
   }
 
-  async updateOrder(orderId: string, orderData: Partial<Order>): Promise<void> {
+  /**
+   * Edita pedido antes da entrega. Campos fora da whitelist sao ignorados. Com
+   * pagamentos lancados e total alterado, o novo total passa por validarNovoTotal
+   * na mesma escrita (reajuste das parcelas via opts.parcelas).
+   */
+  async updateOrder(
+    orderId: string,
+    orderData: Partial<Order>,
+    opts?: { parcelas?: ParcelaInput[] }
+  ): Promise<void> {
     if (!orderId) return Promise.reject('Order ID is required');
-    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
-    const data = { ...orderData };
-    if (data.items) {
-      data.itemsTotal = data.items.reduce((acc, item) => {
-        const itemTotal = item.soldByWeight
-          ? calcularTotalItemPorPeso(item.priceAtSale, item.quantity)
-          : item.priceAtSale * item.quantity;
-        return acc + itemTotal;
-      }, 0);
-      data.total = Number(data.itemsTotal) + Number(data.shippingCost || 0);
-    }
-    return updateDoc(orderRef, data);
+
+    await runTransaction(this.firestore, async (transaction) => {
+      const orderRef = this.orderRef(orderId);
+      const order = await this.lerPedido(transaction, orderRef);
+
+      if (!STATUS_ANTES_DA_ENTREGA.includes(order.status)) {
+        throw new PagamentoInvalidoError(
+          'PEDIDO_NAO_EDITAVEL', `Pedido com status "${order.status}" nao pode ser editado.`
+        );
+      }
+
+      const data = this.comTotalRecalculado(order, camposEditaveis(orderData));
+
+      if (order.payments !== undefined && data.total !== undefined) {
+        data.payments = validarNovoTotal(
+          order, data.total, opts?.parcelas, () => this.gerarIdPagamento()
+        );
+      }
+
+      transaction.update(orderRef, data);
+    });
   }
 
+  /**
+   * Entrega o pedido: baixa estoque, cria a Sale e, se o saldo ja zerou,
+   * conclui na mesma transacao.
+   */
   async markAsDelivered(orderId: string): Promise<void> {
     if (!orderId) return Promise.reject('Order ID is required');
 
     await runTransaction(this.firestore, async (transaction) => {
-      const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
-      const orderSnap = await transaction.get(orderRef);
+      const orderRef = this.orderRef(orderId);
+      const order = await this.lerPedido(transaction, orderRef);
 
-      if (!orderSnap.exists()) throw new Error('Pedido não encontrado.');
-
-      const order = orderSnap.data() as Order;
-
+      if (!STATUS_ANTES_DA_ENTREGA.includes(order.status)) {
+        throw new Error(`Pedido com status "${order.status}" não pode ser entregue.`);
+      }
       if (!order.items || order.items.length === 0) {
         throw new Error('Pedido sem itens — não é possível entregar.');
       }
 
-      const stockUpdates: { ref: any; quantity: number }[] = [];
-
-      for (const item of order.items) {
-        const productRef = doc(this.firestore, `products/${item.idProduct}`);
-        const productSnap = await transaction.get(productRef);
-
-        if (!productSnap.exists()) {
-          throw new Error(`Produto "${item.productName}" não encontrado no banco.`);
-        }
-
-        const data = productSnap.data();
-        const currentStock: number = (data['stock'] as number) ?? 0;
-
-        if (currentStock < item.quantity) {
-          throw new Error(
-            `⚠️ Estoque insuficiente para "${item.productName}": ` +
-            `disponível ${currentStock}, solicitado ${item.quantity}.`
-          );
-        }
-
-        stockUpdates.push({ ref: productRef, quantity: item.quantity });
+      const baixas = await this.lerBaixasDeEstoque(transaction, order.items);
+      for (const baixa of baixas) {
+        transaction.update(baixa.ref, { stock: increment(-baixa.quantity) });
       }
 
-      for (const p of stockUpdates) {
-        transaction.update(p.ref, { stock: increment(-p.quantity) });
-      }
+      const agora = new Date();
+      const saleId = this.criarVendaDoPedido(transaction, order, serverTimestamp());
+      const entregue: Order = { ...order, status: 'delivered', saleId };
+      const payments = listarPagamentos(order);
+      const forma = resolverFormaDeConclusao(entregue, payments);
 
+      const entrega = { status: 'delivered', actualDeliveryDate: serverTimestamp(), saleId };
+      if (!forma) {
+        transaction.update(orderRef, entrega);
+        return;
+      }
+      this.saleService.setSalePaymentInTransaction(transaction, saleId, forma);
       transaction.update(orderRef, {
-        status: 'delivered',
-        actualDeliveryDate: serverTimestamp()
+        ...entrega,
+        ...this.camposDeConclusao(payments, forma, agora)
       });
     });
   }
 
-  async updateStatus(orderId: string, status: string): Promise<void> {
-    if (!orderId) return Promise.reject('Order ID is required');
-    const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
-    return updateDoc(orderRef, { status });
-  }
-
-  async finalizeOrder(order: Order, paymentMethod: PaymentMethod, installments: number = 1): Promise<boolean> {
-    if (!order.id) throw new Error('Pedido sem ID não pode ser finalizado.');
-
-    // Normalize installments defensively: always Number, minimum 1
-    let normalizedInstallments = Number(installments) || 1;
-    if (normalizedInstallments < 1) {
-      normalizedInstallments = 1;
-    }
-
-    try {
-      const saleData: Omit<Sale, 'id' | 'companyId'> = {
-        items: order.items.map(item => ({
-          idProduct: item.idProduct,
-          productName: item.productName,
-          quantity: Number(item.quantity),
-          priceAtSale: Number(item.priceAtSale),
-          priceAtCost: Number(item.priceAtCost),
-          soldByWeight: item.soldByWeight ?? false
-        })),
-        total: Number(order.total),
-        sale_type: 'order',
-        paymentMethod: paymentMethod,
-        installments: normalizedInstallments,
-        date: serverTimestamp(),
-        ...(order.customerId ? { customerId: order.customerId } : {})
-      };
-
-      await this.saleService.processSale(saleData, false);
-
-      const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${order.id}`);
-      await updateDoc(orderRef, {
-        status: 'finished',
-        paymentMethod: paymentMethod,
-        installments: normalizedInstallments,
-        paymentDate: serverTimestamp(),
-        closingDate: serverTimestamp()
-      });
-
-      return true;
-    } catch (error) {
-      console.error('OrderService: Erro ao finalizar pedido:', error);
-      throw error;
-    }
-  }
-
-  async cancelOrder(orderId: string): Promise<void> {
+  async cancelOrder(
+    orderId: string,
+    opts: CancelOrderOptions = { estornar: false }
+  ): Promise<void> {
     if (!orderId) return Promise.reject('Order ID is required');
 
     await runTransaction(this.firestore, async (transaction) => {
-      const orderRef = doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
-      const orderSnap = await transaction.get(orderRef);
+      const orderRef = this.orderRef(orderId);
+      const order = await this.lerPedido(transaction, orderRef);
 
-      if (!orderSnap.exists()) throw new Error('Order not found');
-
-      const order = orderSnap.data() as Order;
+      if (STATUS_NAO_CANCELAVEIS.includes(order.status)) {
+        throw new Error(`Pedido com status "${order.status}" não pode ser cancelado.`);
+      }
 
       if (order.status === 'delivered' && order.items?.length > 0) {
         for (const item of order.items) {
@@ -258,7 +262,141 @@ export class OrderService extends FirestoreBaseService {
         }
       }
 
-      transaction.update(orderRef, { status: 'canceled' });
+      if (order.saleId) {
+        this.saleService.cancelSaleRecordInTransaction(transaction, order.saleId);
+      }
+
+      const payments = aplicarCancelamento(order, opts.estornar);
+      transaction.update(orderRef, {
+        status: 'canceled',
+        ...(order.payments !== undefined ? { payments } : {})
+      });
     });
+  }
+
+  /**
+   * Registra um pagamento (regra-de-negocio.md seção 5.3); conclui o pedido
+   * se entregue e saldo 0.
+   */
+  async registerPayment(
+    orderId: string,
+    input: RegistrarPagamentoInput
+  ): Promise<RegistrarPagamentoResultado> {
+    if (!orderId) return Promise.reject('Order ID is required');
+
+    return runTransaction(this.firestore, async (transaction) => {
+      const orderRef = this.orderRef(orderId);
+      const order = await this.lerPedido(transaction, orderRef);
+      const resultado = aplicarPagamento(order, input, () => this.gerarIdPagamento());
+      const forma = resolverFormaDeConclusao(order, resultado.payments);
+
+      if (forma) {
+        const agora = new Date();
+        const saleId = this.saleIdDoPedido(transaction, order, agora);
+        this.saleService.setSalePaymentInTransaction(transaction, saleId, forma);
+        transaction.update(orderRef, {
+          ...this.camposDeConclusao(resultado.payments, forma, agora),
+          saleId
+        });
+      } else {
+        transaction.update(orderRef, { payments: resultado.payments });
+      }
+
+      return { concluido: forma !== null, saldo: resultado.saldo };
+    });
+  }
+
+  /** Substitui as parcelas previstas do pedido; a soma tem que fechar com o saldo. */
+  async setScheduledInstallments(orderId: string, parcelas: ParcelaInput[]): Promise<void> {
+    if (!orderId) return Promise.reject('Order ID is required');
+
+    await runTransaction(this.firestore, async (transaction) => {
+      const orderRef = this.orderRef(orderId);
+      const order = await this.lerPedido(transaction, orderRef);
+      const payments = aplicarAgendaParcelas(order, parcelas, () => this.gerarIdPagamento());
+      transaction.update(orderRef, { payments });
+    });
+  }
+
+  private camposDeConclusao(
+    payments: OrderPayment[],
+    forma: FormaFinal,
+    agora: Date
+  ): Record<string, unknown> {
+    return {
+      status: 'finished',
+      payments,
+      paymentDate: dataDoUltimoPagamento(payments, agora),
+      closingDate: Timestamp.fromDate(agora),
+      paymentMethod: forma.paymentMethod,
+      installments: forma.installments
+    };
+  }
+
+  /** Pedido entregue sem saleId = entregue antes do deploy da 5.3: a Sale nasce na conclusao. */
+  private saleIdDoPedido(transaction: Transaction, order: Order, agora: Date): string {
+    return order.saleId ?? this.criarVendaDoPedido(transaction, order, Timestamp.fromDate(agora));
+  }
+
+  private criarVendaDoPedido(transaction: Transaction, order: Order, date: Sale['date']): string {
+    const sale: Omit<Sale, 'id' | 'companyId'> = {
+      items: order.items,
+      total: order.total,
+      date,
+      sale_type: 'order',
+      ...(order.customerId ? { customerId: order.customerId } : {})
+    };
+    return this.saleService.addSaleInTransaction(transaction, sale, order.companyId).id;
+  }
+
+  private async lerBaixasDeEstoque(
+    transaction: Transaction, items: OrderItem[]
+  ): Promise<{ ref: DocumentReference; quantity: number }[]> {
+    const baixas: { ref: DocumentReference; quantity: number }[] = [];
+    for (const item of items) {
+      const ref = doc(this.firestore, `products/${item.idProduct}`);
+      const snap = await transaction.get(ref);
+      if (!snap.exists()) {
+        throw new Error(`Produto "${item.productName}" não encontrado no banco.`);
+      }
+      const currentStock = (snap.data()['stock'] as number) ?? 0;
+      if (currentStock < item.quantity) {
+        throw new Error(
+          `⚠️ Estoque insuficiente para "${item.productName}": ` +
+          `disponível ${currentStock}, solicitado ${item.quantity}.`
+        );
+      }
+      baixas.push({ ref, quantity: item.quantity });
+    }
+    return baixas;
+  }
+
+  /**
+   * Recalcula itemsTotal/total quando items ou shippingCost vem na edicao. Quando so
+   * o frete vem, usa os itens gravados; quando so os itens vem, usa o frete gravado.
+   */
+  private comTotalRecalculado(order: Order, editaveis: Partial<Order>): Partial<Order> {
+    if (editaveis.items === undefined && editaveis.shippingCost === undefined) {
+      return editaveis;
+    }
+    const { itemsTotal, total } = calcularTotalDoPedido(
+      editaveis.items ?? order.items,
+      editaveis.shippingCost ?? order.shippingCost
+    );
+    return { ...editaveis, itemsTotal, total };
+  }
+
+  private orderRef(orderId: string): DocumentReference {
+    return doc(this.firestore, `${this.ORDERS_COLLECTION}/${orderId}`);
+  }
+
+  private async lerPedido(transaction: Transaction, orderRef: DocumentReference): Promise<Order> {
+    const orderSnap = await transaction.get(orderRef);
+    if (!orderSnap.exists()) throw new Error('Pedido não encontrado.');
+    return orderSnap.data() as Order;
+  }
+
+  private gerarIdPagamento(): string {
+    return doc(this.ordersCollection).id;
   }
 }

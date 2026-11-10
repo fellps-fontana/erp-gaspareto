@@ -44,6 +44,15 @@ function loadStagingFirebaseConfig() {
   };
 }
 
+// Le as categorias padrao do mesmo arquivo que o app usa (fonte unica).
+function loadDefaultExpenseCategories() {
+  const src = readFileSync(new URL('../src/models/expense-category-defaults.ts', import.meta.url), 'utf8');
+  const entryRe = /\{\s*systemKey:\s*'([^']+)',\s*name:\s*'([^']+)',\s*type:\s*'([^']+)'\s*\}/g;
+  const defs = [...src.matchAll(entryRe)].map(([, systemKey, name, type]) => ({ systemKey, name, type }));
+  if (defs.length === 0) throw new Error('Nenhuma categoria padrao em expense-category-defaults.ts');
+  return defs;
+}
+
 let firebaseConfig;
 if (target === 'emulator') {
   firebaseConfig = { projectId: 'demo-test', apiKey: 'demo-key' };
@@ -68,7 +77,7 @@ if (target === 'emulator') {
 
 const DEFAULT_MODULES = {
   pdv: true, pedidos: true, gestao: true, rotas: true, contas: true,
-  clientes: true, compras: true, vendedores: true,
+  clientes: true, vendedores: true,
   notificacoes: { aniversario: true },
 };
 
@@ -92,6 +101,53 @@ const rand = () => {
 };
 const pickOne = (arr) => arr[Math.floor(rand() * arr.length)];
 const randInt = (min, max) => min + Math.floor(rand() * (max - min + 1));
+
+// --- helpers de data-chave 'YYYY-MM-DD' (aritmetica em UTC, sem fuso) --------
+const keyToUtc = (key) => {
+  const [y, m, d] = key.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+};
+const utcToKey = (ms) => new Date(ms).toISOString().slice(0, 10);
+const addDays = (key, n) => utcToKey(keyToUtc(key) + n * 86400000);
+const withDay = (key, day) => key.slice(0, 8) + pad(day);
+const monthLast = (key) => {
+  const [y, m] = key.split('-').map(Number);
+  return utcToKey(Date.UTC(y, m, 0));
+};
+// Mantem o dia da ancora; dia inexistente no mes cai no ultimo dia do mes.
+const addMonthsKeepDay = (key, n) => {
+  const [y, m, d] = key.split('-').map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + n, 1));
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  return utcToKey(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), Math.min(d, last)));
+};
+const clampKey = (key, min, max) => {
+  if (key < min) return min;
+  if (key > max) return max;
+  return key;
+};
+const todayKeyInSaoPaulo = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date());
+const occurrenceDate = (period, anchorDate, k) => (
+  period === 'semanal' ? addDays(anchorDate, 7 * k) : addMonthsKeepDay(anchorDate, k)
+);
+// Ocorrencias da serie com data <= lastDate (ancora ja inclusa se couber).
+const occurrenceDatesUntil = (period, anchorDate, lastDate) => {
+  const dates = [];
+  for (let k = 0; ; k++) {
+    const dueDate = occurrenceDate(period, anchorDate, k);
+    if (dueDate > lastDate) return dates;
+    dates.push(dueDate);
+  }
+};
+// Parcelas em centavos: 1..N-1 = floor(total/N), a ultima leva o resto.
+const splitInCents = (totalCents, count) => {
+  const base = Math.floor(totalCents / count);
+  return Array.from({ length: count }, (_, i) => (i === count - 1 ? totalCents - base * (count - 1) : base));
+};
+// Firestore rejeita undefined: remove campos opcionais ausentes.
+const withoutUndefined = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 
 // Mesmo arredondamento de calcularTotalItemPorPeso (centavos, tie goes up).
 const lineTotal = (item) => round2(item.priceAtSale * item.quantity);
@@ -339,41 +395,98 @@ async function main() {
     }]);
   }
 
-  // --- fornecedores recorrentes + contas -------------------------------------
-  const ppDefs = [
-    { name: 'Distribuidora de Bebidas Oeste', defaultValue: 1850, recurring: true, recurrencePeriod: 'monthly' },
-    { name: 'Frigorífico Chapecó - carnes', defaultValue: 620, recurring: true, recurrencePeriod: 'weekly' },
-    { name: 'Embalagens e descartáveis', defaultValue: 280, recurring: false },
+  // --- categorias de despesa padrao (ID = companyId_systemKey) ---------------
+  const categories = loadDefaultExpenseCategories();
+  const categoryIdOf = (systemKey) => {
+    if (!categories.some(c => c.systemKey === systemKey)) throw new Error(`Categoria padrao desconhecida: ${systemKey}`);
+    return `${companyId}_${systemKey}`;
+  };
+  for (const c of categories) {
+    writes.push([doc(firestore, 'expenseCategories', categoryIdOf(c.systemKey)), {
+      companyId, name: c.name, type: c.type, archived: false, systemKey: c.systemKey, createdAt: ts(at(-45, 9)),
+    }]);
+  }
+
+  // --- despesas: datas date-only relativas ao hoje de Sao Paulo --------------
+  const todayKey = todayKeyInSaoPaulo();
+  const monthFirst = withDay(todayKey, 1);
+  const monthEndKey = monthLast(todayKey);
+  const dateInMonth = (offset) => clampKey(addDays(todayKey, offset), monthFirst, monthEndKey);
+  const paidDateInMonth = (offset) => clampKey(addDays(todayKey, offset), monthFirst, todayKey);
+  const occurrenceStatus = (dueDate) => (
+    dueDate < todayKey ? { status: 'pago', paidDate: dueDate } : { status: 'a_pagar' }
+  );
+  let expenseCount = 0;
+  let seriesCount = 0;
+  // Ocorrencia de recorrencia passa id determinístico (seriesId_dueDate), como o catch-up do app.
+  const expenseWrite = (fields, id) => {
+    const ref = id ? doc(firestore, 'expenses', id) : newRef('expenses');
+    writes.push([ref, withoutUndefined({ companyId, createdAt: ts(at(-45, 9)), ...fields })]);
+    expenseCount++;
+  };
+
+  // Lancamentos unicos: vencida, a vencer, paga, recebida, a pagar sem recebimento.
+  const singleExpenses = [
+    { description: 'Conta de energia', value: 412.37, systemKey: 'energia_agua_gas',
+      supplier: 'Concessionária de energia', dueDate: addDays(todayKey, -3), status: 'a_pagar' },
+    { description: 'Internet fibra', value: 129.9, systemKey: 'internet_telefone',
+      dueDate: dateInMonth(5), status: 'a_pagar' },
+    { description: 'Impostos Simples Nacional', value: 380, systemKey: 'impostos_taxas',
+      dueDate: dateInMonth(-8), status: 'pago', paidDate: paidDateInMonth(-7), paymentMethod: 'pix' },
+    { description: 'Taxa da maquininha', value: 89.5, systemKey: 'taxas_cartao',
+      dueDate: dateInMonth(-5), status: 'pago', paidDate: paidDateInMonth(-2), paymentMethod: 'cartao' },
+    { description: 'Reposição de bebidas', value: 1850, systemKey: 'compra_mercadoria',
+      supplier: 'Distribuidora de Bebidas Oeste', dueDate: dateInMonth(10), status: 'a_pagar',
+      goodsReceivedDate: paidDateInMonth(-1) },
+    { description: 'Embalagens e descartáveis', value: 280, systemKey: 'insumos_embalagem',
+      dueDate: dateInMonth(3), status: 'a_pagar' },
+    { description: 'Marketing Instagram', value: 150, systemKey: 'marketing',
+      dueDate: dateInMonth(7), status: 'a_pagar' },
   ];
-  const purchaseProducts = ppDefs.map(pp => {
-    const ref = newRef('purchaseProducts');
-    writes.push([ref, { ...pp, createdAt: ts(at(-40, 9)), companyId }]);
-    return { id: ref.id, ...pp };
+  for (const { systemKey, ...fields } of singleExpenses) {
+    expenseWrite({ origin: 'manual', ...fields, categoryId: categoryIdOf(systemKey) });
+  }
+
+  // Parcelado 3x: mesmo grupo, numeracao 1..3, soma exata em centavos.
+  const INSTALLMENT_TOTAL_CENTS = 100000;
+  const INSTALLMENT_COUNT = 3;
+  const installmentGroupId = `${companyId}_parc_forno`;
+  const firstInstallmentDue = addDays(todayKey, 12);
+  splitInCents(INSTALLMENT_TOTAL_CENTS, INSTALLMENT_COUNT).forEach((cents, i) => {
+    expenseWrite({
+      origin: 'parcelamento', description: 'Forno industrial (3x)', value: cents / 100,
+      categoryId: categoryIdOf('manutencao_equipamentos'), supplier: 'Equipamentos Sul',
+      dueDate: addMonthsKeepDay(firstInstallmentDue, i), status: 'a_pagar',
+      installmentGroupId, installmentNumber: i + 1, installmentTotal: INSTALLMENT_COUNT,
+    });
   });
 
-  const bill = (name, value, dueDay, status, extra = {}) => {
-    const data = {
-      name, value, dueDate: ts(at(dueDay, 12)), status, recurring: false,
-      createdAt: ts(at(Math.min(dueDay, 0) - 5, 9)), companyId, ...extra,
-    };
-    if (status === 'pago') data.paidAt = ts(at(Math.min(dueDay, 0), 15));
-    if (status === 'recebido') data.receivedAt = ts(at(Math.min(dueDay, 0), 15));
-    writes.push([newRef('bills'), data]);
+  // Recorrencias: ocorrencias ja passadas/hoje semeadas; generatedThrough = a ultima.
+  // O catch-up do app continua a partir dali sem duplicar (id = seriesId_dueDate).
+  const seedSeries = ({ period, anchorDate, systemKey, ...templateFields }) => {
+    const seriesRef = newRef('expenseSeries');
+    const template = withoutUndefined({ ...templateFields, categoryId: categoryIdOf(systemKey) });
+    const dueDates = occurrenceDatesUntil(period, anchorDate, todayKey);
+    for (const dueDate of dueDates) {
+      expenseWrite(
+        { origin: 'recorrencia', seriesId: seriesRef.id, ...template, dueDate, ...occurrenceStatus(dueDate) },
+        `${seriesRef.id}_${dueDate}`,
+      );
+    }
+    writes.push([seriesRef, withoutUndefined({
+      companyId, active: true, period, anchorDate, generatedThrough: dueDates.at(-1), template, createdAt: ts(at(-45, 9)),
+    })]);
+    seriesCount++;
   };
-  const [bebidas, carnes] = purchaseProducts;
-  const linkMensal = { recurring: true, recurrencePeriod: 'mensal', purchaseProductId: bebidas.id };
-  const linkSemanal = { recurring: true, recurrencePeriod: 'semanal', purchaseProductId: carnes.id };
-  bill(bebidas.name, 1850, -16, 'pago', linkMensal);
-  bill(bebidas.name, 1850, 14, 'pendente', linkMensal);
-  bill(carnes.name, 620, -7, 'pago', linkSemanal);
-  bill(carnes.name, 620, 0, 'pendente', linkSemanal);
-  bill(carnes.name, 620, 7, 'pendente', linkSemanal);
-  bill('Aluguel do ponto', 2200, -15, 'pago', { recurring: true, recurrencePeriod: 'mensal' });
-  bill('Conta de energia', 412.37, -3, 'pendente');
-  bill('Internet', 129.9, 5, 'pendente');
-  bill('Embalagens e descartáveis', 280, -10, 'pago', { purchaseProductId: purchaseProducts[2].id });
-  bill('Evento corporativo - Coopercentral', 3400, -8, 'recebido');
-  bill('Festa de aniversário - Bar do Gringo', 1250, 3, 'pendente');
+  seedSeries({
+    period: 'mensal', anchorDate: withDay(addMonthsKeepDay(monthFirst, -3), 10),
+    description: 'Aluguel do ponto', value: 2200, systemKey: 'aluguel', paymentMethod: 'pix',
+  });
+  seedSeries({
+    period: 'semanal', anchorDate: addDays(todayKey, -35),
+    description: 'Frigorífico Chapecó - carnes', value: 620, systemKey: 'compra_mercadoria',
+    supplier: 'Frigorífico Chapecó',
+  });
 
   console.log(`Gravando ${writes.length} documentos...`);
   await commitAll(writes);
@@ -381,6 +494,7 @@ async function main() {
   console.log('\nPronto!');
   console.log(`  ${products.length} produtos (${weightProducts.length} por kg), ${vendedores.length} vendedores, ${customers.length} clientes`);
   console.log(`  ${pdvCount} vendas PDV, ${orderNumber} pedidos, 2 comandas abertas, ${purchaseDefs.length} compras`);
+  console.log(`  ${categories.length} categorias de despesa, ${expenseCount} despesas, ${seriesCount} series recorrentes`);
   console.log(`\nLogin: ${DEMO_EMAIL} / ${DEMO_PASSWORD}  (${DEMO_COMPANY_NAME})`);
   process.exit(0);
 }

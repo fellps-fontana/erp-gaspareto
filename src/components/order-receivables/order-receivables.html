@@ -1,0 +1,48 @@
+<section class="receivables">
+  <div class="summary-cards">
+    <div class="summary-card overdue">
+      <span class="card-label">Vencido</span>
+      <strong class="card-value">{{ aba.vencido | currency:'BRL' }}</strong>
+    </div>
+    <div class="summary-card month">
+      <span class="card-label">Vence este mês</span>
+      <strong class="card-value">{{ aba.venceEsteMes | currency:'BRL' }}</strong>
+    </div>
+    <div class="summary-card upcoming">
+      <span class="card-label">Próximos</span>
+      <strong class="card-value">{{ aba.proximos | currency:'BRL' }}</strong>
+    </div>
+  </div>
+
+  <div class="empty-state" *ngIf="isEmpty">
+    <p>Nada a receber.</p>
+  </div>
+
+  <ng-container *ngTemplateOutlet="group; context: { title: 'VENCIDAS', kind: 'overdue', items: aba.vencidas }"></ng-container>
+  <ng-container *ngTemplateOutlet="group; context: { title: 'ESTE MÊS', kind: 'month', items: aba.esteMes }"></ng-container>
+  <ng-container *ngTemplateOutlet="group; context: { title: 'PRÓXIMOS MESES', kind: 'upcoming', items: aba.proximosMeses }"></ng-container>
+
+  <ng-template #group let-title="title" let-kind="kind" let-items="items">
+    <div class="group" *ngIf="items.length > 0" [ngClass]="kind">
+      <h3 class="group-title">{{ title }} <span class="group-count">({{ items.length }})</span></h3>
+      <ul class="installment-list">
+        <li class="installment-line" *ngFor="let p of items; trackBy: trackByParcela">
+          <div class="installment-info">
+            <button type="button" class="customer-link" (click)="onOpenCustomer(p)">{{ p.customerName }}</button>
+            <span class="sep">·</span>
+            <span>#{{ p.orderNumber }}</span>
+            <span class="sep">·</span>
+            <span>parcela {{ p.k }}/{{ p.n }}</span>
+            <span class="sep">·</span>
+            <strong class="amount">{{ p.amount | currency:'BRL' }}</strong>
+            <span class="sep">·</span>
+            <span class="due" [class.late]="p.diasAtraso > 0">
+              {{ p.diasAtraso > 0 ? atrasoLabel(p) : 'vence ' + (p.dueDate | date:'dd/MM') }}
+            </span>
+          </div>
+          <button type="button" class="btn-receive" (click)="onReceive(p)">Recebi</button>
+        </li>
+      </ul>
+    </div>
+  </ng-template>
+</section>

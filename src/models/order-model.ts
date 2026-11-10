@@ -10,6 +10,19 @@ export interface OrderItem {
   soldByWeight?: boolean; // snapshot: true = quantity representa peso em kg
 }
 
+export type OrderPaymentStatus = 'previsto' | 'pago' | 'cancelado' | 'estornado';
+
+/** Pagamento ou parcela prevista embutida no pedido (regra-de-negocio.md seção 5.3). */
+export interface OrderPayment {
+  id: string;
+  amount: number;
+  method: PaymentMethod;     // nunca MISTO
+  installments: number;      // informativo, >= 1; previsto => 1
+  dueDate?: Timestamp;       // só parcelas da agenda (Timestamp.fromDate; serverTimestamp não vale dentro de array)
+  paidDate?: Timestamp;      // só status 'pago'
+  status: OrderPaymentStatus;
+}
+
 export interface Order {
   id?: string;
   companyId: string;
@@ -38,7 +51,9 @@ export interface Order {
   paymentDate?: Timestamp;       // DATA DE PAGAMENTO (Preenchida quando pagar)
   closingDate?: Timestamp;       // DATA DE FECHAMENTO (Preenchida no status 'finished')
 
-  // --- PAGAMENTO (preenchido só em finalizeOrder, junto com paymentDate/closingDate) ---
+  // --- PAGAMENTO (forma final preenchida na conclusão, junto com paymentDate/closingDate — seção 5.3) ---
+  payments?: OrderPayment[]; // Ausente = pedido antigo; saldo é sempre derivado, nunca gravado.
+  saleId?: string;           // Sale criada na entrega. Ausente em pedido delivered antes do deploy (regra antiga).
   paymentMethod?: PaymentMethod;
   installments?: number; // Espelha Sale.installments — evita join Histórico -> sales por orderId.
 
@@ -50,4 +65,7 @@ export interface Order {
 
   vendedorId?: string;   // Opcional — pedido pode ficar sem vendedor (regra-de-negocio.md seção 5.2)
   vendedorName?: string; // Snapshot do nome no momento do vínculo
+
+  recurringOrderId?: string; // Pedido gerado por recorrência (seção 5.4); id do doc = rec_{recurringOrderId}_{yyyyMMdd}
+  occurrenceDate?: string;   // 'yyyy-MM-dd' da ocorrência
 }

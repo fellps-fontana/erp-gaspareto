@@ -29,7 +29,7 @@ describe('AppComponent', () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent],
       providers: [
-        { provide: SwUpdate, useValue: { isEnabled: false, versionUpdates: of() } },
+        { provide: SwUpdate, useValue: { isEnabled: false, versionUpdates: of(), unrecoverable: of() } },
         { provide: Auth, useValue: testAuth },
         { provide: Firestore, useValue: testFirestore }
       ],

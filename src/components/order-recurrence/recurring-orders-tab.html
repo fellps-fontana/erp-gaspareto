@@ -1,0 +1,45 @@
+<section class="recurring-tab">
+  <div class="empty-state" *ngIf="rows.length === 0">
+    <p>Nenhum pedido recorrente.</p>
+  </div>
+
+  <ul class="recurring-list" *ngIf="rows.length > 0">
+    <li class="recurring-card" *ngFor="let row of rows; trackBy: trackByModel" [ngClass]="row.status">
+      <div class="recurring-head">
+        <h3 class="recurring-customer">{{ row.customerName }}</h3>
+        <span class="recurring-status" [ngClass]="row.status">{{ row.statusLabel }}</span>
+      </div>
+
+      <p class="recurring-items">{{ row.itemsSummary }}</p>
+
+      <div class="recurring-meta">
+        <span>🔁 {{ row.frequencyLabel }}</span>
+        <span *ngIf="row.nextDateLabel" class="recurring-next">Próxima: <strong>{{ row.nextDateLabel }}</strong></span>
+      </div>
+
+      <p class="recurring-issue" *ngIf="row.issueLabel" role="alert">⚠️ {{ row.issueLabel }}</p>
+
+      <div class="recurring-actions" *ngIf="row.canEdit || row.canPause || row.canResume || row.canEnd">
+        <button type="button" class="btn-secondary" *ngIf="row.canEdit" [disabled]="processing" (click)="edit.emit(row.model)">Editar</button>
+        <button type="button" class="btn-secondary" *ngIf="row.canPause" [disabled]="processing" (click)="pause.emit(row.model)">Pausar</button>
+        <button type="button" class="btn-secondary" *ngIf="row.canResume" [disabled]="processing" (click)="resume.emit(row.model)">Retomar</button>
+        <button type="button" class="btn-end" *ngIf="row.canEnd" [disabled]="processing" (click)="askEnd(row.model)">Encerrar</button>
+      </div>
+    </li>
+  </ul>
+
+  <div class="modal-backdrop" *ngIf="endTarget" (click)="closeEndConfirm()">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="endRecurringTitle" (click)="$event.stopPropagation()">
+      <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeEndConfirm()" [disabled]="processing">✕</button>
+      <h3 id="endRecurringTitle">Encerrar pedido recorrente</h3>
+      <p>
+        Encerrar a recorrência de <strong>{{ endTarget.customerName }}</strong>? É definitivo:
+        nenhum novo pedido será gerado e ela não pode ser reaberta. Os pedidos já gerados continuam.
+      </p>
+      <div class="modal-actions">
+        <button type="button" (click)="closeEndConfirm()" [disabled]="processing">Voltar</button>
+        <button type="button" class="btn-danger-confirm" (click)="confirmEnd()" [disabled]="processing">Encerrar</button>
+      </div>
+    </div>
+  </div>
+</section>

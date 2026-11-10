@@ -347,6 +347,26 @@
   border-radius: var(--radius-md);
 }
 
+.notif-panel__section + .notif-panel__section {
+  margin-top: var(--sp-md);
+}
+
+/* Item de mensalidade: texto e detalhe empilhados */
+.notif-panel__item--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-xs);
+}
+
+/* Mensalidade em atraso: destaque em danger (vence/hoje mantém o visual neutro) */
+.notif-panel__item--atraso {
+  border-color: var(--color-danger);
+}
+
+.notif-panel__item--atraso .notif-panel__name {
+  color: var(--color-danger);
+}
+
 .notif-panel__name {
   font-weight: 600;
 }
@@ -354,6 +374,43 @@
 .notif-panel__phone {
   color: var(--text-secondary);
   font-size: 0.9rem;
+}
+
+.notif-panel__link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.notif-panel__link:hover {
+  border-color: var(--color-primary);
+}
+
+.notif-panel__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.notif-panel__due {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.notif-panel__value {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.notif-panel__value--danger {
+  color: var(--color-danger);
+}
+
+.notif-panel__hint {
+  margin: var(--sp-md) 0 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-align: center;
 }
 
 .notif-panel__empty {
