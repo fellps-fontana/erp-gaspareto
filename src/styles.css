@@ -210,6 +210,30 @@ input[type="month"]::-webkit-date-and-time-value {
   text-align: left;
 }
 
+/* WebKit (iOS Safari) põe padding vertical nos subcampos internos da data
+   (dia/mês/ano/hora), o que deixa o campo mais alto que os outros inputs.
+   Zera esse padding e fixa a altura mínima do valor (vazio colapsa sem ela). */
+input[type="date"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="month"]::-webkit-date-and-time-value {
+  min-height: 1.5em;
+}
+
+input::-webkit-datetime-edit,
+input::-webkit-datetime-edit-fields-wrapper,
+input::-webkit-datetime-edit-year-field,
+input::-webkit-datetime-edit-month-field,
+input::-webkit-datetime-edit-day-field,
+input::-webkit-datetime-edit-hour-field,
+input::-webkit-datetime-edit-minute-field,
+input::-webkit-datetime-edit-second-field,
+input::-webkit-datetime-edit-millisecond-field,
+input::-webkit-datetime-edit-meridiem-field {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 /* Cards */
 .card-base {
   background-color: var(--bg-card);
