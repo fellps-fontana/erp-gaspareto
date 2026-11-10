@@ -370,6 +370,32 @@ describe('Firestore Security Rules - Multi-tenant Authorization (Fase 1)', () =>
       const counterRefB = doc(contextCompanyA.firestore(), 'counters', 'company-b');
       await assertFails(setDoc(counterRefB, { nextOrderNumber: 999 }));
     });
+
+    it('super-admin pode ler e atualizar o contador de outra empresa', async () => {
+      await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+      await semeiaUserDoc('super-admin-1', 'super-admin-1@test.com', 'company-admin', 'owner', true);
+
+      const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+      await setDoc(doc(contextCompanyA.firestore(), 'counters', 'company-a'), { nextOrderNumber: 7 });
+
+      const contextSuperAdmin = autenticarComo('super-admin-1', 'super-admin-1@test.com');
+      const counterRef = doc(contextSuperAdmin.firestore(), 'counters', 'company-a');
+      await assertSucceeds(getDoc(counterRef));
+      await assertSucceeds(updateDoc(counterRef, { nextOrderNumber: 8 }));
+    });
+
+    it('usuario sem isSuperAdmin continua sem acesso ao contador de outra empresa', async () => {
+      await semeiaUserDoc('user-a', 'user-a@test.com', 'company-a', 'owner');
+      await semeiaUserDoc('user-b', 'user-b@test.com', 'company-b', 'owner');
+
+      const contextCompanyA = autenticarComo('user-a', 'user-a@test.com');
+      await setDoc(doc(contextCompanyA.firestore(), 'counters', 'company-a'), { nextOrderNumber: 7 });
+
+      const contextCompanyB = autenticarComo('user-b', 'user-b@test.com');
+      const counterRef = doc(contextCompanyB.firestore(), 'counters', 'company-a');
+      await assertFails(getDoc(counterRef));
+      await assertFails(updateDoc(counterRef, { nextOrderNumber: 999 }));
+    });
   });
 
   describe('Super-admin bypass cross-tenant (isSuperAdmin: true)', () => {

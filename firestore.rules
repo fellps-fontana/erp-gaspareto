@@ -45,8 +45,13 @@ service cloud.firestore {
     // pra pedidos). Qualquer membro da empresa pode ler/escrever — não é
     // restrito a owner/admin como companies/{id}, porque criar um pedido
     // é uma ação operacional comum, não administrativa.
+    // Super-admin tem o mesmo bypass das coleções operacionais
+    // (isSuperAdminUser): OrderService.addOrder lê e grava este contador numa
+    // transação, então sem o bypass o super-admin não cria pedido na empresa
+    // selecionada ("Missing or insufficient permissions").
     match /counters/{companyId} {
-      allow read, write: if isSignedIn() && userCompanyId() == companyId;
+      allow read, write: if isSignedIn()
+        && (userCompanyId() == companyId || isSuperAdminUser());
     }
 
     match /companies/{companyId} {
