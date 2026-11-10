@@ -186,6 +186,30 @@ textarea:focus {
   border-color: var(--color-primary);
 }
 
+/* Campos de data/hora: o Safari do iOS dá ao controle nativo uma largura
+   mínima intrínseca e ignora width:100%, então o campo vaza da borda do
+   container (ex.: modais) e o texto fica centralizado. Remover a aparência
+   nativa e zerar min-width faz o campo respeitar o container; o alinhamento
+   do valor é corrigido no pseudo-elemento do WebKit. */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+}
+
+input[type="date"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="month"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 /* Cards */
 .card-base {
   background-color: var(--bg-card);
