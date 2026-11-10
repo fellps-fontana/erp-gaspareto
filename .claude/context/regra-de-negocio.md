@@ -821,7 +821,11 @@ depois do cutover (ver §14).
   continua **de fora**, deliberadamente — não existe hoje nenhuma
   tela/fluxo que apague uma empresa, então liberar delete seria superfície
   de risco sem uso real; se essa necessidade aparecer no futuro, é decisão
-  nova, não extensão automática deste bypass. Pra usuário sem
+  nova, não extensão automática deste bypass. Em 2026-11-10 o bypass passou
+  a cobrir também `counters/{companyId}` em `read`/`write`, pra o
+  super-admin conseguir criar pedido na empresa selecionada
+  (`OrderService.addOrder` lê e grava o contador numa transação).
+  Pra usuário sem
   `isSuperAdmin`, o `OR` colapsa pra exatamente a mesma condição de hoje —
   o bypass é estritamente aditivo, avaliado a cada request contra o
   Firestore, não forjável client-side.
