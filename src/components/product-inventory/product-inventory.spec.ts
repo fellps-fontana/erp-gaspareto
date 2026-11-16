@@ -1,4 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { registerLocaleData } from '@angular/common';
+import localePt from '@angular/common/locales/pt';
+import { DEFAULT_CURRENCY_CODE, LOCALE_ID } from '@angular/core';
 import {
   ProductInventoryComponent,
   HistoricoItem,
@@ -22,6 +25,8 @@ import { VendedorService } from '../../services/vendedor-service/vendedor-servic
 import { ActivatedRoute } from '@angular/router';
 import { PaymentMethod, PAYMENT_METHOD_LABELS } from '../../models/sell-model';
 import { of } from 'rxjs';
+
+registerLocaleData(localePt);
 
 describe('ProductInventoryComponent', () => {
   let component: ProductInventoryComponent;
@@ -75,6 +80,8 @@ describe('ProductInventoryComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ProductInventoryComponent],
       providers: [
+        { provide: LOCALE_ID, useValue: 'pt-BR' },
+        { provide: DEFAULT_CURRENCY_CODE, useValue: 'BRL' },
         { provide: ProductService, useValue: mockServices.productService },
         { provide: SaleService, useValue: mockServices.saleService },
         { provide: PurchaseService, useValue: mockServices.purchaseService },
@@ -457,9 +464,8 @@ describe('ProductInventoryComponent', () => {
 
       const linha = linhaFrete(el);
       expect(linha).toBeTruthy('Deve existir uma linha de Frete pra pedido delivery');
-      // Separador decimal depende do LOCALE_ID registrado no TestBed (não é
-      // o mesmo do app real, que usa pt-BR) — casa "10.00" ou "10,00".
-      expect(linha!.textContent).toMatch(/R\$\s*10[.,]00/);
+      // Mesmo locale do app real (pt-BR + BRL): separador decimal é vírgula.
+      expect(linha!.textContent).toMatch(/R\$\s*10,00/);
     });
 
     it('pedido com deliveryType pickup mostra "Retirada — sem frete" em vez do valor', () => {

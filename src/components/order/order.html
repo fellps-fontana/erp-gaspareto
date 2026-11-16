@@ -84,9 +84,9 @@
   <section class="estimate-container" *ngIf="valorEstimado$ | async as valor">
     <span class="summary-title">Valor estimado:</span>
     <div class="estimate-values">
-      <div class="estimate-item"><span>Total</span><strong>{{ valor.total | currency:'BRL' }}</strong></div>
-      <div class="estimate-item paid"><span>Pago</span><strong>{{ valor.pago | currency:'BRL' }}</strong></div>
-      <div class="estimate-item balance"><span>Saldo</span><strong>{{ valor.saldo | currency:'BRL' }}</strong></div>
+      <div class="estimate-item"><span>Total</span><strong>{{ valor.total | currency }}</strong></div>
+      <div class="estimate-item paid"><span>Pago</span><strong>{{ valor.pago | currency }}</strong></div>
+      <div class="estimate-item balance"><span>Saldo</span><strong>{{ valor.saldo | currency }}</strong></div>
     </div>
   </section>
   </div>
@@ -177,10 +177,10 @@
         </div>
 
         <div class="payment-progress" *ngIf="canRegisterPayment(order)">
-          Pago {{ paidOf(order) | currency:'BRL' }} de {{ order.total | currency:'BRL' }}
+          Pago {{ paidOf(order) | currency }} de {{ order.total | currency }}
         </div>
         <div class="next-installment" *ngIf="proximaPrevista(order) as prox" [class.overdue]="diasDeAtraso(prox) > 0">
-          prox: {{ prox.amount | currency:'BRL' }} · {{ getOrderDate(prox.dueDate) | date:'dd/MM' }}
+          prox: {{ prox.amount | currency }} · {{ getOrderDate(prox.dueDate) | date:'dd/MM' }}
           <span class="overdue-tag" *ngIf="diasDeAtraso(prox) > 0">{{ atrasoLabel(prox) }}</span>
         </div>
 
@@ -354,7 +354,7 @@
           <div class="mini-product-grid">
             <div *ngFor="let p of products$ | async" class="mini-card" (click)="addToCart(p)">
               <span>{{ p.title }}</span>
-              <div class="price">R$ {{ p.sellPrice }}{{ p.soldByWeight ? ' /kg' : '' }}</div>
+              <div class="price">{{ p.sellPrice | currency }}{{ p.soldByWeight ? ' /kg' : '' }}</div>
             </div>
             <div *ngIf="(products$ | async)?.length === 0" class="no-products">
               Carregando produtos...
@@ -385,14 +385,14 @@
                 <span class="peso-sufixo">kg</span>
               </div>
 
-              <span class="linha-total">R$ {{ totalLinha(item) | number:'1.2-2' }}</span>
+              <span class="linha-total">{{ totalLinha(item) | currency }}</span>
               <a (click)="removeFromCart(item)" class="remove-btn" title="Remover item">x</a>
             </div>
           </div>
           <span *ngIf="cart.length === 0" class="empty-msg">Nenhum item adicionado</span>
         </div>
         <div class="footer-actions">
-          <div class="total-badge">Total: R$ {{ finalTotal | number:'1.2-2' }}</div>
+          <div class="total-badge">Total: {{ finalTotal | currency }}</div>
           <button class="btn-save-order" (click)="saveOrder()"
             [disabled]="cart.length === 0 || isProcessingAction">
             <span *ngIf="!isProcessingAction">CONFIRMAR PEDIDO</span>
@@ -410,7 +410,7 @@
     <div class="modal-content">
       <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closePaymentModal()" [disabled]="isProcessingAction">✕</button>
       <h3>Registrar pagamento</h3>
-      <p>Saldo a receber: <strong>{{ paymentSaldo | currency:'BRL' }}</strong></p>
+      <p>Saldo a receber: <strong>{{ paymentSaldo | currency }}</strong></p>
 
       <div class="payment-form">
         <div class="form-field">
@@ -462,7 +462,7 @@
     <div class="modal-content cancel-payments-modal">
       <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closeCancelPaymentsModal()" [disabled]="isProcessingAction">✕</button>
       <h3>Cancelar pedido de {{ cancelOrderWithPayments.customerName }}</h3>
-      <p class="cancel-received">Já recebido: <strong>{{ cancelPaidAmount | currency:'BRL' }}</strong></p>
+      <p class="cancel-received">Já recebido: <strong>{{ cancelPaidAmount | currency }}</strong></p>
 
       <p class="cancel-warning" *ngIf="cancelHasScheduled">
         As parcelas previstas serão canceladas.
@@ -473,7 +473,7 @@
 
       <div class="cancel-options">
         <button class="cancel-option refund" (click)="confirmCancelWithPayments(true)" [disabled]="isProcessingAction">
-          <strong>Estornar {{ cancelPaidAmount | currency:'BRL' }}</strong>
+          <strong>Estornar {{ cancelPaidAmount | currency }}</strong>
           <small>O valor sai do total recebido.</small>
         </button>
         <button class="cancel-option retain" (click)="confirmCancelWithPayments(false)" [disabled]="isProcessingAction">
@@ -565,7 +565,7 @@
               <div class="item-line">
                 <span class="item-qty">{{ qtyLabel(item) }}</span>
                 <span class="item-name">{{ item.productName }}</span>
-                <span class="item-price">R$ {{ totalLinha(item) | number:'1.2-2' }}</span>
+                <span class="item-price">{{ totalLinha(item) | currency }}</span>
               </div>
             </li>
           </ul>
@@ -574,11 +574,11 @@
         <div class="detail-totals">
           <div class="total-row" *ngIf="selectedOrderDetails.shippingCost > 0">
             <span>Taxa de Entrega:</span>
-            <span>R$ {{ selectedOrderDetails.shippingCost | number:'1.2-2' }}</span>
+            <span>{{ selectedOrderDetails.shippingCost | currency }}</span>
           </div>
           <div class="total-row final">
             <span>Total:</span>
-            <span>R$ {{ selectedOrderDetails.total | number:'1.2-2' }}</span>
+            <span>{{ selectedOrderDetails.total | currency }}</span>
           </div>
         </div>
 
@@ -587,7 +587,7 @@
           <ul>
             <li *ngFor="let p of previstasOf(selectedOrderDetails)" [class.overdue]="diasDeAtraso(p) > 0">
               <span>{{ getOrderDate(p.dueDate) | date:'dd/MM/yyyy' }} · {{ methodLabel(p.method) }}</span>
-              <strong>{{ p.amount | currency:'BRL' }}</strong>
+              <strong>{{ p.amount | currency }}</strong>
               <span class="overdue-tag" *ngIf="diasDeAtraso(p) > 0">{{ atrasoLabel(p) }}</span>
             </li>
           </ul>

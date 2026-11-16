@@ -121,7 +121,7 @@
              (click)="abrirDetalhe('faturamento', 'vendas')"
              (keydown.enter)="abrirDetalhe('faturamento', 'vendas')">
           <span class="kpi-label">Faturamento</span>
-          <strong class="kpi-value">R$ {{ relatorio.faturamento | number:'1.2-2' }}</strong>
+          <strong class="kpi-value">{{ relatorio.faturamento | currency }}</strong>
           <small class="kpi-meta">{{ legendaVendasCard }}</small>
         </div>
 
@@ -129,14 +129,14 @@
              (click)="abrirDetalhe('cmv', 'vendas')"
              (keydown.enter)="abrirDetalhe('cmv', 'vendas')">
           <span class="kpi-label">Custo (CMV)</span>
-          <strong class="kpi-value">R$ {{ relatorio.custoTotal | number:'1.2-2' }}</strong>
+          <strong class="kpi-value">{{ relatorio.custoTotal | currency }}</strong>
         </div>
 
         <div class="card kpi-lucro kpi-clicavel" role="button" tabindex="0" title="Ver detalhes"
              (click)="abrirDetalhe('lucro', 'vendas')"
              (keydown.enter)="abrirDetalhe('lucro', 'vendas')">
           <span class="kpi-label">Lucro Bruto</span>
-          <strong class="kpi-value">R$ {{ relatorio.lucro | number:'1.2-2' }}</strong>
+          <strong class="kpi-value">{{ relatorio.lucro | currency }}</strong>
           <small class="kpi-meta" *ngIf="relatorio.faturamento > 0">
             Margem: {{ relatorio.margem | number:'1.0-0' }}%
           </small>
@@ -233,24 +233,24 @@
                (click)="abrirDetalhe('faturamento', 'balanco')"
                (keydown.enter)="abrirDetalhe('faturamento', 'balanco')">
             <span class="kpi-label">Faturamento</span>
-            <strong class="kpi-value">R$ {{ relatorioBalanco.faturamento | number:'1.2-2' }}</strong>
+            <strong class="kpi-value">{{ relatorioBalanco.faturamento | currency }}</strong>
             <small class="kpi-meta">{{ relatorioBalanco.qtdVendas }} vendas</small>
           </div>
           <div class="card kpi-custo kpi-clicavel" role="button" tabindex="0" title="Ver detalhes"
                (click)="abrirDetalhe('cmv', 'balanco')"
                (keydown.enter)="abrirDetalhe('cmv', 'balanco')">
             <span class="kpi-label">CMV (Custo)</span>
-            <strong class="kpi-value">R$ {{ relatorioBalanco.custoTotal | number:'1.2-2' }}</strong>
+            <strong class="kpi-value">{{ relatorioBalanco.custoTotal | currency }}</strong>
           </div>
           <div class="card kpi-gastos kpi-clicavel" role="button" tabindex="0" title="Ver detalhamento dos gastos"
                (click)="abrirGastosModal()" (keydown.enter)="abrirGastosModal()" (keydown.space)="abrirGastosModal(); $event.preventDefault()">
             <span class="kpi-label">Gastos (despesas operacionais por vencimento)</span>
-            <strong class="kpi-value" style="color: var(--color-danger);">R$ {{ gastosPeriodo | number:'1.2-2' }}</strong>
+            <strong class="kpi-value" style="color: var(--color-danger);">{{ gastosPeriodo | currency }}</strong>
             <small class="kpi-meta">ver detalhamento ›</small>
           </div>
           <div class="card" [class.kpi-lucro]="resultadoFinal >= 0" [class.kpi-prejuizo]="resultadoFinal < 0">
             <span class="kpi-label">Resultado Final</span>
-            <strong class="kpi-value">R$ {{ resultadoFinal | number:'1.2-2' }}</strong>
+            <strong class="kpi-value">{{ resultadoFinal | currency }}</strong>
             <small class="kpi-meta" *ngIf="relatorioBalanco.faturamento > 0">
               Margem líquida: {{ margemLiquida | number:'1.0-0' }}%
             </small>
@@ -262,24 +262,24 @@
           <h3>Composição do Resultado</h3>
           <div class="formula-linha">
             <span class="formula-label">Faturamento</span>
-            <span class="formula-valor positivo">+ R$ {{ relatorioBalanco.faturamento | number:'1.2-2' }}</span>
+            <span class="formula-valor positivo">+ {{ relatorioBalanco.faturamento | currency }}</span>
           </div>
           <div class="formula-linha">
             <span class="formula-label">CMV (Custo dos Produtos)</span>
-            <span class="formula-valor negativo">− R$ {{ relatorioBalanco.custoTotal | number:'1.2-2' }}</span>
+            <span class="formula-valor negativo">− {{ relatorioBalanco.custoTotal | currency }}</span>
           </div>
           <div class="formula-linha formula-subtotal">
             <span class="formula-label">= Lucro Bruto</span>
-            <span class="formula-valor" [class.positivo]="lucroBrutoBalanco >= 0" [class.negativo]="lucroBrutoBalanco < 0">R$ {{ lucroBrutoBalanco | number:'1.2-2' }}</span>
+            <span class="formula-valor" [class.positivo]="lucroBrutoBalanco >= 0" [class.negativo]="lucroBrutoBalanco < 0">{{ lucroBrutoBalanco | currency }}</span>
           </div>
           <div class="formula-linha">
             <span class="formula-label">Despesas operacionais (por vencimento no período)</span>
-            <span class="formula-valor negativo">− R$ {{ gastosPeriodo | number:'1.2-2' }}</span>
+            <span class="formula-valor negativo">− {{ gastosPeriodo | currency }}</span>
           </div>
           <div class="formula-separador"></div>
           <div class="formula-linha formula-resultado" [class.positivo]="resultadoFinal >= 0" [class.negativo]="resultadoFinal < 0">
             <span class="formula-label">= Resultado Final</span>
-            <span class="formula-valor">R$ {{ resultadoFinal | number:'1.2-2' }}</span>
+            <span class="formula-valor">{{ resultadoFinal | currency }}</span>
           </div>
           <small class="formula-nota">Faturamento − CMV − Despesas operacionais = Resultado. Os custos de produção já estão no CMV.</small>
         </div>
@@ -301,17 +301,17 @@
         <div class="cards-kpi">
           <div class="card kpi-success">
             <span class="kpi-label">Recebido no Ano</span>
-            <strong class="kpi-value kpi-value-success">R$ {{ (panorama?.recebidoAno ?? 0) | number:'1.2-2' }}</strong>
+            <strong class="kpi-value kpi-value-success">{{ (panorama?.recebidoAno ?? 0) | currency }}</strong>
             <small class="kpi-meta">{{ anoPanorama }}</small>
           </div>
           <div class="card kpi-info">
             <span class="kpi-label">A Receber no Ano</span>
-            <strong class="kpi-value kpi-value-info">R$ {{ (panorama?.aReceberAno ?? 0) | number:'1.2-2' }}</strong>
+            <strong class="kpi-value kpi-value-info">{{ (panorama?.aReceberAno ?? 0) | currency }}</strong>
             <small class="kpi-meta">previsto, a vencer</small>
           </div>
           <div class="card kpi-prejuizo">
             <span class="kpi-label">Vencido Total</span>
-            <strong class="kpi-value">R$ {{ (panorama?.vencidoTotal ?? 0) | number:'1.2-2' }}</strong>
+            <strong class="kpi-value">{{ (panorama?.vencidoTotal ?? 0) | currency }}</strong>
             <small class="kpi-meta">não pago, todos os anos</small>
           </div>
         </div>
@@ -365,11 +365,11 @@
               <div class="bill-info-rel">
                 <span class="bill-name-rel">{{ c.vendedorName }}</span>
                 <div class="bill-meta-rel">
-                  <span class="meta-chip-rel">💰 Vendido: R$ {{ c.totalVendido | number:'1.2-2' }}</span>
+                  <span class="meta-chip-rel">💰 Vendido: {{ c.totalVendido | currency }}</span>
                   <span class="meta-chip-rel" *ngIf="c.itens.length > 0">📦 {{ c.itens.length }} produto(s)</span>
                 </div>
               </div>
-              <span class="bill-valor-rel" style="color: var(--color-success);">R$ {{ c.totalComissao | number:'1.2-2' }}</span>
+              <span class="bill-valor-rel" style="color: var(--color-success);">{{ c.totalComissao | currency }}</span>
               <button
                 type="button"
                 class="btn-expandir-vendedor"
@@ -385,9 +385,9 @@
               <li class="vendedor-item-linha" *ngFor="let item of c.itens">
                 <span class="vendedor-item-nome">{{ item.quantidade }}x {{ item.productName }}</span>
                 <span class="vendedor-item-valores">
-                  <span class="meta-chip-rel">R$ {{ item.totalVendido | number:'1.2-2' }} vendido</span>
+                  <span class="meta-chip-rel">{{ item.totalVendido | currency }} vendido</span>
                   <span class="meta-chip-rel">{{ item.percentual | number:'1.0-2' }}%</span>
-                  <span class="meta-chip-rel" style="color: var(--color-success);">R$ {{ item.totalComissao | number:'1.2-2' }} comissão</span>
+                  <span class="meta-chip-rel" style="color: var(--color-success);">{{ item.totalComissao | currency }} comissão</span>
                 </span>
               </li>
             </ul>
@@ -470,7 +470,7 @@
           </div>
 
           <div class="total-compra-preview" *ngIf="dadosCompra.quantidade > 0 && dadosCompra.novoPrecoCusto > 0">
-            Total da entrada: <strong>R$ {{ (dadosCompra.quantidade * dadosCompra.novoPrecoCusto) | number:'1.2-2' }}</strong>
+            Total da entrada: <strong>{{ (dadosCompra.quantidade * dadosCompra.novoPrecoCusto) | currency }}</strong>
           </div>
 
           <button class="btn-confirmar-compra" (click)="confirmarCompra()">💰 REGISTRAR ENTRADA</button>
@@ -502,7 +502,7 @@
             <span class="prod-title">{{ p.title }}</span>
             <span class="prod-details">
               Estoque: <strong>{{ p.stock }}{{ p.soldByWeight ? ' kg' : '' }}</strong> |
-              Venda: R$ {{ p.sellPrice | number:'1.2-2' }}{{ p.soldByWeight ? ' /kg' : '' }}
+              Venda: {{ p.sellPrice | currency }}{{ p.soldByWeight ? ' /kg' : '' }}
             </span>
           </div>
 
@@ -816,7 +816,7 @@
               <span class="meta-badge">
                 💳 {{ item.paymentMethod ? paymentMethodLabel(item.paymentMethod) : '—' }}<ng-container *ngIf="item.installments && item.installments > 1"> · {{ item.installments }}x</ng-container>
               </span>
-              <span class="meta-badge valor-badge historico-valor">R$ {{ item.total | number:'1.2-2' }}</span>
+              <span class="meta-badge valor-badge historico-valor">{{ item.total | currency }}</span>
             </div>
           </div>
         </div>
@@ -897,8 +897,8 @@
             </ul>
 
             <div class="pedido-historico-total">
-              <span class="pedido-historico-frete" *ngIf="pedido.shippingCost > 0">Frete: R$ {{ pedido.shippingCost | number:'1.2-2' }}</span>
-              <strong>Total: R$ {{ pedido.total | number:'1.2-2' }}</strong>
+              <span class="pedido-historico-frete" *ngIf="pedido.shippingCost > 0">Frete: {{ pedido.shippingCost | currency }}</span>
+              <strong>Total: {{ pedido.total | currency }}</strong>
             </div>
           </div>
         </ng-container>
@@ -925,7 +925,7 @@
             <span class="receber-mes-meta">#{{ m.orderNumber }} · {{ m.data | date:'dd/MM/yyyy' }}</span>
           </div>
           <span class="mov-tipo" [ngClass]="m.tipo">{{ tipoMovimentoLabel(m.tipo) }}</span>
-          <strong class="receber-mes-valor">R$ {{ m.amount | number:'1.2-2' }}</strong>
+          <strong class="receber-mes-valor">{{ m.amount | currency }}</strong>
         </li>
       </ul>
     </div>
@@ -975,7 +975,7 @@
                       <td><span class="origem-tag" [ngClass]="v.origem">{{ origemVendaLabel(v.origem) }}</span></td>
                       <td>{{ v.clienteNome }}</td>
                       <td>{{ v.formaPagamentoLabel }}</td>
-                      <td class="num">R$ {{ v.valor | number:'1.2-2' }}</td>
+                      <td class="num">{{ v.valor | currency }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1000,7 +1000,7 @@
                     <tr *ngFor="let c of porProduto.porCliente">
                       <td>{{ c.nome }}</td>
                       <td class="num">{{ c.qtdVendas }}</td>
-                      <td class="num">R$ {{ c.valor | number:'1.2-2' }}</td>
+                      <td class="num">{{ c.valor | currency }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1027,8 +1027,8 @@
                     <span class="selo-sem-custo" *ngIf="l.custoZero">Sem custo</span>
                   </td>
                   <td class="num">{{ l.quantidade | number:'1.0-3' }} {{ l.porPeso ? 'kg' : 'un' }}</td>
-                  <td class="num">R$ {{ l.custoUnitarioMedio | number:'1.2-2' }}</td>
-                  <td class="num">R$ {{ l.custoTotal | number:'1.2-2' }}</td>
+                  <td class="num">{{ l.custoUnitarioMedio | currency }}</td>
+                  <td class="num">{{ l.custoTotal | currency }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1046,9 +1046,9 @@
               <tbody>
                 <tr *ngFor="let l of linhasLucro">
                   <td>{{ l.nome }}</td>
-                  <td class="num">R$ {{ l.faturamento | number:'1.2-2' }}</td>
-                  <td class="num">R$ {{ l.custo | number:'1.2-2' }}</td>
-                  <td class="num" [class.negativo]="l.lucro < 0">R$ {{ l.lucro | number:'1.2-2' }}</td>
+                  <td class="num">{{ l.faturamento | currency }}</td>
+                  <td class="num">{{ l.custo | currency }}</td>
+                  <td class="num" [class.negativo]="l.lucro < 0">{{ l.lucro | currency }}</td>
                   <td class="num" [class.negativo]="l.lucro < 0">{{ l.margem | number:'1.0-1' }}%</td>
                 </tr>
               </tbody>
@@ -1059,7 +1059,7 @@
 
       <div class="detalhe-rodape">
         <span class="detalhe-rodape-label">Total</span>
-        <strong class="detalhe-rodape-valor">R$ {{ detalheTotal | number:'1.2-2' }}</strong>
+        <strong class="detalhe-rodape-valor">{{ detalheTotal | currency }}</strong>
       </div>
     </div>
   </div>
@@ -1093,7 +1093,7 @@
       <ul class="pedido-historico-itens detalhe-lancamento-itens">
         <li *ngFor="let i of item.itens">
           <span>{{ i.quantity }}{{ i.soldByWeight ? 'kg' : 'x' }} {{ i.productName }}</span>
-          <span>R$ {{ i.priceAtSale | number:'1.2-2' }} — R$ {{ subtotalItemHistorico(i) | number:'1.2-2' }}</span>
+          <span>{{ i.priceAtSale | currency }} — {{ subtotalItemHistorico(i) | currency }}</span>
         </li>
       </ul>
 
@@ -1104,21 +1104,21 @@
       <div class="balanco-formula detalhe-lancamento-valores">
         <div class="formula-linha">
           <span class="formula-label">Subtotal Produtos</span>
-          <span class="formula-valor">R$ {{ item.itemsTotal | number:'1.2-2' }}</span>
+          <span class="formula-valor">{{ item.itemsTotal | currency }}</span>
         </div>
         <div class="formula-linha" *ngIf="item.origem === 'pedido'">
           <span class="formula-label">Frete</span>
-          <span class="formula-valor" *ngIf="item.deliveryType !== 'pickup'; else semFrete">R$ {{ item.shippingCost | number:'1.2-2' }}</span>
+          <span class="formula-valor" *ngIf="item.deliveryType !== 'pickup'; else semFrete">{{ item.shippingCost | currency }}</span>
           <ng-template #semFrete><span class="formula-valor">Retirada — sem frete</span></ng-template>
         </div>
         <div class="formula-separador"></div>
         <div class="formula-linha formula-resultado">
           <span class="formula-label">Total Pago</span>
-          <span class="formula-valor">R$ {{ item.total | number:'1.2-2' }}</span>
+          <span class="formula-valor">{{ item.total | currency }}</span>
         </div>
         <div class="formula-linha">
           <span class="formula-label">Custo dos Produtos</span>
-          <span class="formula-valor negativo">− R$ {{ custoHistoricoItem(item) | number:'1.2-2' }}</span>
+          <span class="formula-valor negativo">− {{ custoHistoricoItem(item) | currency }}</span>
         </div>
         <div
           class="formula-linha formula-resultado"
@@ -1126,7 +1126,7 @@
           [class.negativo]="lucroHistoricoItem(item) < 0"
         >
           <span class="formula-label">Lucro</span>
-          <span class="formula-valor">R$ {{ lucroHistoricoItem(item) | number:'1.2-2' }}</span>
+          <span class="formula-valor">{{ lucroHistoricoItem(item) | currency }}</span>
         </div>
       </div>
     </div>

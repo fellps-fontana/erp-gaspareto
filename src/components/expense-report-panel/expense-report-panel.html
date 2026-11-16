@@ -18,7 +18,7 @@
             <span class="tag-tipo" [class.tag-producao]="l.type === 'custo_producao'">
               {{ l.rotuloTipo }}
             </span>
-            <strong class="legenda-valor">R$ {{ l.total | number: '1.2-2' }}</strong>
+            <strong class="legenda-valor">{{ l.total | currency }}</strong>
           </li>
         }
       </ul>
