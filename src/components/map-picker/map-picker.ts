@@ -23,7 +23,7 @@ const BRAZIL_FALLBACK_CENTER: google.maps.LatLngLiteral = { lat: -14.235, lng: -
 const BRAZIL_FALLBACK_ZOOM = 4;
 
 // Aceita "lat, lng" (com ou sem espaço, ponto decimal) digitado direto na
-// busca — ex: "-26.978381662252843, -52.72869855561712" — pra centralizar
+// busca — ex: "-27.100123, -52.615456" — pra centralizar
 // sem depender do geocoder, que não resolve coordenadas cruas.
 const LAT_LNG_PATTERN = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
 

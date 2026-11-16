@@ -54,15 +54,15 @@ describe('MapPickerComponent - busca por link/coordenada', () => {
   }
 
   it('aceita o texto do WhatsApp com prefixo "Localização: "', async () => {
-    await search('Localização: https://maps.google.com/?q=-27.079844,-52.635666');
-    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+    await search('Localização: https://maps.google.com/?q=-27.100123,-52.615456');
+    expect(emitted).toEqual([{ lat: -27.100123, lng: -52.615456 }]);
     expect(geocoding.geocode).not.toHaveBeenCalled();
     expect(geocoding.resolveShortMapsLink).not.toHaveBeenCalled();
   });
 
   it('aceita o link puro de maps.google.com com q=lat,lng', async () => {
-    await search('https://maps.google.com/?q=-27.079844,-52.635666');
-    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+    await search('https://maps.google.com/?q=-27.100123,-52.615456');
+    expect(emitted).toEqual([{ lat: -27.100123, lng: -52.615456 }]);
     expect(geocoding.geocode).not.toHaveBeenCalled();
   });
 
@@ -72,18 +72,18 @@ describe('MapPickerComponent - busca por link/coordenada', () => {
   });
 
   it('aceita q=lat,lng(rótulo)', async () => {
-    await search('https://maps.google.com/?q=-27.079844,-52.635666(Cliente)');
-    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+    await search('https://maps.google.com/?q=-27.100123,-52.615456(Cliente)');
+    expect(emitted).toEqual([{ lat: -27.100123, lng: -52.615456 }]);
   });
 
   it('aceita q=lat,lng&z=15', async () => {
-    await search('https://maps.google.com/?q=-27.079844,-52.635666&z=15');
-    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+    await search('https://maps.google.com/?q=-27.100123,-52.615456&z=15');
+    expect(emitted).toEqual([{ lat: -27.100123, lng: -52.615456 }]);
   });
 
   it('ignora ponto final colado na URL do texto', async () => {
-    await search('Localização: https://maps.google.com/?q=-27.079844,-52.635666.');
-    expect(emitted).toEqual([{ lat: -27.079844, lng: -52.635666 }]);
+    await search('Localização: https://maps.google.com/?q=-27.100123,-52.615456.');
+    expect(emitted).toEqual([{ lat: -27.100123, lng: -52.615456 }]);
   });
 
   it('aceita www.google.com.br/maps/@lat,lng', async () => {
