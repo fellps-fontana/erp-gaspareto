@@ -55,3 +55,12 @@ service-account*.json
 
 # Kira task queue (local por branch)
 .kira/
+
+# Variaveis de ambiente (nunca commitar)
+.env
+.env.*
+!.env.example
+
+# Cache local do Firebase Hosting e worktrees do Claude
+.firebase/
+.claude/worktrees/

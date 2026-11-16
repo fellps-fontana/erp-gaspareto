@@ -1,11 +1,11 @@
-# Módulo: Clientes (cadastro e localização)
+# Clientes (cadastro e localização)
 
 ## Visão geral
 
 Cadastro de cliente captura a localização de entrega via mini-mapa (Google
 Maps JavaScript API) em vez de CEP digitado (ViaCEP). O usuário marca a
 posição exata com um pin (clique ou arraste); a geocodificação reversa
-(Google Geocoding API) resolve rua/número/bairro/cidade/uf automaticamente
+(Google Geocoder do Maps JS) resolve rua/número/bairro/cidade/uf automaticamente
 como preview, e tudo é persistido junto de `lat`/`lng` no cliente. A
 geocodificação (direta e reversa) é centralizada num `GeocodingService`
 compartilhado, também usado pela tela de Rotas de entrega.
@@ -46,7 +46,7 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   configurado no Google Cloud Console). `@Input lat/lng/zoom`,
   `@Output positionChange`. Busca por texto no topo recentraliza o mapa
   (via `GeocodingService.geocode`, Nominatim); se o texto digitado casar
-  com o padrão `lat, lng` (ex: `-26.978381662252843, -52.72869855561712`),
+  com o padrão `lat, lng` (ex: `-27.100123, -52.615456`),
   centraliza direto na coordenada e move o pin, sem passar pelo geocoder
   (Nominatim `/search` só resolve endereço em texto, não coordenada crua).
   Sem fallback de centro dedicado: tenta geolocalização do navegador,
@@ -110,7 +110,10 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
     `withTimeout` (5s, um único `AbortController`) cobre o fetch do link
     curto e o fetch + leitura do corpo do geocode; logs só com mensagem
     fixa + `error.name` (a chave vai na query string e nunca chega ao log).
-  - `reverseGeocode(lat, lng)` — Google Geocoding API. Extrai
+  - `reverseGeocode(lat, lng)` — `google.maps.Geocoder` do Maps JS
+    (não a Geocoding REST: ela recusa chave restrita por HTTP referrer).
+    Timeout `REVERSE_GEOCODE_TIMEOUT_MS` (5s); `null` se o Maps não
+    carregou, sem resultado, erro ou timeout. Extrai
     `rua`/`numero`/`bairro`/`cidade`/`uf`/`cep` dos `address_components`
     por `type` (não por ordem do array — a extração itera a lista de tipos
     de prioridade como loop externo, não os componentes, pra não depender
@@ -128,6 +131,12 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   JavaScript API** e **Geocoding API** ativas no Google Cloud Console pro
   projeto dono da chave (as duas são APIs separadas — só uma habilitada
   gera `ApiNotActivatedMapError` no mapa mesmo com a reversa funcionando).
+  A chave é pública por natureza (vai no HTML), então a proteção é no GCP:
+  restrição por HTTP referrer (domínios do Hosting prod/homolog +
+  `localhost:4200`), restrição de API (Maps JavaScript + Geocoding) e cota
+  diária. A function `resolve-maps-short-link` usa outro secret
+  (`GOOGLE_GEOCODING_API_KEY`), que não pode ser restrito por referrer nem
+  por IP (Functions sem IP fixo) — restringir só por API + cota.
 - **`delivery-route.ts`:** só injeta `GeocodingService` em vez de ter
   método privado próprio — resto do comportamento (throttle, montagem da
   URL do Google Maps, haversine) inalterado.
@@ -178,9 +187,8 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   usuário no PR #27: ERP interno). Proteção de custo da Geocoding API fica
   no alerta de orçamento/cota do GCP — revisitar (limite por uid ou App
   Check) se o cadastro de empresa nova ficar aberto ao público.
-- Chave do Google Maps do front (`src/enviroments/`) aceita chamada sem
-  referrer — recomendado restringir por domínio no GCP; se restringir, o
-  secret da function precisa de chave própria restrita por API.
+- Restrição da chave do front por referrer depende de configuração manual
+  no GCP (não versionada) — conferir após o deploy em prod.
 - "lat, lng" digitado cru na busca não passa pela validação de faixa
   (só os links passam) — pré-existente, apontado pelo style no PR #25.
 
