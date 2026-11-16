@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Functions, httpsCallable } from '@angular/fire/functions';
-import { environment } from '../../enviroments/enviroments';
+
+const REVERSE_GEOCODE_TIMEOUT_MS = 5000;
 
 export interface GeocodeResult {
   lat: number;
@@ -21,20 +22,6 @@ interface ResolveMapsShortLinkResult {
   lat?: number;
   lng?: number;
   address?: string;
-}
-
-interface GoogleAddressComponent {
-  long_name: string;
-  short_name: string;
-  types: string[];
-}
-
-interface GoogleGeocodeResponse {
-  status: string;
-  results: Array<{
-    address_components: GoogleAddressComponent[];
-    formatted_address: string;
-  }>;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -106,20 +93,27 @@ export class GeocodingService {
     }
   }
 
+  // Usa o Geocoder do Maps JavaScript API (carregado via <script> no index.html),
+  // que aceita chave restrita por HTTP referrer — a Geocoding REST não aceita.
   async reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodeResult | null> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    try {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${environment.googleMapsApiKey}&language=pt-BR&region=BR`;
-      const res = await fetch(url, { signal: controller.signal });
-      const data: GoogleGeocodeResponse = await res.json();
+    if (typeof google === 'undefined' || !google.maps?.Geocoder) return null;
 
-      if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const timeout = new Promise<null>(resolve => {
+        timer = setTimeout(() => resolve(null), REVERSE_GEOCODE_TIMEOUT_MS);
+      });
+      const response = await Promise.race([
+        geocoder.geocode({ location: { lat, lng }, language: 'pt-BR', region: 'BR' }),
+        timeout
+      ]);
+
+      if (!response || response.results.length === 0) {
         return null;
       }
 
-      const result = data.results[0];
-      const components = result.address_components;
+      const components = response.results[0].address_components;
 
       const rua = this.extractAddressComponent(components, ['route']);
       const numero = this.extractAddressComponent(components, ['street_number']);
@@ -146,7 +140,7 @@ export class GeocodingService {
     }
   }
 
-  private extractAddressComponent(components: GoogleAddressComponent[], types: string[], useShortName: boolean = false): string | undefined {
+  private extractAddressComponent(components: google.maps.GeocoderAddressComponent[], types: string[], useShortName: boolean = false): string | undefined {
     for (const type of types) {
       const match = components.find(c => c.types.includes(type));
       if (match) return useShortName ? match.short_name : match.long_name;
