@@ -46,7 +46,7 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   configurado no Google Cloud Console). `@Input lat/lng/zoom`,
   `@Output positionChange`. Busca por texto no topo recentraliza o mapa
   (via `GeocodingService.geocode`, Nominatim); se o texto digitado casar
-  com o padrão `lat, lng` (ex: `-26.978381662252843, -52.72869855561712`),
+  com o padrão `lat, lng` (ex: `-27.100123, -52.615456`),
   centraliza direto na coordenada e move o pin, sem passar pelo geocoder
   (Nominatim `/search` só resolve endereço em texto, não coordenada crua).
   Sem fallback de centro dedicado: tenta geolocalização do navegador,
