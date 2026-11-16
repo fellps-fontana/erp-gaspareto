@@ -16,7 +16,7 @@
 
       <div class="gastos-total">
         <span>Despesas operacionais</span>
-        <strong>R$ {{ totalOperacional | number: '1.2-2' }}</strong>
+        <strong>{{ totalOperacional | currency }}</strong>
       </div>
 
       @if (operacionais.length === 0) {
@@ -27,7 +27,7 @@
             <li class="gastos-linha">
               <span class="gastos-nome">{{ l.name }}</span>
               <span class="gastos-pct">{{ l.percentual | number: '1.1-1' }}%</span>
-              <strong class="gastos-valor">R$ {{ l.total | number: '1.2-2' }}</strong>
+              <strong class="gastos-valor">{{ l.total | currency }}</strong>
               <span class="gastos-barra">
                 <span class="gastos-barra-fill" [style.width.%]="l.percentual"></span>
               </span>
@@ -39,7 +39,7 @@
       <div class="gastos-cmv">
         <div class="gastos-cmv-topo">
           <span class="gastos-cmv-tag">Já incluso no CMV</span>
-          <strong>R$ {{ totalCustoProducao | number: '1.2-2' }}</strong>
+          <strong>{{ totalCustoProducao | currency }}</strong>
         </div>
         <p class="gastos-cmv-nota">
           Custo de produção (compra de mercadoria, insumos). Apenas informativo: não entra nas
