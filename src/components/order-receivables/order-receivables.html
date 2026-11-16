@@ -2,15 +2,15 @@
   <div class="summary-cards">
     <div class="summary-card overdue">
       <span class="card-label">Vencido</span>
-      <strong class="card-value">{{ aba.vencido | currency:'BRL' }}</strong>
+      <strong class="card-value">{{ aba.vencido | currency }}</strong>
     </div>
     <div class="summary-card month">
       <span class="card-label">Vence este mês</span>
-      <strong class="card-value">{{ aba.venceEsteMes | currency:'BRL' }}</strong>
+      <strong class="card-value">{{ aba.venceEsteMes | currency }}</strong>
     </div>
     <div class="summary-card upcoming">
       <span class="card-label">Próximos</span>
-      <strong class="card-value">{{ aba.proximos | currency:'BRL' }}</strong>
+      <strong class="card-value">{{ aba.proximos | currency }}</strong>
     </div>
   </div>
 
@@ -34,7 +34,7 @@
             <span class="sep">·</span>
             <span>parcela {{ p.k }}/{{ p.n }}</span>
             <span class="sep">·</span>
-            <strong class="amount">{{ p.amount | currency:'BRL' }}</strong>
+            <strong class="amount">{{ p.amount | currency }}</strong>
             <span class="sep">·</span>
             <span class="due" [class.late]="p.diasAtraso > 0">
               {{ p.diasAtraso > 0 ? atrasoLabel(p) : 'vence ' + (p.dueDate | date:'dd/MM') }}

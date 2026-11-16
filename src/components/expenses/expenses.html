@@ -54,14 +54,14 @@
         <span class="card-icone" aria-hidden="true">⏳</span>
         <div class="card-texto">
           <span class="card-label">A pagar no mês</span>
-          <strong class="card-valor">R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong>
+          <strong class="card-valor">{{ grupos.totals.aPagarNoMes | currency }}</strong>
         </div>
       </div>
       <div class="card-resumo">
         <span class="card-icone" aria-hidden="true">✓</span>
         <div class="card-texto">
           <span class="card-label">Pago no mês</span>
-          <strong class="card-valor">R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong>
+          <strong class="card-valor">{{ grupos.totals.pagoNoMes | currency }}</strong>
         </div>
       </div>
       <div class="card-resumo">
@@ -69,7 +69,7 @@
         <div class="card-texto">
           <span class="card-label">Vencidas</span>
           <strong class="card-valor" [class.valor-vencida]="grupos.totals.vencidas > 0"
-            >R$ {{ grupos.totals.vencidas | number: '1.2-2' }}</strong
+            >{{ grupos.totals.vencidas | currency }}</strong
           >
         </div>
       </div>
@@ -77,7 +77,7 @@
         <span class="card-icone" aria-hidden="true">Σ</span>
         <div class="card-texto">
           <span class="card-label">Total do mês</span>
-          <strong class="card-valor">R$ {{ totalDoMes | number: '1.2-2' }}</strong>
+          <strong class="card-valor">{{ totalDoMes | currency }}</strong>
         </div>
       </div>
     </div>
@@ -96,7 +96,7 @@
               <li *ngFor="let f of fatias">
                 <span class="legenda-bolinha" [style.background]="f.cor"></span>
                 <span class="legenda-nome">{{ f.name }}</span>
-                <span class="legenda-valor">R$ {{ f.total | number: '1.2-2' }}</span>
+                <span class="legenda-valor">{{ f.total | currency }}</span>
                 <span class="legenda-pct">{{ f.percentual | number: '1.0-0' }}%</span>
               </li>
             </ul>
@@ -111,7 +111,7 @@
           <h2 class="alerta-titulo">
             {{ vencidasVisiveis.length }}
             {{ vencidasVisiveis.length === 1 ? 'despesa vencida' : 'despesas vencidas' }} ·
-            <span class="alerta-valor">R$ {{ grupos.totals.vencidas | number: '1.2-2' }}</span>
+            <span class="alerta-valor">{{ grupos.totals.vencidas | currency }}</span>
           </h2>
           <ng-container *ngFor="let e of vencidasVisiveis">
             <ng-container *ngTemplateOutlet="linha; context: { $implicit: e }"></ng-container>
@@ -167,13 +167,13 @@
           </section>
           <div class="lista-rodape">
             <span
-              >Pago <strong>R$ {{ grupos.totals.pagoNoMes | number: '1.2-2' }}</strong></span
+              >Pago <strong>{{ grupos.totals.pagoNoMes | currency }}</strong></span
             >
             <span
-              >A pagar <strong>R$ {{ grupos.totals.aPagarNoMes | number: '1.2-2' }}</strong></span
+              >A pagar <strong>{{ grupos.totals.aPagarNoMes | currency }}</strong></span
             >
             <span
-              >Total <strong>R$ {{ totalDoMes | number: '1.2-2' }}</strong></span
+              >Total <strong>{{ totalDoMes | currency }}</strong></span
             >
           </div>
         </div>
@@ -222,7 +222,7 @@
       </div>
 
       <span class="linha-valor" [class.valor-vencida]="estaVencida(e)"
-        >R$ {{ e.value | number: '1.2-2' }}</span
+        >{{ e.value | currency }}</span
       >
 
       <button
@@ -297,7 +297,7 @@
       <h2>Registrar pagamento</h2>
       <div class="modal-info">
         <strong>{{ despesaParaPagar.description }}</strong>
-        <p>R$ {{ despesaParaPagar.value | number: '1.2-2' }}</p>
+        <p>{{ despesaParaPagar.value | currency }}</p>
       </div>
       <div class="modal-field">
         <label for="data-pagamento">Data do pagamento *</label>

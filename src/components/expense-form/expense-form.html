@@ -120,11 +120,11 @@
 
         <div class="preview span-2" *ngIf="modo === 'parcelada' && previewParcelas.length > 0">
           <p class="preview-titulo">
-            {{ previewParcelas.length }} × R$ {{ previewParcelas[0].value | number: '1.2-2' }}
+            {{ previewParcelas.length }} × {{ previewParcelas[0].value | currency }}
             <span
               *ngIf="previewParcelas[previewParcelas.length - 1].value !== previewParcelas[0].value"
             >
-              (última R$ {{ previewParcelas[previewParcelas.length - 1].value | number: '1.2-2' }})
+              (última {{ previewParcelas[previewParcelas.length - 1].value | currency }})
             </span>
           </p>
           <ul class="preview-lista">
@@ -133,7 +133,7 @@
                 {{ p.installmentNumber }}/{{ p.installmentTotal }} ·
                 {{ p.dueDate | date: 'dd/MM/yyyy' }}
               </span>
-              <span>R$ {{ p.value | number: '1.2-2' }}</span>
+              <span>{{ p.value | currency }}</span>
             </li>
           </ul>
         </div>

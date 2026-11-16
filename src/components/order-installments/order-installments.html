@@ -2,7 +2,7 @@
   <div class="modal-content installments-modal">
     <button type="button" class="modal-fechar" aria-label="Fechar" title="Fechar" (click)="closed.emit()" [disabled]="processing">✕</button>
     <h3>Montar parcelas</h3>
-    <p>Saldo a parcelar: <strong>{{ saldoAlvo | currency:'BRL' }}</strong></p>
+    <p>Saldo a parcelar: <strong>{{ saldoAlvo | currency }}</strong></p>
 
     <div class="installments-mode">
       <button type="button" [class.active]="mode === 'iguais'" (click)="setMode('iguais')">Parcelas iguais</button>
@@ -40,9 +40,9 @@
     </div>
 
     <div class="installments-summary" [class.ok]="resumo.diferenca === 0" [class.off]="resumo.diferenca !== 0">
-      <span>Soma: {{ resumo.soma | currency:'BRL' }} de {{ saldoAlvo | currency:'BRL' }}</span>
-      <strong *ngIf="resumo.diferenca > 0">Faltam {{ resumo.diferenca | currency:'BRL' }}</strong>
-      <strong *ngIf="resumo.diferenca < 0">Excede {{ -resumo.diferenca | currency:'BRL' }}</strong>
+      <span>Soma: {{ resumo.soma | currency }} de {{ saldoAlvo | currency }}</span>
+      <strong *ngIf="resumo.diferenca > 0">Faltam {{ resumo.diferenca | currency }}</strong>
+      <strong *ngIf="resumo.diferenca < 0">Excede {{ -resumo.diferenca | currency }}</strong>
       <strong *ngIf="resumo.diferenca === 0">Fechou com o saldo</strong>
     </div>
 

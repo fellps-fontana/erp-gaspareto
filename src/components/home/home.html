@@ -114,7 +114,7 @@
           >
             <span class="notif-panel__name">{{ aviso.texto }}</span>
             <span class="notif-panel__phone">
-              {{ aviso.valor | currency: 'BRL' }} · vencimento
+              {{ aviso.valor | currency }} · vencimento
               {{ aviso.vencimento | date: 'dd/MM/yyyy' }}
             </span>
           </li>
@@ -141,7 +141,7 @@
                 <span class="notif-panel__due">{{ rotuloVencimento(aviso) }}</span>
               </span>
               <span class="notif-panel__value" [class.notif-panel__value--danger]="aviso.vencida">{{
-                aviso.valor | currency: 'BRL'
+                aviso.valor | currency
               }}</span>
             </a>
           </li>
@@ -158,7 +158,7 @@
                 <span class="notif-panel__due">{{ rotuloVencimento(aviso) }}</span>
               </span>
               <span class="notif-panel__value" [class.notif-panel__value--danger]="aviso.vencida">{{
-                aviso.valor | currency: 'BRL'
+                aviso.valor | currency
               }}</span>
             </a>
           </li>
