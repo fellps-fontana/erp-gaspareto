@@ -131,7 +131,9 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   JavaScript API** e **Geocoding API** ativas no Google Cloud Console pro
   projeto dono da chave (as duas são APIs separadas — só uma habilitada
   gera `ApiNotActivatedMapError` no mapa mesmo com a reversa funcionando).
-  A chave é pública por natureza (vai no HTML), então a proteção é no GCP:
+  A chave pertence ao projeto GCP `projetosfelipe-9e458` (criada em
+  2026-11-16; a anterior era de outra conta Google e não podia ser
+  restringida). É pública por natureza (vai no HTML), então a proteção é no GCP:
   restrição por HTTP referrer (domínios do Hosting prod/homolog +
   `localhost:4200`), restrição de API (Maps JavaScript + Geocoding) e cota
   diária. A function `resolve-maps-short-link` usa outro secret
@@ -187,8 +189,10 @@ Ver `.claude/context/regra-de-negocio.md` seção 9 (Clientes) e seção 6
   usuário no PR #27: ERP interno). Proteção de custo da Geocoding API fica
   no alerta de orçamento/cota do GCP — revisitar (limite por uid ou App
   Check) se o cadastro de empresa nova ficar aberto ao público.
-- Restrição da chave do front por referrer depende de configuração manual
-  no GCP (não versionada) — conferir após o deploy em prod.
+- Restrição da chave do front (referrer + APIs) é configuração manual no
+  GCP, não versionada — ao adicionar domínio novo, incluir na chave.
+- A chave anterior (`…WL98`, outra conta Google) segue no histórico git e
+  ativa sem restrição; não está mais no código.
 - "lat, lng" digitado cru na busca não passa pela validação de faixa
   (só os links passam) — pré-existente, apontado pelo style no PR #25.
 
