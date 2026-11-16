@@ -23,7 +23,7 @@
           </div>
 
           <h3>{{ p.title }}</h3>
-          <p>R$ {{ p.sellPrice | number:'1.2-2' }}{{ p.soldByWeight ? ' /kg' : '' }}</p>
+          <p>{{ p.sellPrice | currency }}{{ p.soldByWeight ? ' /kg' : '' }}</p>
         </div>
       </div>
     </div>
@@ -50,8 +50,8 @@
 
           <div class="item-info">
             <strong>{{ item.productName }}</strong>
-            <small *ngIf="!item.soldByWeight">{{ item.quantity }} un. x R$ {{ item.priceAtSale | number:'1.2-2' }}</small>
-            <small *ngIf="item.soldByWeight">R$ {{ item.priceAtSale | number:'1.2-2' }} /kg</small>
+            <small *ngIf="!item.soldByWeight">{{ item.quantity }} un. x {{ item.priceAtSale | currency }}</small>
+            <small *ngIf="item.soldByWeight">{{ item.priceAtSale | currency }} /kg</small>
             <div *ngIf="item.soldByWeight" class="peso-row">
               <input type="number" class="peso-input" [ngModel]="item.quantity"
                 (ngModelChange)="onPesoInputChange(item, $event)" step="0.001" min="0.001"
@@ -61,7 +61,7 @@
           </div>
 
           <div class="item-total">
-            R$ {{ totalLinha(item) | number:'1.2-2' }}
+            {{ totalLinha(item) | currency }}
           </div>
         </div>
       </div>
@@ -69,7 +69,7 @@
       <div class="cart-footer">
         <div class="total-row">
           <span>TOTAL</span>
-          <span>R$ {{ total | number:'1.2-2' }}</span>
+          <span>{{ total | currency }}</span>
         </div>
         <button class="btn-checkout" (click)="openCheckout()" [disabled]="cart.length === 0 || isLoadingProducts">
           {{ isLoadingProducts ? 'Sincronizando...' : 'CONFIRMAR PEDIDO' }}
@@ -102,7 +102,7 @@
         <!-- Passo 2: Seleção de Pagamento -->
         <ng-container *ngIf="checkoutStep === 'payment-method'">
           <h2>Finalizar Pagamento</h2>
-          <p class="total-destaque">Total: R$ {{ (comandaBeingPaid ? comandaBeingPaid.total : total) | number:'1.2-2' }}
+          <p class="total-destaque">Total: {{ (comandaBeingPaid ? comandaBeingPaid.total : total) | currency }}
           </p>
 
           <div class="payment-options">
@@ -124,7 +124,7 @@
             </div>
             <div class="change-row" *ngIf="change > 0">
               <span>Troco:</span>
-              <strong>R$ {{ change | number:'1.2-2' }}</strong>
+              <strong>{{ change | currency }}</strong>
             </div>
           </div>
         </ng-container>
@@ -140,7 +140,7 @@
             <button *ngFor="let c of openComandas; trackBy: trackByComandaId" class="comanda-select-btn"
               [class.selected]="selectedComanda?.id === c.id" (click)="selectComanda(c)">
               <strong>{{ c.customerName }}</strong>
-              <span>R$ {{ c.total | number:'1.2-2' }}</span>
+              <span>{{ c.total | currency }}</span>
             </button>
 
             <button class="comanda-select-btn new" (click)="setStep('new-comanda')">
@@ -192,7 +192,7 @@
           <div class="comanda-item" (click)="toggleComandaItems(c.id!)">
             <div class="c-info">
               <strong>{{ c.customerName }}</strong>
-              <small>{{ c.items?.length || 0 }} itens • R$ {{ (c.total || 0) | number:'1.2-2' }}</small>
+              <small>{{ c.items?.length || 0 }} itens • {{ (c.total || 0) | currency }}</small>
             </div>
             <div class="c-actions">
               <span class="chevron" [class.up]="expandedComandaId === c.id">▼</span>
@@ -213,7 +213,7 @@
           <div class="comanda-items-detail" *ngIf="expandedComandaId === c.id">
             <div *ngFor="let item of c.items" class="c-detail-row">
               <span>{{ qtyLabel(item) }} {{ item.productName }}</span>
-              <span>R$ {{ item.priceAtSale | number:'1.2-2' }}{{ item.soldByWeight ? ' /kg' : '' }}</span>
+              <span>{{ item.priceAtSale | currency }}{{ item.soldByWeight ? ' /kg' : '' }}</span>
             </div>
           </div>
         </div>
@@ -230,7 +230,7 @@
         <span style="font-size: 1.5rem;">🛒</span>
 
         <span *ngIf="total > 0" class="fab-price">
-          R$ {{ total | number:'1.0-0' }}
+          {{ total | currency:'BRL':'symbol':'1.0-0' }}
         </span>
       </button>
     </div>

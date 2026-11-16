@@ -79,7 +79,7 @@
           </span>
           <span class="order-items">
             {{ order.items.length }} iten{{ order.items.length !== 1 ? 's' : '' }}
-            · R$ {{ order.total | number:'1.2-2' }}
+            · {{ order.total | currency }}
           </span>
         </div>
       </label>

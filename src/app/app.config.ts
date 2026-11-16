@@ -1,4 +1,6 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, isDevMode } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import localePt from '@angular/common/locales/pt';
+import { ApplicationConfig, DEFAULT_CURRENCY_CODE, LOCALE_ID, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, isDevMode } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
 import { provideFirestore, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
@@ -8,6 +10,8 @@ import { provideServiceWorker } from '@angular/service-worker';
 import { environment } from '../enviroments/enviroments';
 import { getAuth, provideAuth, connectAuthEmulator } from '@angular/fire/auth';
 import { getFunctions, provideFunctions, connectFunctionsEmulator } from '@angular/fire/functions';
+
+registerLocaleData(localePt);
 
 // Conecta nos emuladores locais SOMENTE em dev mode + flag explicita
 // (environment.useEmulator) -- nunca em build de producao, mesmo que a
@@ -25,6 +29,8 @@ const emulatorHost = typeof window !== 'undefined' ? window.location.hostname : 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    { provide: LOCALE_ID, useValue: 'pt-BR' },
+    { provide: DEFAULT_CURRENCY_CODE, useValue: 'BRL' },
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideServiceWorker('ngsw-worker.js', {
